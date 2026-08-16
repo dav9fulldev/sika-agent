@@ -1,0 +1,60 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugin-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+
+# Android
+mobile/android/.gradle/
+mobile/android/captures/
+mobile/android/gradlew
+mobile/android/gradlew.bat
+mobile/android/local.properties
+mobile/android/app/build/
+mobile/android/app/libs/
+*.apk
+*.aab
+
+# Google Cloud / Credentials
+service-account*.json
+gcp-key*.json
+*.pem
+*.crt
+
+# Flutter generated
+mobile/.flutter-plugins-dependencies
+
+# JVM / Android Studio memory dumps
+*.hprof

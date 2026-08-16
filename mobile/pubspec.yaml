@@ -1,0 +1,36 @@
+name: sika_assistant_mobile
+description: SIKA — Application et SDK Assistant Vocal Intelligent
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # État
+  flutter_riverpod: ^2.4.9
+
+  # Réseau & Stockage local
+  http: ^1.1.2
+  shared_preferences: ^2.2.2
+
+  # Services Android & Permissions
+  permission_handler: ^11.1.0
+
+  # SIKA AI & Voice (STT / TTS / UI)
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.2
+  avatar_glow: ^3.0.1
+
+  # Utilitaires
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
