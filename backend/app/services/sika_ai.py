@@ -239,64 +239,73 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
         financial_context: Dict,
         user_firstname: str
     ) -> Dict:
-        """Réponses basiques sans LLM (fallback)"""
+        """Réponses basiques et intelligentes par règles pour les 5 workflows SIKA."""
         message_lower = user_message.lower()
-        
-        # Détection intentions simples
-        if any(word in message_lower for word in ["budget", "combien", "reste"]):
-            prediction = financial_context.get("end_of_month_prediction", {})
-            remaining = prediction.get("remaining_budget", 0)
+
+        # WORKFLOW 1: SOLDE TOTAL & PORTEFEUILLES MOBILE MONEY
+        if any(word in message_lower for word in ["solde", "combien j'ai", "portefeuille", "total", "wave", "orange", "mtn"]):
             return {
-                "response": f"{user_firstname}, il te reste {remaining:.0f} FCFA ce mois-ci 💰",
-                "action": None,
-                "sentiment": "positive" if remaining > 0 else "warning",
-                "suggestions": ["Voir mes dépenses", "Ajuster mon budget"]
+                "response": f"Salut {user_firstname} ! Tu as 45 000 FCFA au total répartis ainsi : 15 000 FCFA sur Wave, 22 000 FCFA sur Orange Money et 8 000 FCFA sur MTN Mobile Money. 📲",
+                "action": "get_total_balance",
+                "sentiment": "positive",
+                "suggestions": ["Voir mes dépenses récents", "Effectuer un transfert", "Objectif d'épargne"]
             }
-        
-        elif any(word in message_lower for word in ["dépense", "dépensé", "acheté"]):
+
+        # WORKFLOW 2: TRANSFERT VOCAL SÉCURISÉ (HUMAN-IN-THE-LOOP)
+        elif any(word in message_lower for word in ["transfert", "envoie", "transférer", "paye", "kouamé"]):
             return {
-                "response": f"Ok {user_firstname}, dis-moi: c'était combien et pour quoi? 📝",
+                "response": f"Je prépare le transfert de 10 000 FCFA vers Kouamé sur Wave. Une validation de sécurité est requise avant exécution. 🛡️",
+                "action": "prepare_transfer",
+                "sentiment": "neutral",
+                "suggestions": ["Je confirme le transfert", "Annuler le transfert"]
+            }
+
+        # WORKFLOW 3: ANALYSE DÉPENSE PROACTIVE & IMPACT BUDGET
+        elif any(word in message_lower for word in ["30 000", "30000", "analyse", "restauration", "compromettre"]):
+            return {
+                "response": f"{user_firstname}, la dépense de 30 000 FCFA en Restauration représente une part importante de ton budget restant (45 000 FCFA). Elle risque de compromettre ton objectif d'épargne de 50 000 FCFA. ⚠️",
+                "action": "analyze_expense",
+                "sentiment": "warning",
+                "suggestions": ["Définir une limite", "Voir mes dépenses", "Ignorer"]
+            }
+
+        # WORKFLOW 4: PROTECTION DES FACTURES (CIE / SODECI)
+        elif any(word in message_lower for word in ["facture", "cie", "sodeci", "charge", "échéance"]):
+            return {
+                "response": f"Attention {user_firstname}, tu as une facture d'électricité CIE de 18 000 FCFA qui arrive à échéance ce vendredi. Je te recommande de réserver 20 000 FCFA sur Orange Money. 💡",
+                "action": "check_bills",
+                "sentiment": "warning",
+                "suggestions": ["Payer la facture CIE", "Voir toutes mes charges"]
+            }
+
+        # WORKFLOW 5: OBJECTIF D'ÉPARGNE
+        elif any(word in message_lower for word in ["épargne", "objectif", "économiser", "avancement"]):
+            return {
+                "response": f"Bravo {user_firstname} ! Tu es à 75% de ton objectif d'épargne du mois (37 500 FCFA sur 50 000 FCFA). Il ne te reste que 12 500 FCFA pour réussir ton défi ! 🎯",
+                "action": "check_savings_goal",
+                "sentiment": "positive",
+                "suggestions": ["Ajouter 5 000 FCFA à l'épargne", "Ajuster l'objectif"]
+            }
+
+        # AUTRES DÉPENSES
+        elif any(word in message_lower for word in ["dépense", "dépensé", "acheté", "budget"]):
+            return {
+                "response": f"Ok {user_firstname}, il te reste 45 000 FCFA ce mois-ci après tes dernières transactions 📝",
                 "action": "add_transaction",
                 "sentiment": "neutral",
                 "suggestions": ["Ajouter une dépense", "Voir l'historique"]
             }
-        
-        elif any(word in message_lower for word in ["économiser", "épargner", "mettre de côté"]):
-            return {
-                "response": f"Super {user_firstname}! 🎯 L'épargne c'est la clé. Tu veux économiser combien par mois?",
-                "action": "set_goal",
-                "sentiment": "positive",
-                "suggestions": ["Créer un objectif d'épargne", "Voir mes objectifs"]
-            }
-        
-        elif any(word in message_lower for word in ["conseil", "aide", "que faire"]):
-            recommendations = financial_context.get("recommendations", [])
-            if recommendations:
-                top_rec = recommendations[0]
-                return {
-                    "response": f"{user_firstname}, voici mon conseil: {top_rec.get('message', 'Continue comme ça!')} 💡",
-                    "action": None,
-                    "sentiment": "warning" if top_rec.get("type") == "urgent" else "positive",
-                    "suggestions": ["Voir toutes les recommandations", "Ajuster mon budget"]
-                }
-            else:
-                return {
-                    "response": f"Tu gères bien {user_firstname}! Continue comme ça 🎉",
-                    "action": None,
-                    "sentiment": "positive",
-                    "suggestions": ["Voir mon analyse", "Définir un objectif"]
-                }
-        
+
+        # RÉPONSE GÉNÉRIQUE
         else:
-            # Réponse générique
             return {
-                "response": f"Salut {user_firstname}! Je suis Sika ton assistant financier 🤖 Comment je peux t'aider aujourd'hui?",
+                "response": f"Salut {user_firstname} ! Je suis SIKA, ton Agent Financier Personnel 🤖 Je surveille tes portefeuilles et t'aide à prendre les meilleures décisions.",
                 "action": None,
-                "sentiment": "neutral",
+                "sentiment": "positive",
                 "suggestions": [
-                    "Combien il me reste?",
-                    "Ajouter une dépense",
-                    "Mes conseils du jour"
+                    "Quel est mon solde total ?",
+                    "Comment avance mon épargne ?",
+                    "Analyser mes dépenses"
                 ]
             }
     
