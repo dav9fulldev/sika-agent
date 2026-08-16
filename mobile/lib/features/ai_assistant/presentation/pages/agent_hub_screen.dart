@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/agent_orb_widget.dart';
 import '../widgets/proactive_alert_card.dart';
+import '../widgets/proactive_analysis_sheet.dart';
 import '../widgets/human_confirmation_card.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
@@ -35,6 +36,22 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
     notifier.sendTextMessage(query);
     _inputController.clear();
     widget.onOpenChat();
+  }
+
+  void _openAnalysisSheet(SikaNotifier notifier) {
+    ProactiveAnalysisSheet.show(
+      context,
+      onDismiss: () {
+        setState(() => _showAlert = false);
+      },
+      onViewExpenses: () {
+        widget.onOpenInsights();
+      },
+      onSetLimit: () {
+        notifier.sendTextMessage('Définir une limite de budget sur la restauration.');
+        widget.onOpenChat();
+      },
+    );
   }
 
   @override
@@ -112,10 +129,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                       ProactiveAlertCard(
                         message:
                             'Une dépense de 30 000 FCFA vient d\'être détectée. D\'après tes dépenses récentes et ton objectif d\'épargne, cette dépense risque de compromettre ton objectif du mois.',
-                        onExamine: () {
-                          sikaNotifier.sendTextMessage('Analyse la dépense de 30 000 FCFA détectée.');
-                          widget.onOpenChat();
-                        },
+                        onExamine: () => _openAnalysisSheet(sikaNotifier),
                         onDismiss: () {
                           setState(() => _showAlert = false);
                         },
