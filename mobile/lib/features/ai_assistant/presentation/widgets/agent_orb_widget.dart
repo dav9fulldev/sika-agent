@@ -19,26 +19,26 @@ class AgentOrbWidget extends StatelessWidget {
       case SikaState.processing:
         return const Color(0xFF6366F1); // Indigo / Thinking
       case SikaState.speaking:
-        return const Color(0xFF3B82F6); // Electric Blue
+        return const Color(0xFF38BDF8); // Cyan
       case SikaState.error:
         return const Color(0xFFEF4444); // Red error
       case SikaState.idle:
-        return const Color(0xFF0EA5E9); // Cyan / Blue
+        return const Color(0xFF3B82F6); // Soft Blue
     }
   }
 
-  String _getOrbText() {
+  String _getStatusText() {
     switch (state) {
       case SikaState.listening:
-        return '◉ Listening...';
+        return 'Listening...';
       case SikaState.processing:
-        return '✦ SIKA is analyzing...';
+        return 'Analyzing your financial context...';
       case SikaState.speaking:
-        return '🔊 SIKA is responding...';
+        return 'SIKA is responding...';
       case SikaState.error:
-        return '⚠️ Connection issue';
+        return 'Connection issue';
       case SikaState.idle:
-        return '« Dis Sika... »';
+        return 'Tap to speak or say "Sika"';
     }
   }
 
@@ -58,41 +58,54 @@ class AgentOrbWidget extends StatelessWidget {
             duration: const Duration(milliseconds: 2000),
             repeat: true,
             child: Material(
-              elevation: 12,
+              elevation: 8,
               shape: const CircleBorder(),
               color: Colors.transparent,
               child: Container(
-                width: 140,
-                height: 140,
+                width: 150,
+                height: 150,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      orbColor.withValues(alpha: 0.9),
-                      orbColor.withValues(alpha: 0.4),
-                      const Color(0xFF0F172A),
+                      orbColor.withValues(alpha: 0.85),
+                      orbColor.withValues(alpha: 0.35),
+                      const Color(0xFF1E293B),
                     ],
-                    stops: const [0.3, 0.7, 1.0],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: orbColor.withValues(alpha: 0.5),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: orbColor.withValues(alpha: 0.4),
+                      blurRadius: 36,
+                      spreadRadius: 6,
                     ),
                   ],
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 2,
+                  ),
                 ),
                 child: Center(
-                  child: Icon(
-                    state == SikaState.listening
-                        ? Icons.mic
-                        : state == SikaState.processing
-                            ? Icons.auto_awesome
-                            : state == SikaState.speaking
-                                ? Icons.volume_up
-                                : Icons.graphic_eq,
-                    size: 56,
-                    color: Colors.white,
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      state == SikaState.listening
+                          ? Icons.mic
+                          : state == SikaState.processing
+                              ? Icons.auto_awesome
+                              : state == SikaState.speaking
+                                  ? Icons.volume_up
+                                  : Icons.mic_none_rounded,
+                      size: 42,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -103,13 +116,13 @@ class AgentOrbWidget extends StatelessWidget {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: Text(
-            _getOrbText(),
+            _getStatusText(),
             key: ValueKey(state),
             style: TextStyle(
               color: orbColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.3,
             ),
           ),
         ),
