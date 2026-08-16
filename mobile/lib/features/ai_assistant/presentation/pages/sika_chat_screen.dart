@@ -1,0 +1,258 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/sika_provider.dart';
+
+class SikaChatScreen extends ConsumerStatefulWidget {
+  const SikaChatScreen({super.key});
+
+  @override
+  ConsumerState<SikaChatScreen> createState() => _SikaChatScreenState();
+}
+
+class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
+  final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _handleSend(SikaNotifier notifier) {
+    final text = _textController.text.trim();
+    if (text.isNotEmpty) {
+      notifier.sendTextMessage(text);
+      _textController.clear();
+      _scrollToBottom();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sikaData = ref.watch(sikaProvider);
+    final sikaNotifier = ref.read(sikaProvider.notifier);
+
+    _scrollToBottom();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        elevation: 0,
+        title: const Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Color(0xFF10B981),
+              radius: 16,
+              child: Text('🤖', style: TextStyle(fontSize: 16)),
+            ),
+            SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SIKA Conversation',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Agent Active & Contextual',
+                  style: TextStyle(
+                    color: Color(0xFF10B981),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            onPressed: () => sikaNotifier.clearConversation(),
+            tooltip: 'Nouvelle conversation',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // USER-FRIENDLY AGENT REASONING STATE BANNER
+          if (sikaData.state == SikaState.processing)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: const Color(0xFF1E293B),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    '✦ Analyzing your financial context...',
+                    style: TextStyle(
+                      color: Color(0xFF38BDF8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // MESSAGES LIST
+          Expanded(
+            child: sikaData.messages.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: sikaData.messages.length,
+                    itemBuilder: (context, index) {
+                      final message = sikaData.messages[index];
+                      return _buildChatBubble(message);
+                    },
+                  ),
+          ),
+
+          // INPUT BAR
+          _buildInputBar(sikaData, sikaNotifier),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF334155)),
+              ),
+              child: const Text('💬', style: TextStyle(fontSize: 40)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Pose une question à SIKA',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '« Est-ce que je peux dépenser 15 000 FCFA aujourd\'hui ? »',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatBubble(SikaMessage message) {
+    final isUser = message.isUser;
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          color: isUser ? const Color(0xFF10B981) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isUser ? 16 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 16),
+          ),
+          border: Border.all(
+            color: isUser ? const Color(0xFF059669) : const Color(0xFF334155),
+          ),
+        ),
+        child: Text(
+          message.text,
+          style: TextStyle(
+            color: isUser ? Colors.white : const Color(0xFFE2E8F0),
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputBar(SikaData data, SikaNotifier notifier) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E293B),
+        border: Border(top: BorderSide(color: Color(0xFF334155))),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(
+              data.state == SikaState.listening ? Icons.mic_off : Icons.mic,
+              color: data.state == SikaState.listening
+                  ? const Color(0xFFEF4444)
+                  : const Color(0xFF10B981),
+            ),
+            onPressed: () => notifier.toggleListening(),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _textController,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Demande à SIKA...',
+                hintStyle: TextStyle(color: Color(0xFF64748B)),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onSubmitted: (_) => _handleSend(notifier),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send_rounded, color: Color(0xFF10B981)),
+            onPressed: () => _handleSend(notifier),
+          ),
+        ],
+      ),
+    );
+  }
+}
