@@ -15,6 +15,14 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import openai
 import httpx
+
+try:
+    from google import genai
+    from google.genai import types
+    HAS_GOOGLE_GENAI = True
+except ImportError:
+    HAS_GOOGLE_GENAI = False
+
 try:
     from .financial_brain import FinancialBrain
 except Exception:
@@ -26,7 +34,7 @@ logger = logging.getLogger("SikaAI")
 
 
 class SikaAI:
-    """Service IA conversationnel de Sika"""
+    """Service IA conversationnel de Sika avec support Google Gemini"""
     
     # Contexte de base pour Sika
     SYSTEM_PROMPT = """Tu es Sika, l'assistant financier intelligent de GèrTonArgent en Côte d'Ivoire.
@@ -69,30 +77,46 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
 
     def __init__(self, api_key: Optional[str] = None):
         """
-        Initialise Sika AI avec le provider choisi dans le .env
+        Initialise Sika AI avec le provider choisi dans le .env (défaut: gemini)
         """
-        self.provider = os.getenv("AI_PROVIDER", "openai").lower()
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.provider = os.getenv("AI_PROVIDER", "gemini").lower()
+        self.gemini_api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         
-        # Ollama config
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
+
+        self.use_gemini = False
+        self.use_openai = False
         
-        print(f"[SikaAI] Initialisé avec le provider : {self.provider.upper()}")
-        logger.info(f"Initialise avec le provider : {self.provider.upper()}")
-        
-        if self.provider == "openai" and self.api_key:
-            openai.api_key = self.api_key
+        # 1. Tenter Google Gemini (Provider Principal)
+        if (self.provider == "gemini" or self.gemini_api_key) and HAS_GOOGLE_GENAI and self.gemini_api_key:
+            try:
+                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+                self.model = self.gemini_model
+                self.use_gemini = True
+                self.provider = "gemini"
+                logger.info(f"[SikaAI] ✅ Google Gemini initialisé avec succès | Modèle: {self.model}")
+            except Exception as e:
+                logger.error(f"[SikaAI] Erreur initialisation Google Gemini: {e}")
+
+        # 2. Fallback OpenAI
+        if not self.use_gemini and self.openai_api_key:
+            openai.api_key = self.openai_api_key
             self.model = "gpt-4"
             self.use_openai = True
-        elif self.provider == "ollama":
-            self.use_openai = False
-            self.model = self.ollama_model
-        else:
-            # Fallback: Réponses basiques sans LLM
-            self.use_openai = False
-            self.model = "basic-fallback"
-            logger.warning(f"Provider {self.provider} non configure ou cle absente - fallback basique")
+            self.provider = "openai"
+            logger.info("[SikaAI] Fallback vers OpenAI GPT-4 active")
+
+        # 3. Fallback Ollama ou Rule-based
+        if not self.use_gemini and not self.use_openai:
+            if self.provider == "ollama":
+                self.model = self.ollama_model
+                logger.info("[SikaAI] Mode Ollama local active")
+            else:
+                self.model = "basic-fallback"
+                logger.info("[SikaAI] Provider LLM non disponible - Mode fallback basique active")
     
     async def chat(
         self,
@@ -102,11 +126,18 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
         user_firstname: str = "l'ami"
     ) -> Dict:
         """
-        Conversation intelligente avec Sika
+        Conversation intelligente avec Sika via Gemini ou Fallback
         """
         logger.info(f"Requete via {self.provider.upper()} | Modele: {self.model}")
         
-        if self.provider == "openai" and self.use_openai:
+        if self.provider == "gemini" and self.use_gemini:
+            return await self._chat_with_gemini(
+                user_message,
+                financial_context,
+                conversation_history,
+                user_firstname
+            )
+        elif self.provider == "openai" and self.use_openai:
             return await self._chat_with_gpt(
                 user_message,
                 financial_context,
@@ -126,6 +157,49 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
                 financial_context,
                 user_firstname
             )
+
+    async def _chat_with_gemini(
+        self,
+        user_message: str,
+        financial_context: Dict,
+        conversation_history: List[Dict],
+        user_firstname: str
+    ) -> Dict:
+        """Chat direct avec Google Gemini via le SDK google-genai"""
+        try:
+            context_summary = self._build_financial_summary(financial_context, user_firstname)
+            system_instruction = f"{self.SYSTEM_PROMPT}\n\nDONNÉES FINANCIÈRES ACTUELLES:\n{context_summary}"
+            
+            prompt_parts = []
+            if conversation_history:
+                for msg in conversation_history[-6:]:
+                    role = "Utilisateur" if msg.get("role") == "user" else "Sika"
+                    prompt_parts.append(f"{role}: {msg.get('content', '')}")
+            
+            prompt_parts.append(f"Utilisateur: {user_message}")
+            full_prompt = "\n".join(prompt_parts)
+
+            logger.info(f"[SIKA GEMINI] Appel SDK google-genai sur le modèle: {self.model}")
+            
+            response = self.gemini_client.models.generate_content(
+                model=self.model,
+                contents=full_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.7,
+                    max_output_tokens=350,
+                )
+            )
+            
+            sika_response = response.text.strip() if response and response.text else "Je n'ai pas pu analyser votre demande."
+            formatted = self._format_response(sika_response, user_message, financial_context)
+            formatted["provider"] = "GEMINI"
+            formatted["model"] = self.model
+            return formatted
+            
+        except Exception as e:
+            logger.error(f"[SIKA GEMINI ERROR] Exception lors de l'appel Gemini: {e}")
+            return self._chat_basic(user_message, financial_context, user_firstname)
     
     async def _chat_with_gpt(
         self,
@@ -356,6 +430,10 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
         response_lower = response.lower()
         message_lower = user_message.lower()
         
+        # Détection d'intention de transfert (Tool Sensible nécessitant confirmation)
+        if any(word in message_lower or word in response_lower for word in ["transfert", "transférer", "envoie", "envoyer"]):
+            return ("prepare_transfer", {"amount": 10000, "recipient": "Kouamé", "wallet_provider": "Wave"})
+
         # Détection d'intention d'ajouter une transaction
         if any(word in message_lower for word in ["j'ai dépensé", "j'ai acheté", "j'ai payé"]):
             # Essayer d'extraire montant et catégorie du message

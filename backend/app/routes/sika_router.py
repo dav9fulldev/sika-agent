@@ -61,37 +61,44 @@ def sika_confirm_transaction(data: SikaConfirmTransactionDTO):
         }
     }
 
+from ..agent.orchestrator import sika_orchestrator
+
 # ============================================================================
-# ENDPOINTS TASKMASTER AGENT (PHASE 5 SQUELETTE)
+# ENDPOINTS TASKMASTER AGENT (GOOGLE GEMINI REACT LOOP)
 # ============================================================================
 
 @router.post("/agent/process")
 async def sika_agent_process(data: Dict[str, Any]):
-    """Endpoint principal de traitement de la boucle Agent Taskmaster."""
+    """Endpoint principal de traitement de la boucle Agent Taskmaster alimentée par Google Gemini."""
     user_id = data.get("user_id", 1)
     query = data.get("query", "")
-    return {
-        "status": "PROCESSED",
-        "agent_state": "IDLE",
-        "message": "Squelette de l'agent Taskmaster prêt.",
-        "requires_confirmation": False
-    }
+    return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
 
 @router.post("/agent/confirm")
 async def sika_agent_confirm(data: Dict[str, Any]):
     """Endpoint de validation humaine (Human-in-the-loop) pour l'agent SIKA."""
     action_id = data.get("action_id", "")
     confirmed = data.get("confirmed", False)
+    tool_name = data.get("tool_name", "confirm_transfer")
+    arguments = data.get("arguments", {})
+
+    if confirmed and tool_name:
+        res = sika_orchestrator.execute_tool(tool_name, arguments, user_confirmed=True)
+        return {
+            "status": "CONFIRMED",
+            "action_id": action_id,
+            "applied": True,
+            "result": res.to_dict()
+        }
+
     return {
-        "status": "CONFIRMED" if confirmed else "CANCELLED",
+        "status": "CANCELLED",
         "action_id": action_id,
-        "applied": confirmed
+        "applied": False
     }
 
 @router.post("/events")
 async def sika_ingest_event(data: Dict[str, Any]):
     """Endpoint d'ingestion asynchrone des événements financiers (Passif Mobile Money)."""
-    return {
-        "status": "EVENT_INGESTED",
-        "received": True
-    }
+    user_id = data.get("user_id", 1)
+    return await sika_orchestrator.process_financial_event(user_id=user_id, event_data=data)
