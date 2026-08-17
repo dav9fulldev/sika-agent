@@ -28,7 +28,7 @@ class _SikaMainNavigationPageState
     final sikaNotifier = ref.read(sikaProvider.notifier);
     final bool isListening = sikaData.state == SikaState.listening;
 
-    ref.watch(languageProvider);
+    final currentAppLang = ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
 
     // ÉCOUTEUR DE REDIRECTION AUTOMATIQUE VERS CHAT EN CAS DE TRAITEMENT VOCAL
@@ -67,12 +67,12 @@ class _SikaMainNavigationPageState
         ],
       ),
 
-      // 3. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK)
+      // 3. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK & INTERACTIF)
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: GestureDetector(
         onLongPressStart: (_) async {
           debugPrint('[VOICE NAV] Hold-to-Talk STARTED');
-          await sikaNotifier.startListening();
+          await sikaNotifier.startListening(sttLocale: currentAppLang.sttLocale);
         },
         onLongPressEnd: (_) async {
           debugPrint('[VOICE NAV] Hold-to-Talk ENDED');
@@ -80,7 +80,7 @@ class _SikaMainNavigationPageState
         },
         onTap: () async {
           debugPrint('[VOICE NAV] Voice button tapped');
-          await sikaNotifier.toggleListening();
+          await sikaNotifier.toggleListening(sttLocale: currentAppLang.sttLocale);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
