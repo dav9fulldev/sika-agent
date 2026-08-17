@@ -200,6 +200,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
   Future<void> processUserQuery(String query) async {
     if (query.trim().isEmpty) return;
 
+    final queryLower = query.toLowerCase();
     final userMessage = SikaMessage(text: query, isUser: true);
     final updatedMessages = List<SikaMessage>.from(state.messages)..add(userMessage);
 
@@ -208,6 +209,25 @@ class SikaNotifier extends StateNotifier<SikaData> {
       messages: updatedMessages,
       currentText: null,
     );
+
+    // Voice Confirmation interception
+    if (queryLower.contains('confirme') ||
+        queryLower.contains('valide') ||
+        queryLower.contains('oui') ||
+        queryLower.contains('autorise')) {
+      const confirmText =
+          'D\'accord David, j\'ai dicté les informations. Le transfert de 10 000 FCFA vers ta maman sur Wave est maintenant confirmé !';
+      final sikaMessage = SikaMessage(text: confirmText, isUser: false);
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
+
+      state = state.copyWith(
+        state: SikaState.speaking,
+        messages: finalMessages,
+      );
+
+      await _speak(confirmText);
+      return;
+    }
 
     try {
       debugPrint('[SIKA API] Querying backend: "$query"');

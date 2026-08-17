@@ -9,7 +9,7 @@ class HumanConfirmationCard extends StatelessWidget {
 
   const HumanConfirmationCard({
     super.key,
-    this.actionTitle = 'Transfer Preparation',
+    this.actionTitle = 'Validation requise par l\'humain',
     this.recipientText = 'Kouamé (Wave)',
     this.amountText = '10 000 FCFA',
     required this.onConfirm,
@@ -60,7 +60,7 @@ class HumanConfirmationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Human Confirmation Required',
+                      'Validation requise par l\'humain',
                       style: TextStyle(
                         color: Color(0xFF10B981),
                         fontSize: 14,
@@ -68,7 +68,7 @@ class HumanConfirmationCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Security Validation Required',
+                      'Sika attend votre confirmation pour exécuter l\'action',
                       style: TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 11,
@@ -81,44 +81,52 @@ class HumanConfirmationCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: const Color(0xFF0F172A),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF1E293B)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       actionTitle,
                       style: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 12,
+                        color: Color(0xFF10B981),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      'Recipient: $recipientText',
+                      amountText,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF10B981),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                Text(
-                  amountText,
-                  style: const TextStyle(
-                    color: Color(0xFF10B981),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Divider(color: Color(0xFF1E293B), height: 16),
+                _buildDetailRow('Destinataire', recipientText),
+                const SizedBox(height: 4),
+                _buildDetailRow('Plateforme', 'Wave'),
+                const SizedBox(height: 4),
+                _buildDetailRow('Frais', '0 FCFA'),
               ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            '🎙️ Vous pouvez confirmer en cliquant sur le bouton ou en disant : "Sika, je confirme !"',
+            style: TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
             ),
           ),
           const SizedBox(height: 16),
@@ -134,13 +142,13 @@ class HumanConfirmationCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Cancel'),
+                child: const Text('Annuler'),
               ),
               const SizedBox(width: 10),
               ElevatedButton.icon(
                 onPressed: onConfirm,
                 icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text('Confirm'),
+                label: const Text('Confirmer'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
@@ -155,6 +163,29 @@ class HumanConfirmationCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 12,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

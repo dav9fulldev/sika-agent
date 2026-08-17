@@ -187,26 +187,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
-
-                    // QUICK ACTIONS ROW (Screen 3 from Design Specs)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildQuickActionButton(Icons.send, 'Envoyer', () {
-                          _submitQuery('Préparer un transfert', sikaNotifier);
-                        }),
-                        _buildQuickActionButton(Icons.account_balance_wallet, 'Retirer', () {
-                          _submitQuery('Combien ai-je au total ?', sikaNotifier);
-                        }),
-                        _buildQuickActionButton(Icons.receipt_long, 'Payer', () {
-                          _submitQuery('Voir mes factures à payer', sikaNotifier);
-                        }),
-                        _buildQuickActionButton(Icons.qr_code_scanner, 'Scanner', () {}),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // AGENT ORB HERO
                     AgentOrbWidget(
@@ -415,34 +396,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF334155)),
-            ),
-            child: Icon(icon, color: const Color(0xFF38BDF8), size: 20),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
