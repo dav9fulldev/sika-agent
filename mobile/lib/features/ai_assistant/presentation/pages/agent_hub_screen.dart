@@ -6,6 +6,9 @@ import '../../providers/sika_provider.dart';
 import '../widgets/proactive_alert_card.dart';
 import '../widgets/proactive_analysis_sheet.dart';
 import '../widgets/human_confirmation_card.dart';
+import '../widgets/runway_card_widget.dart';
+import '../widgets/wallet_rebalance_card.dart';
+import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
@@ -172,9 +175,16 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                    // 2. BLOC ÉTAT DE SIKA
+                    // 2. MODULE CŒUR 1: INDICE D'AUTONOMIE FINANCIÈRE (RUNWAY)
+                    const RunwayCardWidget(
+                      totalBalanceFcfa: 45000.0,
+                      dailyBurnRateFcfa: 2500.0,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3. BLOC ÉTAT DE SIKA (ROBOT EN LÉVITATION)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -219,7 +229,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                             ),
                           ),
 
-                          // LE ROBOT ANIMÉ EN LÉVITATION
                           AnimatedBuilder(
                             animation: _robotAnimationController,
                             builder: (context, child) {
@@ -240,7 +249,20 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+
+                    // 4. MODULE CŒUR 2: ÉQUILIBRAGE MULTI-PORTEFEUILLES (AUTO-BALANCER)
+                    WalletRebalanceCard(
+                      onRebalanceConfirmed: () => widget.onOpenChat(),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 5. MODULE CŒUR 3: BOOSTER D'ÉPARGNE AUTONOME
+                    SavingsBoosterCard(
+                      onBoostConfirmed: () => widget.onOpenChat(),
+                    ),
+                    const SizedBox(height: 16),
+
                     // PROACTIVE ALERT BANNER (Si active)
                     if (_showAlert)
                       ProactiveAlertCard(
