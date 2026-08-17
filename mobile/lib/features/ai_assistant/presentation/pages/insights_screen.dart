@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 
 class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
@@ -17,6 +18,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Widget build(BuildContext context) {
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
+
+    ref.watch(currencyProvider);
+    final currNotifier = ref.read(currencyProvider.notifier);
 
     final Map<String, String> periodLabels = {
       'Ce mois': langNotifier.tr('Ce mois', 'This month'),
@@ -76,7 +80,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. LE GRAND BLOC PRINCIPAL DES DÉPENSES TOTALES
+            // 1. LE GRAND BLOC PRINCIPAL DES DÉPENSES TOTALES (CONVERSION DEVISE)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -119,26 +123,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            RichText(
-                              text: const TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: '120 000 ',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: 'FCFA',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              currNotifier.format(120000),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -201,7 +191,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
             const SizedBox(height: 20),
 
-            // 2. LE BLOC DE L'OBJECTIF D'ÉPARGNE
+            // 2. LE BLOC DE L'OBJECTIF D'ÉPARGNE (CONVERSION DEVISE)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -241,26 +231,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      RichText(
-                        text: const TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '80 000 ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'FCFA',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        currNotifier.format(80000),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       const Text(
@@ -288,9 +264,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  const Text(
-                    '48 000 / 80 000 FCFA',
-                    style: TextStyle(
+                  Text(
+                    '${currNotifier.format(48000)} / ${currNotifier.format(80000)}',
+                    style: const TextStyle(
                       color: Color(0xFF10B981),
                       fontSize: 13,
                       fontWeight: FontWeight.w500,

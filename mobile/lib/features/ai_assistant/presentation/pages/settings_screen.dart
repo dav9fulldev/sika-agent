@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/sika_native_service.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +23,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // États pour les switchs de préférences générales
   bool _notificationPrefEnabled = true;
 
+  // DÉCLENCHEMENT DU BOTTOM SHEET DE SÉLECTION DE LANGUE
   void _showLanguageBottomSheet(LanguageNotifier langNotifier, String currentLang) {
     showModalBottomSheet(
       context: context,
@@ -100,11 +102,99 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  // DÉCLENCHEMENT DU BOTTOM SHEET DE SÉLECTION DE DEVISE (AVEC TAUX DE CHANGE)
+  void _showCurrencyBottomSheet(CurrencyNotifier currNotifier, AppCurrency currentCurr, LanguageNotifier langNotifier) {
+    final currencies = [
+      {'code': 'FCFA', 'name': 'Franc CFA (XOF)', 'currency': AppCurrency.fcfa},
+      {'code': 'USD', 'name': 'US Dollar (\$)', 'currency': AppCurrency.usd},
+      {'code': 'EUR', 'name': 'Euro (€)', 'currency': AppCurrency.eur},
+      {'code': 'GBP', 'name': 'British Pound (£)', 'currency': AppCurrency.gbp},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceDarker,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceDarker,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    langNotifier.tr('Choisir la devise', 'Choose Currency'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...currencies.map((item) {
+                final curr = item['currency'] as AppCurrency;
+                final bool isSelected = currentCurr == curr;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF0B1329) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.5) : Colors.transparent,
+                    ),
+                  ),
+                  child: ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      currNotifier.setCurrency(curr);
+                    },
+                    title: Text(
+                      item['name'] as String,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 22)
+                        : null,
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentAppLanguage = ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
     final String currentLang = currentAppLanguage.displayName;
+
+    final currentAppCurrency = ref.watch(currencyProvider);
+    final currNotifier = ref.read(currencyProvider.notifier);
+    final String currentCurrStr = currentAppCurrency.code;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
@@ -183,8 +273,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildActionTile(
             icon: Icons.payments_outlined,
             title: langNotifier.tr('Devise', 'Currency'),
-            trailingText: 'FCFA',
-            onTap: () {},
+            trailingText: currentCurrStr,
+            onTap: () => _showCurrencyBottomSheet(currNotifier, currentAppCurrency, langNotifier),
           ),
 
           const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),

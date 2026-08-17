@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/proactive_alert_card.dart';
 import '../widgets/proactive_analysis_sheet.dart';
@@ -79,6 +80,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
 
+    ref.watch(currencyProvider);
+    final currNotifier = ref.read(currencyProvider.notifier);
+
     return Scaffold(
       backgroundColor: const Color(0xff020614),
       appBar: AppBar(
@@ -118,7 +122,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   children: [
                     const SizedBox(height: 15),
 
-                    // 1. BLOC SOLDE TOTAL
+                    // 1. BLOC SOLDE TOTAL (CONVERTION EN TEMPS RÉEL)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -139,26 +143,12 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                             ),
                           ),
                           const SizedBox(height: 6),
-                          RichText(
-                            text: const TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: '45 000 ',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: 'FCFA',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            currNotifier.format(45000),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -172,11 +162,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           const SizedBox(height: 18),
                           Row(
                             children: [
-                              _buildWalletCard('Wave', '15 000 FCFA', Colors.blue, '🌊'),
+                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, '🌊'),
                               const SizedBox(width: 8),
-                              _buildWalletCard('Orange Money', '22 000 FCFA', Colors.orange, '🍊'),
+                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, '🍊'),
                               const SizedBox(width: 8),
-                              _buildWalletCard('MTN MoMo', '8 000 FCFA', Colors.amber, '🟡'),
+                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, '🟡'),
                             ],
                           ),
                         ],
@@ -254,9 +244,10 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     // PROACTIVE ALERT BANNER (Si active)
                     if (_showAlert)
                       ProactiveAlertCard(
+                        amountText: currNotifier.format(30000),
                         message: langNotifier.tr(
-                          'Une dépense de 30 000 FCFA vient d\'être détectée. Selon vos dépenses récentes et votre objectif d\'épargne, cette dépense consomme deux tiers de votre budget restant.',
-                          'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
+                          'Une dépense de ${currNotifier.format(30000)} vient d\'être détectée. Selon vos dépenses récentes et votre objectif d\'épargne, cette dépense consomme deux tiers de votre budget restant.',
+                          'A ${currNotifier.format(30000)} expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
                         ),
                         onExamine: () => _openAnalysisSheet(sikaNotifier),
                         onDismiss: () {
@@ -269,9 +260,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       HumanConfirmationCard(
                         actionTitle: langNotifier.tr('Préparation du transfert', 'Transfer Preparation'),
                         recipientText: 'Kouamé (Wave)',
-                        amountText: '10 000 FCFA',
+                        amountText: currNotifier.format(10000),
                         onConfirm: () {
-                          sikaNotifier.sendTextMessage(langNotifier.tr('Je confirme le transfert de 10 000 FCFA.', 'I confirm the transfer of 10,000 FCFA.'));
+                          sikaNotifier.sendTextMessage(langNotifier.tr('Je confirme le transfert de ${currNotifier.format(10000)}.', 'I confirm the transfer of ${currNotifier.format(10000)}.'));
                           setState(() => _showConfirmation = false);
                         },
                         onCancel: () {
@@ -433,7 +424,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
               amount,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),
