@@ -3,38 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../../data/services/api_service.dart';
+import '../../../core/services/api_service.dart';
+import '../../../core/models/sika_state_model.dart';
+import '../../../core/models/sika_message_model.dart';
 
+export '../../../core/models/sika_state_model.dart';
+export '../../../core/models/sika_message_model.dart';
 
-// État de Sika
-/// Différents états possibles pour l'assistant Sika.
-/// Guide l'UI pour afficher l'animation appropriée (écoute, traitement, parole).
-enum SikaState {
-  idle, // En attente : prêt à être activé
-  listening, // Écoute en cours : capture de la voix de l'utilisateur
-  processing, // Traitement : appel à l'API IA
-  speaking, // Sika parle : restitution vocale de la réponse
-  error, // Erreur : problème réseau ou vocal
-}
-
-// Message dans la conversation
-class SikaMessage {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-  final Map<String, dynamic>? suggestedTransaction;
-  final bool canAddTransaction;
-
-  SikaMessage({
-    required this.text,
-    required this.isUser,
-    DateTime? timestamp,
-    this.suggestedTransaction,
-    this.canAddTransaction = false,
-  }) : timestamp = timestamp ?? DateTime.now();
-}
-
-// État global de Sika
+// State global de SIKA Agent
 class SikaData {
   final SikaState state;
   final List<SikaMessage> messages;
@@ -67,9 +43,7 @@ class SikaData {
   }
 }
 
-// Provider principal de Sika
-/// Cerveau de l'assistant Sika côté Frontend.
-/// Orchestre la reconnaissance vocale (STT) et la synthèse vocale (TTS).
+// Provider principal de SIKA
 class SikaNotifier extends StateNotifier<SikaData> {
   final ApiService _apiService;
   final SpeechToText _speechToText = SpeechToText();
@@ -82,7 +56,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
     _initializeSika();
   }
 
-  /// Bascule de manière atomique l'état d'écoute avec garde anti-rebond de 1500 ms
   Future<void> toggleListening() async {
     final now = DateTime.now();
     if (_lastListeningToggle != null &&
@@ -101,302 +74,238 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   Future<void> _initializeSika() async {
     try {
-      debugPrint('[SIKA STT] initialize started');
+      await _requestPermissions();
+      await _initSpeechToText();
+      await _initTextToSpeech();
 
-      // Vérification permission micro
-      var micStatus = await Permission.microphone.status;
-      debugPrint('[SIKA VOICE] Permission microphone = $micStatus');
-      if (!micStatus.isGranted) {
-        micStatus = await Permission.microphone.request();
-        debugPrint('[SIKA VOICE] Permission requested result = $micStatus');
-      }
-      debugPrint('[SIKA VOICE] Permission granted = ${micStatus.isGranted}');
-
-      // Initialiser Speech-to-Text
-      _speechEnabled = await _speechToText.initialize(
-        onError: (error) {
-          debugPrint('[SIKA STT] error = $error');
-          if (state.state == SikaState.listening) {
-            if (state.currentText != null && state.currentText!.trim().isNotEmpty) {
-              _processQuery(state.currentText!);
-            } else {
-              debugPrint('[SIKA STT] STT error on emulator (no speech captured): ${error.errorMsg}');
-              state = state.copyWith(
-                state: SikaState.idle,
-                errorMessage: 'Aucun son capturé. Tapez votre message ou vérifiez le micro.',
-              );
-            }
-          }
-        },
-        onStatus: (status) {
-          debugPrint('[SIKA STT] status = $status');
-          if (status == 'done' || status == 'notListening') {
-            if (state.state == SikaState.listening) {
-              if (state.currentText != null && state.currentText!.trim().isNotEmpty) {
-                _processQuery(state.currentText!);
-              } else {
-                state = state.copyWith(state: SikaState.idle);
-              }
-            }
-          }
-        },
-      );
-
-      debugPrint('[SIKA STT] initialize result = $_speechEnabled');
-
-      if (_speechEnabled) {
-        final sysLoc = await _speechToText.systemLocale();
-        debugPrint('[SIKA STT] systemLocale = ${sysLoc?.localeId}');
-        final locs = await _speechToText.locales();
-        debugPrint('[SIKA STT] available locales count = ${locs.length}');
-        for (var l in locs) {
-          debugPrint('[SIKA STT] locale = ${l.localeId} (${l.name})');
-        }
-      }
-
-      // Configurer Text-to-Speech
-      await _flutterTts.setLanguage('fr-FR');
-      await _flutterTts.setSpeechRate(0.5);
-      await _flutterTts.setVolume(1.0);
-      await _flutterTts.setPitch(1.0);
-
-      _flutterTts.setCompletionHandler(() {
-        if (state.state == SikaState.speaking) {
-          state = state.copyWith(state: SikaState.idle);
-        }
-      });
-
-      // Message de bienvenue
-      final welcomeMessage = SikaMessage(
-        text: "Salut ! Je suis Sika, ton assistant financier. "
-            "Appuie sur le micro et parle-moi de tes dépenses !",
-        isUser: false,
-      );
-
-      state = state.copyWith(
-        isInitialized: true,
-        messages: [welcomeMessage],
-      );
-
-      debugPrint('Sika initialized. Speech enabled: $_speechEnabled');
+      state = state.copyWith(isInitialized: true);
+      debugPrint('[SIKA VOICE] SIKA Assistant initialized successfully');
     } catch (e) {
-      debugPrint('Failed to initialize Sika: $e');
+      debugPrint('[SIKA VOICE] Error initializing SIKA: $e');
       state = state.copyWith(
         state: SikaState.error,
-        errorMessage: 'Impossible d\'initialiser Sika',
+        errorMessage: 'Error initializing SIKA: $e',
       );
     }
   }
 
-  // Démarrer l'écoute
-  Future<void> startListening() async {
-    debugPrint('[SIKA VOICE] microphone button pressed');
-    debugPrint('[SIKA VOICE] starting listening');
-
-    if (!_speechEnabled) {
-      debugPrint('[SIKA STT] SpeechToText not enabled, attempting re-initialization');
-      await _initializeSika();
+  Future<void> _requestPermissions() async {
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      throw Exception('Microphone permission denied');
     }
+  }
 
-    if (!_speechEnabled) {
-      debugPrint('[SIKA STT] SpeechToText still disabled after retry');
-      state = state.copyWith(
-        state: SikaState.error,
-        errorMessage: 'La reconnaissance vocale n\'est pas disponible',
-      );
-      return;
-    }
-
-    state = state.copyWith(
-      state: SikaState.listening,
-      currentText: '',
-    );
-    debugPrint('[SIKA VOICE] listening started');
-
-    await _speechToText.listen(
-      onResult: (result) {
-        debugPrint('[SIKA STT] recognizedWords = "${result.recognizedWords}"');
-        debugPrint('[SIKA STT] finalResult = ${result.finalResult}');
-        debugPrint('[SIKA STT] confidence = ${result.confidence}');
-
-        if (result.recognizedWords.isNotEmpty) {
-          state = state.copyWith(
-            currentText: result.recognizedWords,
-          );
-        }
-
-        if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
-          _processQuery(result.recognizedWords);
+  Future<void> _initSpeechToText() async {
+    _speechEnabled = await _speechToText.initialize(
+      onError: (error) {
+        debugPrint('[SIKA STT] Speech error: ${error.errorMsg}');
+        state = state.copyWith(
+          state: SikaState.error,
+          errorMessage: 'Speech error: ${error.errorMsg}',
+        );
+      },
+      onStatus: (status) {
+        debugPrint('[SIKA STT] Speech status: $status');
+        if (status == 'done' || status == 'notListening') {
+          if (state.state == SikaState.listening) {
+            _onSpeechComplete();
+          }
         }
       },
-      listenOptions: SpeechListenOptions(
-        localeId: 'fr_FR',
-        listenMode: ListenMode.dictation,
-        cancelOnError: false,
-        partialResults: true,
-      ),
     );
+
+    if (!_speechEnabled) {
+      debugPrint('[SIKA STT] Speech recognition not available');
+    }
   }
 
-  // Arrêter l'écoute
+  Future<void> _initTextToSpeech() async {
+    await _flutterTts.setLanguage('fr-FR');
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
+
+    _flutterTts.setCompletionHandler(() {
+      debugPrint('[SIKA TTS] TTS playback completed');
+      if (state.state == SikaState.speaking) {
+        state = state.copyWith(state: SikaState.idle);
+      }
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      debugPrint('[SIKA TTS] TTS error: $msg');
+      state = state.copyWith(state: SikaState.idle);
+    });
+  }
+
+  Future<void> startListening() async {
+    if (!_speechEnabled) {
+      debugPrint('[SIKA VOICE] Cannot listen: STT not enabled');
+      await _initializeSika();
+      if (!_speechEnabled) return;
+    }
+
+    try {
+      state = state.copyWith(
+        state: SikaState.listening,
+        currentText: null,
+        errorMessage: null,
+      );
+
+      await _speechToText.listen(
+        onResult: (result) {
+          debugPrint('[SIKA STT] Recognized text: ${result.recognizedWords}');
+          state = state.copyWith(currentText: result.recognizedWords);
+        },
+        listenOptions: SpeechListenOptions(
+          localeId: 'fr_FR',
+          listenFor: const Duration(seconds: 15),
+          pauseFor: const Duration(seconds: 3),
+          cancelOnError: true,
+          partialResults: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[SIKA VOICE] Error starting STT: $e');
+      state = state.copyWith(
+        state: SikaState.error,
+        errorMessage: 'Error starting STT: $e',
+      );
+    }
+  }
+
   Future<void> stopListening() async {
-    debugPrint('[SIKA VOICE] stopListening requested');
-    await _speechToText.stop();
+    if (state.state != SikaState.listening) return;
 
-    if (state.currentText != null && state.currentText!.trim().isNotEmpty) {
-      _processQuery(state.currentText!);
+    try {
+      await _speechToText.stop();
+      _onSpeechComplete();
+    } catch (e) {
+      debugPrint('[SIKA VOICE] Error stopping STT: $e');
+    }
+  }
+
+  void _onSpeechComplete() {
+    final text = state.currentText;
+    if (text != null && text.trim().isNotEmpty) {
+      debugPrint('[SIKA VOICE] Final query: $text');
+      processUserQuery(text);
     } else {
+      debugPrint('[SIKA VOICE] No text recognized');
       state = state.copyWith(state: SikaState.idle);
     }
   }
 
-  /// Traitement manuel d'une requête textuelle.
-  /// Pédagogie : Sika peut être utilisé par clavier si l'environnement est bruyant.
-  Future<void> sendTextMessage(String text) async {
-    if (text.trim().isEmpty) return;
-    await _processQuery(text);
-  }
+  Future<void> processUserQuery(String query) async {
+    if (query.trim().isEmpty) return;
 
-  // Traiter la requête
-  Future<void> _processQuery(String query) async {
-    if (query.trim().isEmpty) {
-      state = state.copyWith(state: SikaState.idle);
-      return;
-    }
-
-    debugPrint('[SIKA VOICE] sending recognized text = "$query"');
-
-    // Ajouter le message de l'utilisateur
     final userMessage = SikaMessage(text: query, isUser: true);
+    final updatedMessages = List<SikaMessage>.from(state.messages)..add(userMessage);
+
     state = state.copyWith(
       state: SikaState.processing,
-      messages: [...state.messages, userMessage],
+      messages: updatedMessages,
       currentText: null,
     );
 
     try {
-      debugPrint('[SIKA API] request sent');
-      // Appeler l'API Sika
+      debugPrint('[SIKA API] Querying backend: "$query"');
       final response = await _apiService.sikaChat(query);
 
-      // Créer le message de réponse
+      final String sikaText = response['response'] ??
+          'Pardon, je n\'ai pas bien compris. Peux-tu répéter ?';
+
+      Map<String, dynamic>? suggestedTx;
+      bool canAddTx = false;
+      if (response['action'] == 'add_transaction' &&
+          response['action_data'] != null) {
+        suggestedTx = Map<String, dynamic>.from(response['action_data']);
+        canAddTx = true;
+      }
+
       final sikaMessage = SikaMessage(
+        text: sikaText,
+        isUser: false,
+        suggestedTransaction: suggestedTx,
+        canAddTransaction: canAddTx,
+      );
+
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
+
+      state = state.copyWith(
+        state: SikaState.speaking,
+        messages: finalMessages,
+      );
+
+      await _speak(sikaText);
+    } catch (e) {
+      debugPrint('[SIKA API] Error processing query: $e');
+
+      final errorMessage = SikaMessage(
         text:
-            response['message'] ?? "Je n'ai pas compris, peux-tu reformuler ?",
-        isUser: false,
-        suggestedTransaction: response['suggested_transaction'],
-        canAddTransaction: response['can_add_transaction'] ?? false,
-      );
-
-      state = state.copyWith(
-        messages: [...state.messages, sikaMessage],
-      );
-
-      // Faire parler Sika
-      await _speak(sikaMessage.text);
-    } catch (e) {
-      debugPrint('Sika API error: $e');
-
-      final errorMessage = SikaMessage(
-        text: "Oups ! Je n'arrive pas à me connecter au serveur. "
-            "Vérifie ta connexion internet.",
+            'Désolé, j\'ai rencontré un problème pour me connecter à mon serveur. Peux-tu réessayer ?',
         isUser: false,
       );
+
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(errorMessage);
 
       state = state.copyWith(
         state: SikaState.error,
-        messages: [...state.messages, errorMessage],
-        errorMessage: e.toString(),
+        messages: finalMessages,
+        errorMessage: 'Error connecting to backend: $e',
       );
+
+      await _speak('Désolé, un problème de connexion est survenu.');
     }
   }
 
-  // Confirmer une transaction suggérée
-  Future<void> confirmTransaction(Map<String, dynamic> transaction) async {
-    state = state.copyWith(state: SikaState.processing);
-
-    try {
-      final response = await _apiService.sikaConfirmTransaction(
-        amount: transaction['amount'],
-        category: transaction['category'],
-        description: transaction['description'],
-      );
-
-      final confirmMessage = SikaMessage(
-        text: response['message'] ?? "Transaction enregistrée !",
-        isUser: false,
-      );
-
-      state = state.copyWith(
-        state: SikaState.idle,
-        messages: [...state.messages, confirmMessage],
-      );
-
-      await _speak(confirmMessage.text);
-    } catch (e) {
-      debugPrint('Transaction confirmation error: $e');
-
-      final errorMessage = SikaMessage(
-        text: "Désolé, je n'ai pas pu enregistrer la transaction. "
-            "Réessaie plus tard.",
-        isUser: false,
-      );
-
-      state = state.copyWith(
-        state: SikaState.error,
-        messages: [...state.messages, errorMessage],
-      );
-    }
-  }
-
-  // Annuler une transaction suggérée
-  void cancelTransaction() {
-    final cancelMessage = SikaMessage(
-      text: "D'accord, j'annule. Dis-moi si tu as besoin d'autre chose !",
-      isUser: false,
-    );
-
-    state = state.copyWith(
-      messages: [...state.messages, cancelMessage],
-    );
-
-    _speak(cancelMessage.text);
-  }
-
-  // Faire parler Sika
   Future<void> _speak(String text) async {
-    state = state.copyWith(state: SikaState.speaking);
-    await _flutterTts.speak(text);
+    try {
+      final cleanText = text
+          .replaceAll(RegExp(r'[^\w\s\d,.\-!?]'), '')
+          .trim();
+
+      if (cleanText.isEmpty) {
+        state = state.copyWith(state: SikaState.idle);
+        return;
+      }
+
+      debugPrint('[SIKA TTS] Speaking: "$cleanText"');
+      await _flutterTts.speak(cleanText);
+    } catch (e) {
+      debugPrint('[SIKA TTS] Error playing TTS: $e');
+      state = state.copyWith(state: SikaState.idle);
+    }
   }
 
-  // Arrêter Sika de parler
-  Future<void> stopSpeaking() async {
-    await _flutterTts.stop();
-    state = state.copyWith(state: SikaState.idle);
+  Future<void> sendTextMessage(String message) async {
+    await processUserQuery(message);
   }
 
-  // Effacer la conversation
   void clearConversation() {
-    final welcomeMessage = SikaMessage(
-      text: "Conversation effacée ! Comment puis-je t'aider ?",
-      isUser: false,
-    );
-
     state = state.copyWith(
-      messages: [welcomeMessage],
       state: SikaState.idle,
+      messages: [],
+      errorMessage: null,
     );
   }
 
-  @override
-  void dispose() {
+  void clearError() {
+    state = state.copyWith(
+      state: SikaState.idle,
+      errorMessage: null,
+    );
+  }
+
+  void reset() {
     _speechToText.cancel();
     _flutterTts.stop();
-    super.dispose();
+    state = const SikaData();
   }
 }
 
-// Provider
 final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
-  return SikaNotifier(ApiService());
+  final apiService = ApiService();
+  return SikaNotifier(apiService);
 });

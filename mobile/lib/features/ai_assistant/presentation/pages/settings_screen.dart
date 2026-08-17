@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../services/sika_native.dart';
+import '../../../../core/services/sika_native_service.dart';
+import '../../../../core/constants/app_colors.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,14 +17,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.surfaceDarker,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: AppColors.surface,
         elevation: 0,
         title: const Text(
           'Agent Settings & Permissions',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -37,7 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(
               'VOICE & WAKE WORD',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: AppColors.textMuted,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
@@ -49,14 +50,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (val) {
               setState(() => _wakeWordEnabled = val);
               if (val) {
-                SikaNative.startSikaService();
+                SikaNativeService.startSikaService();
               } else {
-                SikaNative.stopSikaService();
+                SikaNativeService.stopSikaService();
               }
             },
             title: const Text(
               'Mot-clé "Sika" (Wake Word)',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
             ),
             subtitle: const Text(
               'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',

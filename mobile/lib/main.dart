@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'services/sika_native.dart';
-import 'features/ai_assistant/presentation/pages/sika_page.dart';
+import 'core/services/sika_native_service.dart';
+import 'core/constants/app_theme.dart';
+import 'features/ai_assistant/presentation/pages/sika_main_navigation_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Démarrage du service vocal Sika natif
   try {
-    await SikaNative.startSikaService();
+    await SikaNativeService.startSikaService();
     debugPrint('[SikaMain] ✅ Service Sika natif démarré');
   } catch (e) {
     debugPrint('[SikaMain] ⚠️ Erreur lors du démarrage du service Sika: $e');
@@ -27,13 +27,10 @@ class SikaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sika Assistant',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E40AF)),
-        useMaterial3: true,
-      ),
+      title: 'SIKA Assistant',
+      theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: const SikaPage(),
+      home: const SikaMainNavigationPage(),
     );
   }
 }
