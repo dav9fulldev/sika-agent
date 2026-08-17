@@ -1,21 +1,37 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_images.dart';
+import 'package:paymechap/screens/register_screen.dart';
+
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_images.dart';
+import '../constants/app_colors.dart';
+import '../constants/app_images.dart';
 
 class SplashScreen extends StatefulWidget {
-  final VoidCallback onFinish;
-
-  const SplashScreen({super.key, required this.onFinish});
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  int activeDot = 0;
+  Timer? dotTimer;
+
   @override
   void initState() {
     super.initState();
+
+    dotTimer = Timer.periodic(
+      const Duration(milliseconds: 400),
+          (timer) {
+        setState(() {
+          activeDot = (activeDot + 1) % 3;
+        });
+      },
+    );
+
     checkSession();
   }
 
@@ -37,9 +53,103 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> checkSession() async {
     await Future.delayed(const Duration(seconds: 3));
 
+    final tokenService = TokenService();
+
+    final hasToken = await tokenService.hasToken();
+    final telephone = await tokenService.getTelephone();
+    final state = await tokenService.getOnboardingState();
+
     if (!mounted) return;
 
-    widget.onFinish();
+    switch (state) {
+      case TokenService.stateRegister:
+        if (telephone != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RegisterScreen(
+                telephone: telephone,
+              ),
+            ),
+          );
+          return;
+        }
+        break;
+
+      case TokenService.stateOtp:
+        if (telephone != null && telephone.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OtpCodeScreen(
+                telephone: telephone,
+              ),
+            ),
+          );
+          return;
+        }
+        break;
+
+      case TokenService.stateSecurityCode:
+        if (telephone != null && telephone.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SecurityCodeScreen(
+                telephone: telephone,
+              ),
+            ),
+          );
+          return;
+        }
+        break;
+
+      case TokenService.stateCreatePin:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CreatePinScreen(),
+          ),
+        );
+        return;
+
+      case TokenService.stateBiometric:
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const BiometricSetupScreen(),
+          ),
+        );
+        return;
+
+      case TokenService.stateCompleted:
+        if (hasToken && telephone != null && telephone.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const PinScreen(
+                mode: "unlock",
+                showBackButton: false,
+              ),
+            ),
+          );
+          return;
+        }
+        break;
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PhoneAuthScreen(),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    dotTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -47,39 +157,105 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. BACKGROUND
           Container(
             width: double.infinity,
-            height: double.infinity,
-            color: AppColors.background,
-          ),
-
-          // 2. LOGO — POSITION HAUTE (TIERS SUPÉRIEUR)
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.16,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                AppImages.logo,
-                width: 130,
-                gaplessPlayback: true,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.darkBlue,
+                  AppColors.darkBlue,
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
             ),
           ),
 
-          // 3. WAVE — PARTIE BASSE
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  AppImages.logo,
+                  width: 125,
+                  gaplessPlayback: true,
+                ),
+
+                const SizedBox(height: 25),
+
+                RichText(
+                  text: const TextSpan(
+                    children: [
+                      TextSpan(
+                        text: "Payme ",
+                        style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(
+                        text: "Chap",
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                const Text(
+                  "Simple. Rapide. Sécurisé",
+                  style: TextStyle(
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           Positioned(
-            bottom: 0,
+            bottom: -75,
             left: 0,
             right: 0,
             child: Image.asset(
               AppImages.wave,
-              fit: BoxFit.cover,
               gaplessPlayback: true,
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          Positioned(
+            bottom: 50,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                dot(0),
+                const SizedBox(width: 8),
+                dot(1),
+                const SizedBox(width: 8),
+                dot(2),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget dot(int index) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: activeDot == index ? AppColors.success : AppColors.white,
+        shape: BoxShape.circle,
       ),
     );
   }
