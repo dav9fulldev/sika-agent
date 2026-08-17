@@ -140,6 +140,8 @@ class ProfileScreen extends StatelessWidget {
             title: 'Historique des transactions',
             onTap: () {},
           ),
+
+          // LIEN DIRECT VERS LES PARAMÈTRES DEPUIS LA LISTE
           _buildMenuItem(
             icon: Icons.settings_outlined,
             title: 'Paramètres & Perception SIKA',
