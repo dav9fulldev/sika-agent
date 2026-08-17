@@ -2,7 +2,9 @@
 SQLAlchemy Data Models pour la Base de Données SIKA
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
