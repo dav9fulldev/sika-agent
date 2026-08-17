@@ -2,15 +2,72 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/auth_provider.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
+import '../../../auth/presentation/pages/login_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0B1329),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          langNotifier.tr('Déconnexion', 'Log Out'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          langNotifier.tr(
+            'Êtes-vous sûr de vouloir vous déconnecter de votre compte SIKA ?',
+            'Are you sure you want to log out of your SIKA account?',
+          ),
+          style: const TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              langNotifier.tr('Annuler', 'Cancel'),
+              style: const TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(authProvider.notifier).logout();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.rose,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              langNotifier.tr('Déconnexion', 'Log Out'),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
+
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final userName = user?.name ?? 'David YAO';
+    final userEmail = user?.email ?? 'david.yao@email.com';
+    final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'D';
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
@@ -54,9 +111,9 @@ class ProfileScreen extends ConsumerWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: AppColors.emerald,
-                  child: const Text(
-                    'D',
-                    style: TextStyle(
+                  child: Text(
+                    initialLetter,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -70,12 +127,16 @@ class ProfileScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            'David YAO',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              userName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -107,9 +168,11 @@ class ProfileScreen extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'david.yao@email.com',
-                        style: TextStyle(
+                      Text(
+                        userEmail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
                         ),
@@ -158,12 +221,12 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 32),
 
-          // LOGOUT BUTTON
+          // LOGOUT BUTTON (DÉCONNEXION EFFECTIVE)
           SizedBox(
             width: double.infinity,
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () => _showLogoutDialog(context, ref, langNotifier),
               icon: const Icon(Icons.logout, color: AppColors.rose),
               label: Text(
                 langNotifier.tr('Déconnexion', 'Log Out'),
