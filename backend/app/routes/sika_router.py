@@ -3,6 +3,9 @@ from typing import Dict, Any
 from ..schemas.sika_dto import SikaQueryDTO, SikaConfirmTransactionDTO, SikaResponseDTO
 from ..services.sika_ai import SikaAI
 from ..services.sika_nlp import SikaNLP
+from ..services.user_learning_service import user_learning_service
+from ..services.backup_service import backup_service
+from ..agent.orchestrator import sika_orchestrator
 
 router = APIRouter(prefix="/api/v1/sika", tags=["sika"])
 sika_ai = SikaAI()
@@ -22,18 +25,18 @@ def sika_health_check():
 async def sika_chat(data: SikaQueryDTO):
     """
     Endpoint principal SIKA AI.
-    Reçoit la requête et le contexte financier DTO (sans couplage direct avec DB).
+    Reçoit la requête et le contexte financier DTO.
     """
     ctx_dict = data.context.dict() if data.context else {}
     firstname = data.context.user_firstname if data.context else "l'ami"
-    
+
     result = await sika_ai.chat(
         user_message=data.query,
         financial_context=ctx_dict,
         conversation_history=[],
         user_firstname=firstname
     )
-    
+
     return SikaResponseDTO(
         query=data.query,
         message=result["response"],
@@ -47,10 +50,9 @@ async def sika_chat(data: SikaQueryDTO):
 def sika_confirm_transaction(data: SikaConfirmTransactionDTO):
     """
     Valide et enregistre une dépense confirmée par Sika.
-    Formate le message de confirmation avec SikaNLP.
     """
     speech_amount = sika_nlp.format_amount_for_speech(data.amount)
-    
+
     return {
         "success": True,
         "message": f"✅ Dépense de {speech_amount} en {data.category} enregistrée avec succès !",
@@ -61,10 +63,8 @@ def sika_confirm_transaction(data: SikaConfirmTransactionDTO):
         }
     }
 
-from ..agent.orchestrator import sika_orchestrator
-
 # ============================================================================
-# ENDPOINTS TASKMASTER AGENT (GOOGLE GEMINI REACT LOOP)
+# ENDPOINTS TASKMASTER AGENT (GOOGLE GEMINI REACT LOOP & MEMORY)
 # ============================================================================
 
 @router.post("/agent/process")
@@ -102,3 +102,45 @@ async def sika_ingest_event(data: Dict[str, Any]):
     """Endpoint d'ingestion asynchrone des événements financiers (Passif Mobile Money)."""
     user_id = data.get("user_id", 1)
     return await sika_orchestrator.process_financial_event(user_id=user_id, event_data=data)
+
+# ============================================================================
+# ENDPOINTS ARRIÈRE-PLAN (BACKGROUND PERCEPTION & LEARNING BACKUP)
+# ============================================================================
+
+@router.post("/background/perceive-notification")
+async def perceive_background_notification(data: Dict[str, Any]):
+    """
+    Endpoint d'arrière-plan appelé par le service Android/iOS
+    lors de la réception d'un SMS ou d'une notification Mobile Money.
+    """
+    user_id = data.get("user_id", "default_user")
+    notification_text = data.get("notification_text", "")
+    provider_name = data.get("provider", "Wave")
+
+    # Ingestion dans le service d'apprentissage
+    if "wave" in provider_name.lower():
+        user_learning_service.update_user_habit(user_id, "Mobile Money Wave", 5000.0)
+    elif "orange" in provider_name.lower():
+        user_learning_service.update_user_habit(user_id, "Mobile Money Orange", 10000.0)
+
+    return {
+        "status": "PROCESSED",
+        "user_id": user_id,
+        "notification_received": notification_text,
+        "learned_insight": f"Transaction {provider_name} capturée en arrière-plan et assimilée."
+    }
+
+@router.get("/habits")
+def get_user_learned_habits(user_id: str = "default_user"):
+    """Retourne le profil d'apprentissage et la mémoire comportementale du client."""
+    return user_learning_service.get_user_profile(user_id)
+
+@router.post("/backup")
+def trigger_memory_backup(user_id: str = "default_user"):
+    """Crée un snapshot de sauvegarde complet de la mémoire IA pour ré-entraînement."""
+    snapshot = backup_service.create_backup_snapshot(user_id)
+    return {
+        "status": "SUCCESS",
+        "message": "Snapshot de mémoire IA généré avec succès.",
+        "backup": snapshot
+    }
