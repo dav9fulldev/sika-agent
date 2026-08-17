@@ -167,31 +167,35 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: AppColors.cyan),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: AppColors.cyan),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (trailingText != null)
-              Text(
-                trailingText,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (trailingText != null)
+                Text(
+                  trailingText,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
-          ],
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+            ],
+          ),
         ),
       ),
     );
