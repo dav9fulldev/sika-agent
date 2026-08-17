@@ -3,10 +3,15 @@ from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.sika_router import router as sika_router
+from app.database import Base, engine
+from app.repositories.financial_repository import financial_repository
 
 """
 Point d'entrée principal de l'API SIKA AI Standalone.
 """
+
+# Initialisation des tables SQL au démarrage
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="SIKA AI API",
@@ -31,6 +36,7 @@ def read_root():
     return {
         "message": "Bienvenue sur l'API SIKA Assistant Vocal",
         "version": "1.0.0",
+        "database": "SQL Database Connected",
         "status": "running"
     }
 
@@ -38,5 +44,5 @@ if __name__ == "__main__":
     # pyrefly: ignore [missing-import]
     import uvicorn
     import os
-    port = int(os.getenv("PORT", 8080))
+    port = int(os.getenv("PORT", 8001))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
