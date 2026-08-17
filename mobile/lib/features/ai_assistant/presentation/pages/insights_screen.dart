@@ -1,18 +1,29 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/language_provider.dart';
 
-class InsightsScreen extends StatefulWidget {
+class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
 
   @override
-  State<InsightsScreen> createState() => _InsightsScreenState();
+  ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
 }
 
-class _InsightsScreenState extends State<InsightsScreen> {
-  String _selectedPeriod = 'Ce mois';
+class _InsightsScreenState extends ConsumerState<InsightsScreen> {
+  String _selectedPeriodKey = 'Ce mois';
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
+    final Map<String, String> periodLabels = {
+      'Ce mois': langNotifier.tr('Ce mois', 'This month'),
+      'Mois dernier': langNotifier.tr('Mois dernier', 'Last month'),
+      '3 mois': langNotifier.tr('3 mois', '3 months'),
+    };
+
     return Scaffold(
       backgroundColor: const Color(0xff020614),
       appBar: AppBar(
@@ -39,19 +50,19 @@ class _InsightsScreenState extends State<InsightsScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _selectedPeriod,
+                  value: _selectedPeriodKey,
                   dropdownColor: const Color(0xFF0B1329),
                   icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                  items: <String>['Ce mois', 'Mois dernier', '3 mois'].map((String value) {
+                  items: periodLabels.keys.map((String key) {
                     return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
+                      value: key,
+                      child: Text(periodLabels[key]!),
                     );
                   }).toList(),
                   onChanged: (newValue) {
                     if (newValue != null) {
-                      setState(() => _selectedPeriod = newValue);
+                      setState(() => _selectedPeriodKey = newValue);
                     }
                   },
                 ),
@@ -88,9 +99,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                         child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF635BFF), size: 16),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Dépenses totales',
-                        style: TextStyle(
+                      Text(
+                        langNotifier.tr('Dépenses totales', 'Total Expenses'),
+                        style: const TextStyle(
                           color: Color(0xFF64748B),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -131,9 +142,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
-                              '+12% vs mois dernier',
-                              style: TextStyle(
+                            Text(
+                              langNotifier.tr('+12% vs mois dernier', '+12% vs last month'),
+                              style: const TextStyle(
                                 color: Color(0xFF10B981),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -141,13 +152,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             ),
                             const SizedBox(height: 20),
 
-                            _buildCategoryRow('Alimentation', '72%', const Color(0xFF38BDF8)),
+                            _buildCategoryRow(langNotifier.tr('Alimentation', 'Food'), '72%', const Color(0xFF38BDF8)),
                             const SizedBox(height: 10),
-                            _buildCategoryRow('Transport', '15%', const Color(0xFF10B981)),
+                            _buildCategoryRow(langNotifier.tr('Transport', 'Transport'), '15%', const Color(0xFF10B981)),
                             const SizedBox(height: 10),
-                            _buildCategoryRow('Loisirs', '8%', const Color(0xFFF59E0B)),
+                            _buildCategoryRow(langNotifier.tr('Loisirs', 'Leisure'), '8%', const Color(0xFFF59E0B)),
                             const SizedBox(height: 10),
-                            _buildCategoryRow('Autres', '5%', const Color(0xFF635BFF)),
+                            _buildCategoryRow(langNotifier.tr('Autres', 'Others'), '5%', const Color(0xFF635BFF)),
                           ],
                         ),
                       ),
@@ -213,9 +224,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
                         child: const Icon(Icons.savings_outlined, color: Color(0xFF10B981), size: 16),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Objectif d\'épargne',
-                        style: TextStyle(
+                      Text(
+                        langNotifier.tr('Objectif d\'épargne', 'Savings Goal'),
+                        style: const TextStyle(
                           color: Color(0xFF64748B),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,

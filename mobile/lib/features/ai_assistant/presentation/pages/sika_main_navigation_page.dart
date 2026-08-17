@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 import 'agent_hub_screen.dart';
 import 'sika_chat_screen.dart';
@@ -25,6 +26,9 @@ class _SikaMainNavigationPageState
     final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
     final bool isListening = sikaData.state == SikaState.listening;
+
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
 
     // ÉCOUTEUR DE REDIRECTION AUTOMATIQUE VERS CHAT EN CAS DE TRAITEMENT VOCAL
     ref.listen<SikaData>(sikaProvider, (previous, next) {
@@ -105,7 +109,7 @@ class _SikaMainNavigationPageState
       // 5. BARRE DE NAVIGATION MAQUETTE BLEU NUIT (#0B1329) AVEC BORDURE ULTRA-FINE
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF0B1329), // Fond bleu nuit officiel
+          color: Color(0xFF0B1329),
           border: Border(
             top: BorderSide(
               color: Colors.white10,
@@ -155,7 +159,7 @@ class _SikaMainNavigationPageState
                   index: 3,
                   icon: Icons.person_outline_rounded,
                   activeIcon: Icons.person_rounded,
-                  label: 'Profil',
+                  label: langNotifier.tr('Profil', 'Profile'),
                 ),
               ],
             ),

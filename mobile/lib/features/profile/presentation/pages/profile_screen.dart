@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: const Text(
-          'Profil & Compte',
-          style: TextStyle(
+        title: Text(
+          langNotifier.tr('Profil & Compte', 'Profile & Account'),
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -23,7 +28,7 @@ class ProfileScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: AppColors.cyan),
-            tooltip: 'Paramètres',
+            tooltip: langNotifier.tr('Paramètres', 'Settings'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -121,30 +126,28 @@ class ProfileScreen extends StatelessWidget {
           // MENU OPTIONS
           _buildMenuItem(
             icon: Icons.person_outline,
-            title: 'Informations personnelles',
+            title: langNotifier.tr('Informations personnelles', 'Personal Information'),
             onTap: () {},
           ),
           _buildMenuItem(
             icon: Icons.account_balance_wallet_outlined,
-            title: 'Mes portefeuilles',
-            trailingText: '3 connectés',
+            title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
+            trailingText: langNotifier.tr('3 connectés', '3 connected'),
             onTap: () {},
           ),
           _buildMenuItem(
             icon: Icons.credit_card_outlined,
-            title: 'Méthodes de paiement',
+            title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
             onTap: () {},
           ),
           _buildMenuItem(
             icon: Icons.history,
-            title: 'Historique des transactions',
+            title: langNotifier.tr('Historique des transactions', 'Transaction History'),
             onTap: () {},
           ),
-
-          // LIEN DIRECT VERS LES PARAMÈTRES DEPUIS LA LISTE
           _buildMenuItem(
             icon: Icons.settings_outlined,
-            title: 'Paramètres & Perception SIKA',
+            title: langNotifier.tr('Paramètres & Perception SIKA', 'Settings & SIKA Perception'),
             onTap: () {
               Navigator.push(
                 context,
@@ -162,9 +165,9 @@ class ProfileScreen extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.logout, color: AppColors.rose),
-              label: const Text(
-                'Déconnexion',
-                style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold),
+              label: Text(
+                langNotifier.tr('Déconnexion', 'Log Out'),
+                style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.rose),

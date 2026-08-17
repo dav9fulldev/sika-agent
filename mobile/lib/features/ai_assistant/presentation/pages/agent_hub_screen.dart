@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/proactive_alert_card.dart';
 import '../widgets/proactive_analysis_sheet.dart';
@@ -75,6 +76,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
   @override
   Widget build(BuildContext context) {
     final sikaNotifier = ref.read(sikaProvider.notifier);
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
 
     return Scaffold(
       backgroundColor: const Color(0xff020614),
@@ -127,9 +130,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Solde total',
-                            style: TextStyle(
+                          Text(
+                            langNotifier.tr('Solde total', 'Total Balance'),
+                            style: const TextStyle(
                               color: Color(0xFF64748B),
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -159,9 +162,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'sur 3 portefeuilles',
-                            style: TextStyle(
+                          Text(
+                            langNotifier.tr('sur 3 portefeuilles', 'across 3 wallets'),
+                            style: const TextStyle(
                               color: Color(0xFF475569),
                               fontSize: 12,
                             ),
@@ -181,7 +184,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // 2. BLOC ÉTAT DE SIKA (AVEC EFFET DE MOUVEMENT CONTINU)
+                    // 2. BLOC ÉTAT DE SIKA
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -193,31 +196,31 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'État de Sika',
-                                  style: TextStyle(
+                                  langNotifier.tr('État de Sika', 'Sika Status'),
+                                  style: const TextStyle(
                                     color: Color(0xFF64748B),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Text(
-                                  'Actif et à l\'écoute',
-                                  style: TextStyle(
+                                  langNotifier.tr('Actif et à l\'écoute', 'Active & Listening'),
+                                  style: const TextStyle(
                                     color: Color(0xFF10B981),
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Je veille sur vos finances',
-                                  style: TextStyle(
+                                  langNotifier.tr('Je veille sur vos finances', 'Watching over your finances'),
+                                  style: const TextStyle(
                                     color: Color(0xFF475569),
                                     fontSize: 13,
                                   ),
@@ -251,8 +254,10 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     // PROACTIVE ALERT BANNER (Si active)
                     if (_showAlert)
                       ProactiveAlertCard(
-                        message:
-                        'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
+                        message: langNotifier.tr(
+                          'Une dépense de 30 000 FCFA vient d\'être détectée. Selon vos dépenses récentes et votre objectif d\'épargne, cette dépense consomme deux tiers de votre budget restant.',
+                          'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
+                        ),
                         onExamine: () => _openAnalysisSheet(sikaNotifier),
                         onDismiss: () {
                           setState(() => _showAlert = false);
@@ -262,11 +267,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     // HUMAN CONFIRMATION BANNER (Si active)
                     if (_showConfirmation)
                       HumanConfirmationCard(
-                        actionTitle: 'Transfer Preparation',
+                        actionTitle: langNotifier.tr('Préparation du transfert', 'Transfer Preparation'),
                         recipientText: 'Kouamé (Wave)',
                         amountText: '10 000 FCFA',
                         onConfirm: () {
-                          sikaNotifier.sendTextMessage('I confirm the transfer of 10,000 FCFA.');
+                          sikaNotifier.sendTextMessage(langNotifier.tr('Je confirme le transfert de 10 000 FCFA.', 'I confirm the transfer of 10,000 FCFA.'));
                           setState(() => _showConfirmation = false);
                         },
                         onCancel: () {
@@ -277,9 +282,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     const SizedBox(height: 16),
 
                     // TEXTE SECTION SUGGESTIONS
-                    const Text(
-                      'Suggestions pour vous',
-                      style: TextStyle(
+                    Text(
+                      langNotifier.tr('Suggestions pour vous', 'Suggestions for you'),
+                      style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -291,36 +296,36 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
                     _buildSuggestionPill(
                       icon: '💰',
-                      text: 'How much money do I have in total?',
+                      text: langNotifier.tr('Combien d\'argent ai-je au total ?', 'How much money do I have in total?'),
                       onTap: () => _submitQuery(
-                        'How much money do I have in total?',
+                        langNotifier.tr('Combien d\'argent ai-je au total ?', 'How much money do I have in total?'),
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '🎯',
-                      text: 'How is my savings goal progressing?',
+                      text: langNotifier.tr('Comment progresse mon objectif d\'épargne ?', 'How is my savings goal progressing?'),
                       onTap: () => _submitQuery(
-                        'How is my savings goal progressing?',
+                        langNotifier.tr('Comment progresse mon objectif d\'épargne ?', 'How is my savings goal progressing?'),
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '📊',
-                      text: 'What is my total Mobile Money balance?',
+                      text: langNotifier.tr('Quel est mon solde Mobile Money total ?', 'What is my total Mobile Money balance?'),
                       onTap: () => _submitQuery(
-                        'What is my total Mobile Money balance?',
+                        langNotifier.tr('Quel est mon solde Mobile Money total ?', 'What is my total Mobile Money balance?'),
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '⚡',
-                      text: 'Analyze my recent expenses',
+                      text: langNotifier.tr('Analyser mes dépenses récentes', 'Analyze my recent expenses'),
                       onTap: () => _submitQuery(
-                        'Analyze my recent expenses',
+                        langNotifier.tr('Analyser mes dépenses récentes', 'Analyze my recent expenses'),
                         sikaNotifier,
                       ),
                     ),
@@ -331,7 +336,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
               ),
             ),
 
-            // FLOATING INPUT BAR ÉPURÉE (Uniquement le champ et le bouton d'envoi fléché)
+            // FLOATING INPUT BAR ÉPURÉE
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -359,9 +364,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       child: TextField(
                         controller: _inputController,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: const InputDecoration(
-                          hintText: 'Ask SIKA anything...',
-                          hintStyle: TextStyle(color: Color(0xFF475569), fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: langNotifier.tr('Poser une question à SIKA...', 'Ask SIKA anything...'),
+                          hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 14),
                           border: InputBorder.none,
                         ),
                         onSubmitted: (val) => _submitQuery(val, sikaNotifier),
@@ -393,7 +398,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-  // COMPOSANT D'AIDE : LES CARTES DE COMPTES PORTEFEUILLES
   Widget _buildWalletCard(String name, String amount, Color brandColor, String emoji) {
     return Expanded(
       child: Container(
@@ -439,7 +443,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-  // COMPOSANT D'AIDE : LES PILLULES DE SUGGESTION
   Widget _buildSuggestionPill({
     required String icon,
     required String text,

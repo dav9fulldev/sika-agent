@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/sika_native_service.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  // 1. VARIABLE D'ÉTAT DE LANGUE INITIALISÉE SUR 'English' PAR DÉFAUT
-  String _currentLanguage = 'English';
-
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // États d'activation des permissions et services natifs
   bool _wakeWordEnabled = true;
   bool _overlayEnabled = true;
@@ -23,8 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // États pour les switchs de préférences générales
   bool _notificationPrefEnabled = true;
 
-  // 2 & 3. DÉCLENCHEMENT DU BOTTOM SHEET PREMIUM DE SÉLECTION DE LANGUE
-  void _showLanguageBottomSheet() {
+  void _showLanguageBottomSheet(LanguageNotifier langNotifier, String currentLang) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surfaceDarker,
@@ -45,9 +43,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Choisir la langue / Language',
-                    style: TextStyle(
+                  Text(
+                    langNotifier.tr('Choisir la langue', 'Choose Language'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -60,9 +58,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _buildLanguageOption('English', 'English'),
+              _buildLanguageOption('English', 'English', currentLang, langNotifier),
               const SizedBox(height: 8),
-              _buildLanguageOption('Français', 'Français'),
+              _buildLanguageOption('Français', 'Français', currentLang, langNotifier),
               const SizedBox(height: 16),
             ],
           ),
@@ -71,8 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLanguageOption(String langName, String value) {
-    final bool isSelected = _currentLanguage == value;
+  Widget _buildLanguageOption(String langName, String value, String currentLang, LanguageNotifier langNotifier) {
+    final bool isSelected = currentLang == value;
     return Container(
       decoration: BoxDecoration(
         color: isSelected ? const Color(0xFF0B1329) : Colors.transparent,
@@ -84,11 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         onTap: () {
-          // 4. FERMETURE DU BOTTOMSHEET ET MISE À JOUR DYNAMIQUE PAR SETSTATE
           Navigator.pop(context);
-          setState(() {
-            _currentLanguage = value;
-          });
+          langNotifier.setLanguageByString(value);
         },
         title: Text(
           langName,
@@ -107,6 +102,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentAppLanguage = ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+    final String currentLang = currentAppLanguage.displayName;
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
       appBar: AppBar(
@@ -116,9 +115,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Paramètres',
-          style: TextStyle(
+        title: Text(
+          langNotifier.tr('Paramètres', 'Settings'),
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -128,12 +127,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16),
         children: [
-          // 1. SECTION COMPTE ÉPURÉE
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          // 1. SECTION COMPTE
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              'Compte',
-              style: TextStyle(
+              langNotifier.tr('Compte', 'Account'),
+              style: const TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -143,19 +142,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _buildActionTile(
             icon: Icons.lock_outline_rounded,
-            title: 'Sécurité',
-            subtitle: 'PIN, biométrie',
+            title: langNotifier.tr('Sécurité', 'Security'),
+            subtitle: langNotifier.tr('PIN, biométrie', 'PIN, biometrics'),
             onTap: () {},
           ),
 
           const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),
 
           // 2. SECTION PRÉFÉRENCES
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              'Préférences',
-              style: TextStyle(
+              langNotifier.tr('Préférences', 'Preferences'),
+              style: const TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -166,25 +165,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SwitchListTile(
             value: _notificationPrefEnabled,
             onChanged: (val) => setState(() => _notificationPrefEnabled = val),
-            title: const Text(
-              'Notifications',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            title: Text(
+              langNotifier.tr('Notifications', 'Notifications'),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             secondary: const Icon(Icons.notifications_none_rounded, color: AppColors.cyan, size: 22),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
-          // 5. CORRECTION DU TEXTE TRAILING DYNAMIQUE UTILISANT _currentLanguage
           _buildActionTile(
             icon: Icons.language_rounded,
-            title: 'Langue',
-            trailingText: _currentLanguage,
-            onTap: _showLanguageBottomSheet,
+            title: langNotifier.tr('Langue', 'Language'),
+            trailingText: currentLang,
+            onTap: () => _showLanguageBottomSheet(langNotifier, currentLang),
           ),
           _buildActionTile(
             icon: Icons.payments_outlined,
-            title: 'Devise',
+            title: langNotifier.tr('Devise', 'Currency'),
             trailingText: 'FCFA',
             onTap: () {},
           ),
@@ -214,13 +212,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SikaNativeService.stopSikaService();
               }
             },
-            title: const Text(
-              'Mot-clé "Sika" (Wake Word)',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            title: Text(
+              langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            subtitle: const Text(
-              'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+            subtitle: Text(
+              langNotifier.tr(
+                'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
+                'Allows calling SIKA in background without opening the app.',
+              ),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -245,13 +246,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SwitchListTile(
             value: _overlayEnabled,
             onChanged: (val) => setState(() => _overlayEnabled = val),
-            title: const Text(
-              'Bulle Flottante Android (Overlay)',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            title: Text(
+              langNotifier.tr('Bulle Flottante Android (Overlay)', 'Android Floating Bubble (Overlay)'),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            subtitle: const Text(
-              'Affiche des alertes proactives au-dessus des autres applications.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+            subtitle: Text(
+              langNotifier.tr(
+                'Affiche des alertes proactives au-dessus des autres applications.',
+                'Displays proactive alerts on top of other applications.',
+              ),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -260,13 +264,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SwitchListTile(
             value: _notificationsEnabled,
             onChanged: (val) => setState(() => _notificationsEnabled = val),
-            title: const Text(
-              'Perception des Notifications Mobile Money',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            title: Text(
+              langNotifier.tr(
+                'Perception des Notifications Mobile Money',
+                'Mobile Money Notification Perception',
+              ),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            subtitle: const Text(
-              'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+            subtitle: Text(
+              langNotifier.tr(
+                'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
+                'Allows SIKA to read Wave, Orange Money and MTN alerts.',
+              ),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -316,24 +326,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(color: Color(0xFF1E293B), height: 32, thickness: 1),
 
           // 6. VERSION EN BAS DE PAGE
-          const ListTile(
-            contentPadding: EdgeInsets.symmetric(horizontal: 20),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             title: Text(
-              'Version SIKA Agent',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              langNotifier.tr('Version SIKA Agent', 'SIKA Agent Version'),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            subtitle: Text(
+            subtitle: const Text(
               'v1.0.0 (All Things Agentic Taskmaster)',
               style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
             ),
-            trailing: Icon(Icons.info_outline, color: Color(0xFF475569), size: 20),
+            trailing: const Icon(Icons.info_outline, color: Color(0xFF475569), size: 20),
           ),
         ],
       ),
     );
   }
 
-  // COMPOSANT REUTILISABLE POUR LES LIGNES INTERACTIVES DU COMPTE ET DES PREFERENCES
   Widget _buildActionTile({
     required IconData icon,
     required String title,
