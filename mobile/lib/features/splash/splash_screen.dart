@@ -85,25 +85,17 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    const Color backgroundWaveColor = Color(0xff020614); // Identique au fond de wave.png
+
     return Scaffold(
-      backgroundColor: const Color(0xff020614),
+      backgroundColor: backgroundWaveColor,
       body: Stack(
         children: [
-          // 1. FOND GRADIENT AMBIANT HOMOGÈNE
+          // 1. FOND UNIFORME EXACTEMENT IDENTIQUE À WAVE.PNG
           Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xff020614),
-              gradient: RadialGradient(
-                center: Alignment(0, -0.3),
-                radius: 0.95,
-                colors: [
-                  Color(0x2838bdf8), // Halo lumineux cyan subtil
-                  Color(0xff020614),
-                ],
-              ),
-            ),
+            color: backgroundWaveColor,
           ),
 
           // 2. LOGO ET TEXTE ANIMÉ AU CENTRE
@@ -118,31 +110,19 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       opacity: _logoFade.value,
                       child: Transform.scale(
                         scale: _logoScale.value,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                                blurRadius: 40,
-                                spreadRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            AppImages.logo,
-                            width: 145,
-                            gaplessPlayback: true,
-                          ),
+                        child: Image.asset(
+                          AppImages.logo,
+                          width: 145,
+                          gaplessPlayback: true,
                         ),
                       ),
                     ),
                     const SizedBox(height: 35),
                     Opacity(
                       opacity: _textFade.value,
-                      child: Column(
+                      child: const Column(
                         children: [
-                          const Text(
+                          Text(
                             "Sika",
                             style: TextStyle(
                               color: Colors.white,
@@ -151,12 +131,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               letterSpacing: 1.8,
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          const Text(
+                          SizedBox(height: 12),
+                          Text(
                             "Your Autonomous\nFinancial Agent",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Color(0xFF94A3B8), // Lisibilité parfaite en argenté/cyan
+                              color: Color(0xFF38BDF8), // Cyan lumineux parfaitement lisible
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
@@ -173,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             ),
           ),
 
-          // 3. VAGUES CYAN EN ARRIÈRE-PLAN (FUSION SANS DÉCUT DE FOND)
+          // 3. VAGUES CYAN EN ARRIÈRE-PLAN (SANS AUCUNE DÉCOUPE NI DÉGRADÉ DIVERGENT)
           Positioned(
             bottom: 75,
             left: 0,
@@ -183,14 +163,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               builder: (context, child) {
                 return Transform.translate(
                   offset: Offset(0, _waveSlide.value * 15),
-                  child: Opacity(
-                    opacity: 0.9,
-                    child: Image.asset(
-                      AppImages.wave,
-                      gaplessPlayback: true,
-                      fit: BoxFit.contain,
-                      colorBlendMode: BlendMode.screen,
-                    ),
+                  child: Image.asset(
+                    AppImages.wave,
+                    gaplessPlayback: true,
+                    fit: BoxFit.contain,
                   ),
                 );
               },
