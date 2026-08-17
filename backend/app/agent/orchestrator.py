@@ -74,7 +74,7 @@ class SikaAgentOrchestrator:
             "tool_result": tool_result,
             "requires_confirmation": requires_confirmation,
             "provider": ai_response.get("provider", self.ai_service.provider.upper()),
-            "model": ai_response.get("model", self.ai_service.model)
+            "model": ai_response.get("model", os.getenv("GEMINI_MODEL", "gemini-3.5-flash"))
         }
 
     async def process_financial_event(self, user_id: int, event_data: dict) -> Dict[str, Any]:

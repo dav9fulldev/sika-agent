@@ -1,4 +1,5 @@
 import os
+# pyrefly: ignore [missing-import]
 import pytest
 import asyncio
 from unittest.mock import MagicMock, patch
@@ -11,7 +12,7 @@ def mock_gemini_env():
     with patch.dict(os.environ, {
         "AI_PROVIDER": "gemini",
         "GEMINI_API_KEY": "fake_gemini_key_for_testing",
-        "GEMINI_MODEL": "gemini-2.5-flash"
+        "GEMINI_MODEL": "gemini-3.5-flash"
     }):
         yield
 
@@ -21,7 +22,7 @@ def test_gemini_initialization(mock_gemini_env):
     with patch("google.genai.Client") as mock_client_class:
         sika_ai = SikaAI(api_key="fake_gemini_key_for_testing")
         assert sika_ai.provider == "gemini"
-        assert sika_ai.model == "gemini-2.5-flash"
+        assert sika_ai.model == "gemini-3.5-flash"
         assert sika_ai.use_gemini is True
         mock_client_class.assert_called_once_with(api_key="fake_gemini_key_for_testing")
 
@@ -47,7 +48,7 @@ def test_gemini_chat_invocation(mock_gemini_env):
 
         assert mock_genai_client.models.generate_content.called is True
         assert res["provider"] == "GEMINI"
-        assert res["model"] == "gemini-2.5-flash"
+        assert res["model"] == "gemini-3.5-flash"
         assert "Gemini" in res["response"]
 
 
@@ -73,7 +74,7 @@ def test_orchestrator_react_loop_with_gemini(mock_gemini_env):
         assert result["status"] == "PROCESSED"
         assert result["requires_confirmation"] is True
         assert result["provider"] == "GEMINI"
-        assert result["model"] == "gemini-2.5-flash"
+        assert result["model"] == "gemini-3.5-flash"
 
 
 def test_gemini_fallback_on_error(mock_gemini_env):

@@ -81,7 +81,7 @@ Réponds toujours de façon adaptée aux DONNÉES FINANCIÈRES que je te fournis
         """
         self.provider = os.getenv("AI_PROVIDER", "gemini").lower()
         self.gemini_api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
         
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
