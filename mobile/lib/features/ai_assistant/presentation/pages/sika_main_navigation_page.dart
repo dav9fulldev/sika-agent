@@ -1,106 +1,192 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/sika_provider.dart';
 import 'agent_hub_screen.dart';
 import 'sika_chat_screen.dart';
 import 'insights_screen.dart';
 import '../../../profile/presentation/pages/profile_screen.dart';
 
-class SikaMainNavigationPage extends StatefulWidget {
+/// SikaMainNavigationPage — Main navigation scaffold with 4 aligned screens
+/// and an interactive "Hold-to-Talk" central voice button.
+class SikaMainNavigationPage extends ConsumerStatefulWidget {
   const SikaMainNavigationPage({super.key});
 
   @override
-  State<SikaMainNavigationPage> createState() => _SikaMainNavigationPageState();
+  ConsumerState<SikaMainNavigationPage> createState() =>
+      _SikaMainNavigationPageState();
 }
 
-class _SikaMainNavigationPageState extends State<SikaMainNavigationPage> {
+class _SikaMainNavigationPageState
+    extends ConsumerState<SikaMainNavigationPage> {
   int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    // 1. RESTRUCTURATION STRATEGIQUE DES INDEX DES PAGES POUR S'ALIGNER SUR LES ONGLETS
+    final sikaData = ref.watch(sikaProvider);
+    final sikaNotifier = ref.read(sikaProvider.notifier);
+    final bool isListening = sikaData.state == SikaState.listening;
+
+    // 4 REAL PAGES ALIGNED TO NAVIGATION INDEXES
     final List<Widget> pages = [
       AgentHubScreen(
-        onOpenChat: () => setState(() => _currentIndex = 3),     // Chat passe à l'index 3
-        onOpenInsights: () => setState(() => _currentIndex = 1), // Insights reste à l'index 1
+        onOpenChat: () => setState(() => _currentIndex = 2),     // Chat at Index 2
+        onOpenInsights: () => setState(() => _currentIndex = 1), // Insights at Index 1
       ),
       const InsightsScreen(), // Index 1
-
-      // LE BOUTON CENTRAL VOCAL (Index 2)
-      // Note : Tu peux mettre ici l'écran d'activation vocale plein écran ou une page miroir
-      AgentHubScreen(
-        onOpenChat: () => setState(() => _currentIndex = 3),
-        onOpenInsights: () => setState(() => _currentIndex = 1),
-      ),
-
-      const SikaChatScreen(), // Index 3 : Le Chat textuel classique
-      const ProfileScreen(),  // Index 4 : Le profil (Réglages supprimé)
+      const SikaChatScreen(), // Index 2
+      const ProfileScreen(),  // Index 3
     ];
 
     return Scaffold(
+      backgroundColor: const Color(0xff020614),
       body: IndexedStack(
         index: _currentIndex,
         children: pages,
       ),
-      // 2. STYLISATION DE LA BARRE DE NAVIGATION (LOOK MAQUETTE BLEU NUITE)
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0B1329), // Fond bleu nuit officiel des cartes de ta maquette
-          border: Border(
-            top: BorderSide(color: Colors.white10, width: 0.8), // Fine bordure supérieure
+
+      // 4. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK)
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: GestureDetector(
+        onLongPressStart: (_) async {
+          debugPrint('[VOICE NAV] Hold-to-Talk STARTED');
+          await sikaNotifier.startListening();
+        },
+        onLongPressEnd: (_) async {
+          debugPrint('[VOICE NAV] Hold-to-Talk ENDED');
+          await sikaNotifier.stopListening();
+        },
+        onTap: () async {
+          debugPrint('[VOICE NAV] Voice button tapped');
+          await sikaNotifier.toggleListening();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: isListening ? 64 : 56,
+          height: isListening ? 64 : 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF635BFF), // Violet Sika officiel (#635BFF)
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF635BFF).withValues(
+                  alpha: isListening ? 0.8 : 0.45,
+                ),
+                blurRadius: isListening ? 20 : 12,
+                spreadRadius: isListening ? 6 : 2,
+              ),
+              if (isListening)
+                BoxShadow(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                  blurRadius: 28,
+                  spreadRadius: 8,
+                ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              isListening ? Icons.mic_rounded : Icons.auto_awesome,
+              color: Colors.white,
+              size: isListening ? 30 : 24,
+            ),
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            // Action spécifique si l'utilisateur clique sur le gros bouton vocal central (Index 2)
-            if (index == 2) {
-              // Ici, tu peux directement appeler ton service vocal au lieu de changer de page :
-              // ref.read(sikaProvider.notifier).toggleListening();
-              // Pour l'instant, on le laisse actif visuellement :
-              setState(() => _currentIndex = index);
-            } else {
-              setState(() => _currentIndex = index);
-            }
-          },
-          backgroundColor: const Color(0xFF0B1329),
-          selectedItemColor: const Color(0xFF10B981),   // Vert Sika actif de la maquette
-          unselectedItemColor: const Color(0xFF475569), // Gris bleuté éteint
-          type: BottomNavigationBarType.fixed,
+      ),
+
+      // 5. BARRE DE NAVIGATION MAQUETTE BLEU NUIT (#0B1329) AVEC BORDURE ULTRA-FINE
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0B1329), // Fond bleu nuit officiel
+          border: Border(
+            top: BorderSide(
+              color: Colors.white10,
+              width: 0.8,
+            ),
+          ),
+        ),
+        child: BottomAppBar(
+          color: const Color(0xFF0B1329),
           elevation: 0,
-          selectedFontSize: 11,
-          unselectedFontSize: 11,
-          items: const [
-            // Onglet 0
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home_rounded),
-              label: 'Hub',
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
+          child: SizedBox(
+            height: 54,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // ONGLET 0 : HUB
+                _buildNavItem(
+                  index: 0,
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  label: 'Hub',
+                ),
+
+                // ONGLET 1 : INSIGHTS
+                _buildNavItem(
+                  index: 1,
+                  icon: Icons.insights_outlined,
+                  activeIcon: Icons.insights,
+                  label: 'Insights',
+                ),
+
+                // ESPACE RÉSERVÉ POUR LE BOUTON CENTRAL FLOATING
+                const SizedBox(width: 48),
+
+                // ONGLET 2 : CHAT
+                _buildNavItem(
+                  index: 2,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  activeIcon: Icons.chat_bubble_rounded,
+                  label: 'Chat',
+                ),
+
+                // ONGLET 3 : PROFIL
+                _buildNavItem(
+                  index: 3,
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Profil',
+                ),
+              ],
             ),
-            // Onglet 1
-            BottomNavigationBarItem(
-              icon: Icon(Icons.insights_outlined),
-              activeIcon: Icon(Icons.insights),
-              label: 'Insights',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+  }) {
+    final bool isSelected = _currentIndex == index;
+    const Color activeColor = Color(0xFF10B981);   // Vert Sika actif maquette
+    const Color inactiveColor = Color(0xFF475569); // Gris bleuté éteint
+
+    return InkWell(
+      onTap: () => setState(() => _currentIndex = index),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? activeColor : inactiveColor,
+              size: 22,
             ),
-            // Onglet 2 : LE GROS BOUTON CENTRAL VOCAL ÉTIRÉ ET BRILLANT
-            BottomNavigationBarItem(
-              icon: CircleAvatar(
-                radius: 20,
-                backgroundColor: Color(0xFF635BFF), // Violet Sika de ta charte
-                child: Icon(Icons.auto_awesome, color: Colors.white, size: 22),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? activeColor : inactiveColor,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
-              label: '', // Pas de texte sous le bouton central pour un effet épuré parfait
-            ),
-            // Onglet 3
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              activeIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'Chat',
-            ),
-            // Onglet 4
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Profil',
             ),
           ],
         ),
