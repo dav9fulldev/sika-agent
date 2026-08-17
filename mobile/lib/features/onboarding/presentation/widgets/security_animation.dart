@@ -20,7 +20,7 @@ class _SecurityAnimationState extends State<SecurityAnimation>
   @override
   void initState() {
     super.initState();
-    // 3D Tilt rotation loop
+    // Boucle de rotation / inclinaison en 3D
     _tiltController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -33,7 +33,7 @@ class _SecurityAnimationState extends State<SecurityAnimation>
       ),
     );
 
-    // Pulse & security validation glow loop
+    // Boucle de pulsation du halo et des ondes de sécurité
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -60,15 +60,15 @@ class _SecurityAnimationState extends State<SecurityAnimation>
       animation: Listenable.merge([_tiltController, _pulseController]),
       builder: (context, child) {
         return SizedBox(
-          height: 280,
+          height: 300,
           width: double.infinity,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 1. EMERALD SECURITY SHIELD AURA
+              // 1. AURA DU BOUCLIER DE SÉCURITÉ ÉMERAUDE
               Container(
-                width: 210,
-                height: 210,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
@@ -81,12 +81,12 @@ class _SecurityAnimationState extends State<SecurityAnimation>
                 ),
               ),
 
-              // 2. ORBITING SECURITY RINGS
+              // 2. ANNEAUX DE SÉCURITÉ EN PULSATION
               ScaleTransition(
                 scale: _pulseAnimation,
                 child: Container(
-                  width: 190,
-                  height: 190,
+                  width: 220,
+                  height: 220,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -97,15 +97,15 @@ class _SecurityAnimationState extends State<SecurityAnimation>
                 ),
               ),
 
-              // 3. CENTER 3D TILTING SHIELD & LOCK
+              // 3. BOUCLIER ET CADENAS CENTRAL AVEC INCLINAISON 3D
               Transform(
                 transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001) // perspective
+                  ..setEntry(3, 2, 0.001) // Effet de perspective
                   ..rotateY(_tiltAnimation.value),
                 alignment: Alignment.center,
                 child: Container(
-                  width: 100,
-                  height: 100,
+                  width: 190,
+                  height: 190,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
@@ -131,15 +131,15 @@ class _SecurityAnimationState extends State<SecurityAnimation>
                 ),
               ),
 
-              // 4. FLOATING SECURITY BADGES
+              // 4. BADGES FLOTTANTS DE SÉCURITÉ AUTOUR DU BOUCLIER
               Positioned(
-                top: 40,
-                right: 70,
+                top: 50,
+                right: 80,
                 child: _buildBadge(Icons.fingerprint, 'Biométrie', AppColors.emerald),
               ),
               Positioned(
-                bottom: 40,
-                left: 60,
+                bottom: 60,
+                left: 70,
                 child: _buildBadge(Icons.lock_outline_rounded, 'Contrôle Humain', AppColors.cyan),
               ),
               Positioned(
@@ -164,7 +164,7 @@ class _SecurityAnimationState extends State<SecurityAnimation>
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.25),
-            blurRadius: 8,
+            blurRadius: 20,
           ),
         ],
       ),

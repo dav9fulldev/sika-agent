@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/sika_provider.dart';
-import '../widgets/agent_orb_widget.dart';
 import '../widgets/proactive_alert_card.dart';
 import '../widgets/proactive_analysis_sheet.dart';
 import '../widgets/human_confirmation_card.dart';
+import '../../../../core/constants/app_images.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenChat;
@@ -20,20 +20,40 @@ class AgentHubScreen extends ConsumerStatefulWidget {
   ConsumerState<AgentHubScreen> createState() => _AgentHubScreenState();
 }
 
-class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
+class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _robotAnimationController;
+  late Animation<double> _robotFloatAnimation;
   final TextEditingController _inputController = TextEditingController();
+
   bool _showAlert = true;
   bool _showConfirmation = false;
 
   @override
+  void initState() {
+    super.initState();
+    _robotAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+
+    _robotFloatAnimation =
+        Tween<double>(begin: -6.0, end: 6.0).animate(CurvedAnimation(
+          parent: _robotAnimationController,
+          curve: Curves.easeInOut,
+        ));
+  }
+
+  @override
   void dispose() {
+    _robotAnimationController.dispose();
     _inputController.dispose();
     super.dispose();
   }
 
   void _submitQuery(String query, SikaNotifier notifier) {
     if (query.trim().isEmpty) return;
-    notifier.sendTextMessage(query);
+    notifier.sendTextMessage(query.trim());
     _inputController.clear();
     widget.onOpenChat();
   }
@@ -41,9 +61,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
   void _openAnalysisSheet(SikaNotifier notifier) {
     ProactiveAnalysisSheet.show(
       context,
-      onDismiss: () {
-        setState(() => _showAlert = false);
-      },
+      onDismiss: () {},
       onViewExpenses: () {
         widget.onOpenInsights();
       },
@@ -56,159 +74,192 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
 
-return Scaffold(
-backgroundColor: const Color(0xFF0F172A),
-appBar: AppBar(
-backgroundColor: const Color(0xFF0F172A),
-elevation: 0,
-centerTitle: false,
-title: const Column(
-crossAxisAlignment: CrossAxisAlignment.start,
-children: [
-Text(
-'Bonjour David 👋',
-style: TextStyle(
-color: Colors.white,
-fontWeight: FontWeight.bold,
-fontSize: 18,
-),
-),
-Text(
-'Your Personal AI Financial Agent',
-style: TextStyle(
-color: Color(0xFF94A3B8),
-fontSize: 12,
-),
-),
-],
-),
-actions: [
-IconButton(
-icon: const Icon(Icons.tune_outlined, color: Colors.white70),
-onPressed: widget.onOpenInsights,
-tooltip: 'Insights',
-),
-],
-),
-body: SafeArea(
-child: Column(
-children: [
-Expanded(
-child: SingleChildScrollView(
-padding: const EdgeInsets.symmetric(horizontal: 20),
-child: Column(
-children: [
-const SizedBox(height: 12),
+    return Scaffold(
+      backgroundColor: const Color(0xff020614),
+      appBar: AppBar(
+        backgroundColor: const Color(0xff020614),
+        elevation: 0,
+        centerTitle: false,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'SIKA Hub',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              'Autonomous Financial Agent',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 15),
 
-// MAIN TITLE
-const Text(
-'How can I help you?',
-style: TextStyle(
-color: Colors.white,
-fontSize: 24,
-fontWeight: FontWeight.bold,
-letterSpacing: -0.5,
-),
-),
-
-                    const SizedBox(height: 16),
-
-                    // SOLDE TOTAL MULTI-WALLET CARD (Screen 3 from Design Specs)
+                    // 1. BLOC SOLDE TOTAL
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF334155)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: const Color(0xFF0B1329),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Solde total',
-                                style: TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Text(
-                                  '3 portefeuilles',
+                          const Text(
+                            'Solde total',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          RichText(
+                            text: const TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '45 000 ',
                                   style: TextStyle(
-                                    color: Color(0xFF10B981),
-                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontSize: 32,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            '45 000 FCFA',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.5,
+                                TextSpan(
+                                  text: 'FCFA',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'sur 3 portefeuilles',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
                           Row(
                             children: [
-                              _buildWalletChip('Wave', '15 000 FCFA', const Color(0xFF38BDF8)),
-                              const SizedBox(width: 6),
-                              _buildWalletChip('Orange Money', '22 000 FCFA', const Color(0xFFF59E0B)),
-                              const SizedBox(width: 6),
-                              _buildWalletChip('MTN MoMo', '8 000 FCFA', const Color(0xFFEAB308)),
+                              _buildWalletCard('Wave', '15 000 FCFA', Colors.blue, '🌊'),
+                              const SizedBox(width: 8),
+                              _buildWalletCard('Orange Money', '22 000 FCFA', Colors.orange, '🍊'),
+                              const SizedBox(width: 8),
+                              _buildWalletCard('MTN MoMo', '8 000 FCFA', Colors.amber, '🟡'),
                             ],
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
 
-                    const SizedBox(height: 24),
+                    // 2. BLOC ÉTAT DE SIKA (AVEC EFFET DE MOUVEMENT CONTINU)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0B1329),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'État de Sika',
+                                  style: TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Actif et à l\'écoute',
+                                  style: TextStyle(
+                                    color: Color(0xFF10B981),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Je veille sur vos finances',
+                                  style: TextStyle(
+                                    color: Color(0xFF475569),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
-                    // AGENT ORB HERO
-                    AgentOrbWidget(
-                      state: sikaData.state,
-                      onTap: () => sikaNotifier.toggleListening(),
+                          // LE ROBOT ANIMÉ EN LÉVITATION
+                          AnimatedBuilder(
+                            animation: _robotAnimationController,
+                            builder: (context, child) {
+                              return Transform.translate(
+                                offset: Offset(0, _robotFloatAnimation.value),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Image.asset(
+                                    AppImages.bienv,
+                                    width: 82,
+                                    height: 82,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-
                     const SizedBox(height: 24),
-
-                    // PROACTIVE ALERT BANNER (If Active)
+                    // PROACTIVE ALERT BANNER (Si active)
                     if (_showAlert)
                       ProactiveAlertCard(
                         message:
-                            'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
+                        'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
                         onExamine: () => _openAnalysisSheet(sikaNotifier),
                         onDismiss: () {
                           setState(() => _showAlert = false);
                         },
                       ),
 
-                    // HUMAN CONFIRMATION BANNER (If Active)
+                    // HUMAN CONFIRMATION BANNER (Si active)
                     if (_showConfirmation)
                       HumanConfirmationCard(
                         actionTitle: 'Transfer Preparation',
@@ -223,19 +274,16 @@ letterSpacing: -0.5,
                         },
                       ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
 
-                    // SUGGESTIONS FOR YOU (Inspired directly by reference photo 3)
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Suggestions for You',
-                        style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
+                    // TEXTE SECTION SUGGESTIONS
+                    const Text(
+                      'Suggestions pour vous',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                       ),
                     ),
 
@@ -283,13 +331,13 @@ letterSpacing: -0.5,
               ),
             ),
 
-            // FLOATING INPUT BAR (Inspired by reference photos 3 & 4)
+            // FLOATING INPUT BAR ÉPURÉE (Uniquement le champ et le bouton d'envoi fléché)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: const Color(0xFF0B1329),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: const Color(0xFF334155)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.3),
@@ -304,49 +352,29 @@ letterSpacing: -0.5,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: const Color(0xff020614),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFF334155)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: TextField(
                         controller: _inputController,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: const InputDecoration(
                           hintText: 'Ask SIKA anything...',
-                          hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                          hintStyle: TextStyle(color: Color(0xFF475569), fontSize: 14),
                           border: InputBorder.none,
                         ),
                         onSubmitted: (val) => _submitQuery(val, sikaNotifier),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => sikaNotifier.toggleListening(),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: sikaData.state == SikaState.listening
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFF10B981).withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        sikaData.state == SikaState.listening ? Icons.mic_off : Icons.mic,
-                        color: sikaData.state == SikaState.listening
-                            ? Colors.white
-                            : const Color(0xFF10B981),
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: () => _submitQuery(_inputController.text, sikaNotifier),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF3B82F6),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -365,33 +393,44 @@ letterSpacing: -0.5,
     );
   }
 
-  Widget _buildWalletChip(String name, String amount, Color color) {
+  // COMPOSANT D'AIDE : LES CARTES DE COMPTES PORTEFEUILLES
+  Widget _buildWalletCard(String name, String amount, Color brandColor, String emoji) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          color: const Color(0xff020614).withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: brandColor.withValues(alpha: 0.12), width: 1.2),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              name,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 10),
             Text(
               amount,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -400,6 +439,7 @@ letterSpacing: -0.5,
     );
   }
 
+  // COMPOSANT D'AIDE : LES PILLULES DE SUGGESTION
   Widget _buildSuggestionPill({
     required String icon,
     required String text,
@@ -408,9 +448,9 @@ letterSpacing: -0.5,
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: const Color(0xFF0B1329),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -433,7 +473,7 @@ letterSpacing: -0.5,
               ),
               const Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Color(0xFF64748B),
+                color: Color(0xFF475569),
                 size: 14,
               ),
             ],

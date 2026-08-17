@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_images.dart';
 import '../widgets/sika_robot_animation.dart';
 import '../widgets/financial_animation.dart';
 import '../widgets/security_animation.dart';
@@ -25,21 +23,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'subtitle':
           'Votre agent financier autonome qui vous accompagne au quotidien.',
       'widget': const SikaRobotAnimation(),
-      'image': AppImages.bienv,
     },
     {
       'title': 'Sika comprend vos finances',
       'subtitle':
           'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
       'widget': const FinancialAnimation(),
-      'image': AppImages.bienv,
     },
     {
       'title': 'Toujours sous votre contrôle',
       'subtitle':
           'Sika agit avec votre autorisation pour toutes les actions sensibles.',
       'widget': const SecurityAnimation(),
-      'image': AppImages.bienv,
     },
   ];
 
@@ -52,38 +47,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xff020614), // Fond bleu nuit officiel de la maquette
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. FULLSCREEN BACKGROUND IMAGE TAKING THE ENTIRE SCREEN
-          Image.asset(
-            AppImages.bienv,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: AppColors.background,
-            ),
-          ),
-
-          // 2. DARK GRADIENT OVERLAY FOR CRISP TEXT READABILITY
+          // 1. HALO D'AMBIANCE DE FOND
           Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, 0.3),
+                radius: 1.2,
                 colors: [
-                  AppColors.background.withValues(alpha: 0.85),
-                  AppColors.background.withValues(alpha: 0.4),
-                  AppColors.background.withValues(alpha: 0.95),
+                  Color(0x0a3f8cff), // Halo bleu très discret et diffus
+                  Colors.transparent,
                 ],
-                stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
 
-          // 3. PAGE VIEW CONTENT (TOP TEXT OVERLAY + CENTER ANIMATIONS)
+          // 2. CONTENU DU PAGE VIEW AVEC VOS TRANSITIONS DE FONDU PARALLAXE
           SafeArea(
             child: Column(
               children: [
@@ -103,19 +85,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           double value = 1.0;
                           if (_pageController.position.haveDimensions) {
                             value = (_pageController.page ?? 0) - index;
-                            value = (1 - (value.abs() * 0.3)).clamp(0.0, 1.0);
+                            value = (1 - (value.abs() * 0.4)).clamp(0.0, 1.0);
                           }
 
                           return Opacity(
                             opacity: value,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 24.0, vertical: 16.0),
+                                horizontal: 24.0,
+                                vertical: 16.0,
+                              ),
                               child: Column(
                                 children: [
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 30),
 
-                                  // TOP TEXT DIRECTLY OVERLAID ON IMAGE
+                                  // TITRE DE L'ÉTAPE
                                   Text(
                                     step['title'] as String,
                                     textAlign: TextAlign.center,
@@ -123,40 +107,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       color: Colors.white,
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: -0.5,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 10,
-                                        ),
-                                      ],
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
 
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 14),
 
+                                  // SOUS-TITRE DE L'ÉTAPE
                                   Text(
                                     step['subtitle'] as String,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 14,
-                                      height: 1.4,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 8,
-                                        ),
-                                      ],
+                                      color: Color(0xff94a3b8), // Gris bleuté ultra-lisible
+                                      fontSize: 15,
+                                      height: 1.45,
                                     ),
                                   ),
 
                                   const Spacer(),
 
-                                  // CENTER ANIMATED HERO VISUAL
+                                  // COMPOSANT ANIMÉ DÉDIÉ (ROBOT, ECOSYSTEME, CADENAS)
                                   step['widget'] as Widget,
 
-                                  const Spacer(),
+                                  const Spacer(flex: 2),
                                 ],
                               ),
                             ),
@@ -167,7 +140,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                 ),
 
-                // PAGE INDICATOR DOTS (● ○ ○, ○ ● ○, ○ ○ ●)
+                // 3. INDICATEURS DE PAGE (POINTS HORIZONTAUX MODÈLE MAQUETTE)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
@@ -175,54 +148,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     (index) => AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == index ? 24 : 8,
+                      width: _currentPage == index ? 24 : 8, // Effet d'étirement moderne
                       height: 8,
                       decoration: BoxDecoration(
                         color: _currentPage == index
-                            ? AppColors.indigo
-                            : AppColors.border,
+                            ? const Color(0xff3f8cff) // Bleu brillant maquette
+                            : const Color(0xff1e293b), // Point inactif sombre
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
-                // MAIN BUTTON (SUIVANT / COMMENCER)
+                // 4. MAIN ACTION BUTTON (SUIVANT / COMMENCER EN DEGRADÉ MAQUETTE)
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_currentPage < _onboardingSteps.length - 1) {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeInOutCubic,
-                          );
-                        } else {
-                          widget.onFinish();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.indigo,
-                        foregroundColor: AppColors.white,
-                        elevation: 6,
-                        shadowColor: AppColors.indigo.withValues(alpha: 0.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_currentPage < _onboardingSteps.length - 1) {
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOutCubic,
+                        );
+                      } else {
+                        widget.onFinish();
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 56, // Épaisseur professionnelle
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xff3f8cff), // Bleu brillant
+                            Color(0xff635bff), // Violet Sika
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xff635bff).withValues(alpha: 0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        _currentPage == _onboardingSteps.length - 1
-                            ? 'Commencer'
-                            : 'Suivant',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      child: Center(
+                        child: Text(
+                          _currentPage == _onboardingSteps.length - 1
+                              ? 'Commencer'
+                              : 'Suivant',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),

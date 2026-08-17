@@ -18,7 +18,7 @@ dependencies:
   http: ^1.2.0
 
   # Voice & Audio AI
-  speech_to_text: ^6.6.0
+  speech_to_text: ^7.4.0
   flutter_tts: ^3.8.5
 
   # Icons & UI
@@ -30,6 +30,7 @@ dependencies:
 
   # Utilitaires
   intl: ^0.18.1
+  lottie: ^3.5.1
 
 dev_dependencies:
   flutter_test:
@@ -42,12 +43,14 @@ flutter:
   assets:
     - assets/images/
 
-# Configuration de l'écran de démarrage natif
+# Configuration de l'écran de démarrage natif (Nettoyé pour être invisible)
 flutter_native_splash:
-  color: "#0B0F19"
-  color_dark: "#0B0F19"
-  image: assets/images/sika_logo.png
+  color: "#020614" # Harmonisé avec le fond exact de votre SplashScreen Dart (0xff020614)
+  color_dark: "#020614"
+  fullscreen: true
+  # Ligne "image" supprimée volontairement ici pour éviter le logo statique initial
+
   android_12:
-    image: assets/images/sika_logo.png
-    icon_background_color: "#0B0F19"
-    color: "#0B0F19"
+    color: "#020614"
+    icon_background_color: "#020614"
+    # Ligne "image" supprimée volontairement ici aussi

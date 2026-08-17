@@ -12,6 +12,8 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -26,17 +28,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * SikaWakeWordServiceV2 — Service natif pour détection wake-word "Sika"
- * 
- * Fonctionnalités :
- * 1. Écoute continue du mot "Sika" (fallback simple si Vosk indisponible)
- * 2. À la détection : TTS "Oui {firstname} ?"
- * 3. STT pour capturer la commande complète
- * 4. Parsing et ajout à pending_transactions (SharedPreferences)
- * 5. MethodChannel pour notifier Flutter
- * 6. TTS de confirmation personnalisée
- */
 class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
 
     companion object {
@@ -153,7 +144,6 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
             try {
                 val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                 if (read > 0) {
-                    // Détection simple: ampleur audio
                     var loudSamples = 0
                     for (i in 0 until read step 2) {
                         if (i + 1 < read) {
@@ -163,14 +153,12 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                         }
                     }
 
-                    // Si >40% de samples sont forts, incrémenter compteur
                     if (loudSamples > read / 2.5) {
                         loudnessCount++
                     } else {
                         loudnessCount = Math.max(0, loudnessCount - 1)
                     }
 
-                    // Si loud pendant ~0.5s, traiter comme "Sika"
                     if (loudnessCount > 8) {
                         Log.d(TAG, "🎤 Wake-word detected (loud sound)")
                         onWakeWordDetected()
@@ -190,23 +178,20 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
             stopAudioRecord()
             Log.d(TAG, "======== WAKE-WORD DETECTED ========")
 
-            // Broadcast pour Flutter
             val intent = Intent(ACTION_WAKE_WORD_DETECTED)
             sendBroadcast(intent)
 
-            // Récupérer le prénom utilisateur
             val firstname = prefs.getString("user_firstname", "utilisateur") ?: "utilisateur"
             Log.d(TAG, "Username: $firstname")
 
-            // Dire bonjour en TTS
             val greeting = "Oui $firstname ?"
             speakAsync(greeting)
 
-            // Attendre 500ms que le TTS commence
-            Thread.sleep(500)
+            // Attente asynchrone non-bloquante de 500ms avant de capturer
+            Handler(Looper.getMainLooper()).postDelayed({
+                startCommandCapture()
+            }, 500)
 
-            // Démarrer STT pour capturer la commande
-            startCommandCapture()
         } catch (e: Exception) {
             Log.e(TAG, "Error in onWakeWordDetected: ${e.message}", e)
             restartWakeWordDetection()
@@ -219,54 +204,61 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
 
     private fun startCommandCapture() {
         Log.d(TAG, "Starting command capture...")
-        
+
         if (isProcessingCommand.getAndSet(true)) {
             Log.w(TAG, "Already processing a command, skipping")
             return
         }
 
-        try {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
-            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
+        // CORRECTIF SÉCURITÉ CRITICAL THREAD : On instancie le STT sur le thread principal
+        Handler(Looper.getMainLooper()).post {
+            try {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
+                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
 
-            val listener = object : RecognitionListener {
-                override fun onReadyForSpeech(params: android.os.Bundle?) {
-                    Log.d(TAG, "Ready for speech input")
+                val listener = object : RecognitionListener {
+                    override fun onReadyForSpeech(params: android.os.Bundle?) {
+                        Log.d(TAG, "Ready for speech input")
+                    }
+                    override fun onBeginningOfSpeech() {
+                        Log.d(TAG, "User started speaking")
+                    }
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        Log.d(TAG, "User finished speaking")
+                    }
+                    override fun onError(error: Int) {
+                        Log.e(TAG, "STT Error code: $error")
+                        isProcessingCommand.set(false)
+                        restartWakeWordDetection()
+                    }
+                    override fun onResults(results: android.os.Bundle?) {
+                        handleSTTResults(results)
+                        isProcessingCommand.set(false)
+                    }
+                    override fun onPartialResults(partialResults: android.os.Bundle?) {}
+                    override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
                 }
-                override fun onBeginningOfSpeech() {
-                    Log.d(TAG, "User started speaking")
-                }
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {
-                    Log.d(TAG, "User finished speaking")
-                }
-                override fun onError(error: Int) {
-                    Log.e(TAG, "STT Error code: $error")
-                    isProcessingCommand.set(false)
-                    restartWakeWordDetection()
-                }
-                override fun onResults(results: android.os.Bundle?) {
-                    handleSTTResults(results)
-                    isProcessingCommand.set(false)
-                }
-                override fun onPartialResults(partialResults: android.os.Bundle?) {}
-                override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
+
+                speechRecognizer?.setRecognitionListener(listener)
+                speechRecognizer?.startListening(intent)
+                Log.d(TAG, "✅ SpeechRecognizer active on Main Thread")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting STT: ${e.message}", e)
+                isProcessingCommand.set(false)
+                restartWakeWordDetection()
             }
-
-            speechRecognizer?.setRecognitionListener(listener)
-            speechRecognizer?.startListening(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting STT: ${e.message}", e)
-            isProcessingCommand.set(false)
-            restartWakeWordDetection()
         }
     }
+    // ============================================================================
+    // STT RESULTS PROCESSING
+    // ============================================================================
 
     private fun handleSTTResults(results: android.os.Bundle?) {
         try {
@@ -280,7 +272,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
             val command = matches[0].lowercase(Locale.getDefault())
             Log.d(TAG, "📝 STT result: \"$command\"")
 
-            // Parser la commande
+            // Parser la commande via vos règles Regex
             val (intention, entities) = parseCommand(command)
             Log.d(TAG, "Parsed intention: $intention, entities: $entities")
 
@@ -290,8 +282,10 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                 }
                 "unknown" -> {
                     speakAsync("Désolé, je n'ai pas compris votre demande.")
-                    Thread.sleep(2000)
-                    restartWakeWordDetection()
+                    // CORRECTIF NON-BLOQUANT : Attente asynchrone pour laisser parler le TTS sans figer l'écran
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        restartWakeWordDetection()
+                    }, 2000)
                 }
                 else -> {
                     Log.d(TAG, "Intention not yet handled: $intention")
@@ -305,7 +299,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
     }
 
     // ============================================================================
-    // COMMAND PARSING
+    // COMMAND PARSING (VOTRE ENGINE REGEX)
     // ============================================================================
 
     private data class ParseResult(val intention: String, val entities: Map<String, String>)
@@ -313,9 +307,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
     private fun parseCommand(command: String): ParseResult {
         val entities = mutableMapOf<String, String>()
 
-        // Patterns pour détection de dépense
         if (command.contains(Regex("ajoute|enregistre|ajouter|dépen|expense", RegexOption.IGNORE_CASE))) {
-            // Extraire le montant (ex: "5000", "10 mille")
             val amountMatch = Regex("""(\d+)\s*(?:mille|k|fcfa|cfa)?""").find(command)
             if (amountMatch != null) {
                 var amount = amountMatch.groupValues[1].toInt()
@@ -325,7 +317,6 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                 entities["amount"] = amount.toString()
             }
 
-            // Extraire la catégorie (transport, repas, etc.)
             val categoryMatch = Regex(
                 """(transport|taxi|bus|essence|food|repas|manger|eat|café|cofee|santé|health|médecin|shopping|course|loisir|divertissement)""",
                 RegexOption.IGNORE_CASE
@@ -334,7 +325,6 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                 entities["category"] = categoryMatch.groupValues[0].lowercase()
             }
 
-            // Notes/description
             entities["description"] = command
 
             if (entities.containsKey("amount")) {
@@ -346,7 +336,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
     }
 
     // ============================================================================
-    // HANDLE EXPENSE
+    // HANDLE EXPENSE & FLUTTER SYNCHRONIZATION
     // ============================================================================
 
     private fun handleAddExpense(entities: Map<String, String>) {
@@ -360,7 +350,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
             val description = entities["description"] ?: ""
             val firstname = prefs.getString("user_firstname", "utilisateur") ?: "utilisateur"
 
-            // Créer la transaction
+            // Créer l'objet JSON de transaction
             val transaction = JSONObject().apply {
                 put("amount", amount)
                 put("category", category)
@@ -370,19 +360,19 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                 put("status", "pending")
             }
 
-            // Ajouter à pending_transactions
+            // Mettre en cache locale Android
             addPendingTransaction(transaction)
 
-            // TTS confirmation
+            // Confirmation vocale (TTS)
             val confirmation = "Très bien $firstname, j'ai enregistré $amount FCFA en $category."
             speakAsync(confirmation)
             Log.d(TAG, "✅ Expense added and confirmed via TTS")
 
-            // Attendre la fin du TTS
-            Thread.sleep(3000)
+            // CORRECTIF SÉCURITÉ NON-BLOQUANT : Laisse 3 secondes au TTS pour parler, puis relance l'écoute
+            Handler(Looper.getMainLooper()).postDelayed({
+                restartWakeWordDetection()
+            }, 3000)
 
-            // Relancer détection
-            restartWakeWordDetection()
         } catch (e: Exception) {
             Log.e(TAG, "Error handling expense: ${e.message}", e)
             speakAsync("Une erreur s'est produite.")
@@ -398,7 +388,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
             prefs.edit().putString("pending_transactions", array.toString()).apply()
             Log.d(TAG, "📌 Pending transaction saved (total: ${array.length()})")
 
-            // Notifier Flutter via MethodChannel (sera fait via MainActivity broadcast)
+            // Notifier Flutter via un Broadcast global intercepté par MainActivity
             val intent = Intent("com.gertonargent.PENDING_TRANSACTION_ADDED")
             intent.putExtra("transaction", transaction.toString())
             sendBroadcast(intent)
@@ -427,7 +417,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
     }
 
     // ============================================================================
-    // CLEANUP & RESTART
+    // CLEANUP & RESTART (ZONE DE NETTOYAGE AUDIO)
     // ============================================================================
 
     private fun stopListening() {
@@ -451,12 +441,15 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
         Log.d(TAG, "Restarting wake-word detection...")
         isListening.set(false)
         stopAudioRecord()
-        Thread.sleep(500)
-        startWakeWordDetection()
+
+        // Relance de la détection de bruit de fond de manière propre et asynchrone
+        Handler(Looper.getMainLooper()).postDelayed({
+            startWakeWordDetection()
+        }, 500)
     }
 
     // ============================================================================
-    // NOTIFICATION
+    // FOREGROUND NOTIFICATION MANAGEMENT
     // ============================================================================
 
     private fun createNotificationChannel() {
