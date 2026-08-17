@@ -89,21 +89,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       backgroundColor: const Color(0xff020614),
       body: Stack(
         children: [
+          // 1. FOND GRADIENT AMBIANT HOMOGÈNE
           Container(
             width: double.infinity,
             height: double.infinity,
             decoration: const BoxDecoration(
+              color: Color(0xff020614),
               gradient: RadialGradient(
-                center: Alignment(0, -0.2),
-                radius: 1.1,
+                center: Alignment(0, -0.3),
+                radius: 0.95,
                 colors: [
-                  Color(0x1a3f8cff),
+                  Color(0x2838bdf8), // Halo lumineux cyan subtil
                   Color(0xff020614),
                 ],
               ),
             ),
           ),
 
+          // 2. LOGO ET TEXTE ANIMÉ AU CENTRE
           Center(
             child: AnimatedBuilder(
               animation: _contentController,
@@ -115,10 +118,22 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       opacity: _logoFade.value,
                       child: Transform.scale(
                         scale: _logoScale.value,
-                        child: Image.asset(
-                          AppImages.logo,
-                          width: 145,
-                          gaplessPlayback: true,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
+                                blurRadius: 40,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Image.asset(
+                            AppImages.logo,
+                            width: 145,
+                            gaplessPlayback: true,
+                          ),
                         ),
                       ),
                     ),
@@ -136,13 +151,13 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               letterSpacing: 1.8,
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          Text(
+                          const SizedBox(height: 12),
+                          const Text(
                             "Your Autonomous\nFinancial Agent",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: const Color(0xff3f8cff).withValues(alpha: 0.95),
-                              fontSize: 18,
+                              color: Color(0xFF94A3B8), // Lisibilité parfaite en argenté/cyan
+                              fontSize: 16,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
                               letterSpacing: 0.6,
@@ -151,15 +166,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         ],
                       ),
                     ),
-                    const SizedBox(height: 120),
+                    const SizedBox(height: 100),
                   ],
                 );
               },
             ),
           ),
 
+          // 3. VAGUES CYAN EN ARRIÈRE-PLAN (FUSION SANS DÉCUT DE FOND)
           Positioned(
-            bottom: 85,
+            bottom: 75,
             left: 0,
             right: 0,
             child: AnimatedBuilder(
@@ -168,11 +184,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 return Transform.translate(
                   offset: Offset(0, _waveSlide.value * 15),
                   child: Opacity(
-                    opacity: 0.85,
+                    opacity: 0.9,
                     child: Image.asset(
                       AppImages.wave,
                       gaplessPlayback: true,
                       fit: BoxFit.contain,
+                      colorBlendMode: BlendMode.screen,
                     ),
                   ),
                 );
@@ -180,8 +197,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             ),
           ),
 
+          // 4. JAUGE DE CHARGEMENT LINÉAIRE PROGRESSIVE (VERT ÉCLATANT)
           Positioned(
-            bottom: 60,
+            bottom: 50,
             left: 85,
             right: 85,
             child: ClipRRect(
@@ -194,7 +212,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     return LinearProgressIndicator(
                       value: _progressController.value,
                       backgroundColor: Colors.white.withValues(alpha: 0.08),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xff4facfe)),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF10B981),
+                      ),
                     );
                   },
                 ),
