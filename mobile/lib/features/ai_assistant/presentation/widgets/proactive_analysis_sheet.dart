@@ -87,16 +87,16 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Analyse de SIKA',
+                    const Text(
+                      'SIKA Analysis',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      'Intervention proactive SIKA',
+                    const Text(
+                      'Proactive SIKA Intervention',
                       style: TextStyle(
                         color: Color(0xFFF59E0B),
                         fontSize: 12,
@@ -125,24 +125,24 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildMetricRow('💰 Dépense détectée', '30 000 FCFA', isHighlight: true),
+                _buildMetricRow('💰 Expense Detected', '30 000 FCFA', isHighlight: true),
                 const Divider(color: Color(0xFF1E293B), height: 16),
-                _buildMetricRow('Catégorie', 'Restauration'),
+                _buildMetricRow('Category', 'Dining / Restaurant'),
                 const SizedBox(height: 6),
-                _buildMetricRow('Dépenses similaires cette semaine', '12 500 FCFA'),
+                _buildMetricRow('Similar spending this week', '12 500 FCFA'),
                 const SizedBox(height: 6),
-                _buildMetricRow('Budget restant', '45 000 FCFA'),
+                _buildMetricRow('Remaining budget', '45 000 FCFA'),
                 const SizedBox(height: 6),
-                _buildMetricRow('Objectif d\'épargne du mois', '50 000 FCFA'),
+                _buildMetricRow('Monthly savings goal', '50 000 FCFA'),
               ],
             ),
           ),
 
           const SizedBox(height: 20),
 
-          // REASONING SECTION ("Pourquoi je t'alerte ?")
+          // REASONING SECTION ("Why am I alerting you?")
           const Text(
-            'Pourquoi je t\'alerte ?',
+            'Why am I alerting you?',
             style: TextStyle(
               color: Colors.white,
               fontSize: 14,
@@ -158,7 +158,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
             ),
             child: const Text(
-              'Cette dépense représente une part importante de ton budget restant et risque de compromettre ton objectif d\'épargne de 50 000 FCFA.',
+              'This single expense consumes about two-thirds of your remaining budget (45,000 FCFA) and threatens your 50,000 FCFA savings target.',
               style: TextStyle(
                 color: Color(0xFFE2E8F0),
                 fontSize: 13,
@@ -169,9 +169,9 @@ class ProactiveAnalysisSheet extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ACTION CHOICES ("Que veux-tu faire ?")
+          // ACTION CHOICES ("What would you like to do?")
           const Text(
-            'Que veux-tu faire ?',
+            'What would you like to do?',
             style: TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 13,
@@ -193,7 +193,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Ignorer'),
+                  child: const Text('Ignore'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -208,7 +208,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Voir mes dépenses', style: TextStyle(fontSize: 12)),
+                  child: const Text('View Spending', style: TextStyle(fontSize: 11)),
                 ),
               ),
               const SizedBox(width: 8),

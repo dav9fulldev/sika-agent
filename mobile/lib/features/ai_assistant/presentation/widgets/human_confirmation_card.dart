@@ -9,8 +9,8 @@ class HumanConfirmationCard extends StatelessWidget {
 
   const HumanConfirmationCard({
     super.key,
-    this.actionTitle = 'Préparation de Transfert',
-    this.recipientText = 'Kouamé',
+    this.actionTitle = 'Transfer Preparation',
+    this.recipientText = 'Kouamé (Wave)',
     this.amountText = '10 000 FCFA',
     required this.onConfirm,
     required this.onCancel,
@@ -68,7 +68,7 @@ class HumanConfirmationCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Validation de sécurité requise par SIKA',
+                      'Security Validation Required',
                       style: TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 11,
@@ -101,7 +101,7 @@ class HumanConfirmationCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Destinataire: $recipientText',
+                      'Recipient: $recipientText',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,

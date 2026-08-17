@@ -68,7 +68,7 @@ class ProactiveAlertCard extends StatelessWidget {
                       ),
                     ),
                     const Text(
-                      'Intervention proactive SIKA',
+                      'Proactive SIKA Intervention',
                       style: TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 11,
@@ -112,13 +112,13 @@ class ProactiveAlertCard extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF94A3B8),
                 ),
-                child: const Text('Ignorer'),
+                child: const Text('Ignore'),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: onExamine,
                 icon: const Icon(Icons.analytics_outlined, size: 16),
-                label: const Text('Examiner'),
+                label: const Text('Review'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF59E0B),
                   foregroundColor: Colors.black,

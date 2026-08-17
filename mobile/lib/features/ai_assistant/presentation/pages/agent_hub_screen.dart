@@ -128,7 +128,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                     if (_showAlert)
                       ProactiveAlertCard(
                         message:
-                            'Une dépense de 30 000 FCFA vient d\'être détectée. D\'après tes dépenses récentes et ton objectif d\'épargne, cette dépense risque de compromettre ton objectif du mois.',
+                            'A 30,000 FCFA expense was just detected. Based on your recent spending and savings target, this single expense consumes about two-thirds of your remaining budget.',
                         onExamine: () => _openAnalysisSheet(sikaNotifier),
                         onDismiss: () {
                           setState(() => _showAlert = false);
@@ -138,11 +138,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                     // HUMAN CONFIRMATION BANNER (If Active)
                     if (_showConfirmation)
                       HumanConfirmationCard(
-                        actionTitle: 'Préparation de Transfert',
+                        actionTitle: 'Transfer Preparation',
                         recipientText: 'Kouamé (Wave)',
                         amountText: '10 000 FCFA',
                         onConfirm: () {
-                          sikaNotifier.sendTextMessage('Je confirme le transfert de 10 000 FCFA.');
+                          sikaNotifier.sendTextMessage('I confirm the transfer of 10,000 FCFA.');
                           setState(() => _showConfirmation = false);
                         },
                         onCancel: () {
@@ -170,36 +170,36 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
 
                     _buildSuggestionPill(
                       icon: '💰',
-                      text: 'Est-ce que je peux dépenser 15 000 FCFA aujourd\'hui ?',
+                      text: 'How much money do I have in total?',
                       onTap: () => _submitQuery(
-                        'Est-ce que je peux dépenser 15 000 FCFA aujourd\'hui ?',
+                        'How much money do I have in total?',
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '🎯',
-                      text: 'Comment avance mon objectif d\'épargne ?',
+                      text: 'How is my savings goal progressing?',
                       onTap: () => _submitQuery(
-                        'Comment avance mon objectif d\'épargne ?',
+                        'How is my savings goal progressing?',
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '📊',
-                      text: 'Quel est mon solde total Mobile Money ?',
+                      text: 'What is my total Mobile Money balance?',
                       onTap: () => _submitQuery(
-                        'Quel est mon solde total Mobile Money ?',
+                        'What is my total Mobile Money balance?',
                         sikaNotifier,
                       ),
                     ),
 
                     _buildSuggestionPill(
                       icon: '⚡',
-                      text: 'Analyser mes dépenses récentes',
+                      text: 'Analyze my recent expenses',
                       onTap: () => _submitQuery(
-                        'Analyser mes dépenses récentes',
+                        'Analyze my recent expenses',
                         sikaNotifier,
                       ),
                     ),

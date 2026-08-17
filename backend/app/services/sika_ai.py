@@ -13,11 +13,15 @@ import json
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 import openai
+# pyrefly: ignore [missing-import]
 import httpx
 
 try:
+    # pyrefly: ignore [missing-import]
     from google import genai
+    # pyrefly: ignore [missing-import]
     from google.genai import types
     HAS_GOOGLE_GENAI = True
 except ImportError:
