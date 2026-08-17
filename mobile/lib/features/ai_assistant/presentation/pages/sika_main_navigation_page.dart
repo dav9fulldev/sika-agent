@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
+import '../widgets/sika_voice_overlay_widget.dart';
 import 'agent_hub_screen.dart';
 import 'sika_chat_screen.dart';
 import 'insights_screen.dart';
 import '../../../profile/presentation/pages/profile_screen.dart';
 
-/// SikaMainNavigationPage — Main navigation scaffold with 4 aligned screens
-/// and an interactive "Hold-to-Talk" central voice button.
+/// SikaMainNavigationPage — Main navigation scaffold with 4 aligned screens,
+/// a Siri-style voice listening overlay, and an interactive central voice button.
 class SikaMainNavigationPage extends ConsumerStatefulWidget {
   const SikaMainNavigationPage({super.key});
 
@@ -53,12 +54,20 @@ class _SikaMainNavigationPageState
 
     return Scaffold(
       backgroundColor: const Color(0xff020614),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+      body: Stack(
+        children: [
+          // 1. NAVIGATION PRINCIPALE (INDEXED STACK)
+          IndexedStack(
+            index: _currentIndex,
+            children: pages,
+          ),
+
+          // 2. OVERLAY GLOBAL STYLE SIRI ("Sika écoute...")
+          const SikaVoiceOverlayWidget(),
+        ],
       ),
 
-      // 4. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK)
+      // 3. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK)
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: GestureDetector(
         onLongPressStart: (_) async {
@@ -106,7 +115,7 @@ class _SikaMainNavigationPageState
         ),
       ),
 
-      // 5. BARRE DE NAVIGATION MAQUETTE BLEU NUIT (#0B1329) AVEC BORDURE ULTRA-FINE
+      // 4. BARRE DE NAVIGATION MAQUETTE BLEU NUIT (#0B1329) AVEC BORDURE ULTRA-FINE
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Color(0xFF0B1329),
