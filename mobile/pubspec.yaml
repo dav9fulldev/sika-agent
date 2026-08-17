@@ -17,6 +17,9 @@ dependencies:
   # Network & API
   http: ^1.2.0
 
+  # Storage & Preferences
+  shared_preferences: ^2.2.2
+
   # Voice & Audio AI
   speech_to_text: ^7.4.0
   flutter_tts: ^3.8.5

@@ -27,7 +27,7 @@ class SikaApp extends StatefulWidget {
 }
 
 class _SikaAppState extends State<SikaApp> {
-  int _appStep = 0; // 0 = Splash, 1 = Onboarding, 2 = Auth / Login, 3 = Main Agent Hub
+  bool _splashFinished = false;
 
   @override
   void initState() {
@@ -59,29 +59,32 @@ class _SikaAppState extends State<SikaApp> {
     return Consumer(
       builder: (context, ref, child) {
         final authState = ref.watch(authProvider);
+        final authNotifier = ref.read(authProvider.notifier);
 
         Widget currentScreen;
-        switch (_appStep) {
-          case 0:
-            currentScreen = SplashScreen(
-              key: const ValueKey(0),
-              onFinish: () => setState(() => _appStep = 1),
-            );
-            break;
-          case 1:
-            currentScreen = OnboardingScreen(
-              key: const ValueKey(1),
-              onFinish: () => setState(() => _appStep = 2),
-            );
-            break;
-          case 2:
-          default:
-            if (authState.isAuthenticated) {
-              currentScreen = const SikaMainNavigationPage(key: ValueKey(3));
-            } else {
-              currentScreen = const LoginScreen(key: ValueKey(2));
-            }
-            break;
+
+        if (!_splashFinished) {
+          // 1. SPLASH SCREEN (Affiché au tout premier démarrage)
+          currentScreen = SplashScreen(
+            key: const ValueKey('splash'),
+            onFinish: () {
+              setState(() => _splashFinished = true);
+            },
+          );
+        } else if (!authState.hasSeenOnboarding) {
+          // 2. ONBOARDING (Seulement sur un nouvel appareil / 1ère installation)
+          currentScreen = OnboardingScreen(
+            key: const ValueKey('onboarding'),
+            onFinish: () {
+              authNotifier.completeOnboarding();
+            },
+          );
+        } else if (!authState.isAuthenticated) {
+          // 3. ECRAN DE CONNEXION / INSCRIPTION (Après l'onboarding ou après déconnexion)
+          currentScreen = const LoginScreen(key: ValueKey('login'));
+        } else {
+          // 4. HUB AGENT SIKA (Utilisateur authentifié)
+          currentScreen = const SikaMainNavigationPage(key: ValueKey('main_hub'));
         }
 
         return MaterialApp(
