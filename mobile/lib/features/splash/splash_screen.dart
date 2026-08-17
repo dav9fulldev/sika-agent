@@ -1,15 +1,12 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:paymechap/screens/register_screen.dart';
-
-import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_images.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_images.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_images.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback onFinish;
+
+  const SplashScreen({super.key, required this.onFinish});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -25,10 +22,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     dotTimer = Timer.periodic(
       const Duration(milliseconds: 400),
-          (timer) {
-        setState(() {
-          activeDot = (activeDot + 1) % 3;
-        });
+      (timer) {
+        if (mounted) {
+          setState(() {
+            activeDot = (activeDot + 1) % 3;
+          });
+        }
       },
     );
 
@@ -53,97 +52,9 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> checkSession() async {
     await Future.delayed(const Duration(seconds: 3));
 
-    final tokenService = TokenService();
-
-    final hasToken = await tokenService.hasToken();
-    final telephone = await tokenService.getTelephone();
-    final state = await tokenService.getOnboardingState();
-
     if (!mounted) return;
 
-    switch (state) {
-      case TokenService.stateRegister:
-        if (telephone != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RegisterScreen(
-                telephone: telephone,
-              ),
-            ),
-          );
-          return;
-        }
-        break;
-
-      case TokenService.stateOtp:
-        if (telephone != null && telephone.isNotEmpty) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OtpCodeScreen(
-                telephone: telephone,
-              ),
-            ),
-          );
-          return;
-        }
-        break;
-
-      case TokenService.stateSecurityCode:
-        if (telephone != null && telephone.isNotEmpty) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SecurityCodeScreen(
-                telephone: telephone,
-              ),
-            ),
-          );
-          return;
-        }
-        break;
-
-      case TokenService.stateCreatePin:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const CreatePinScreen(),
-          ),
-        );
-        return;
-
-      case TokenService.stateBiometric:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const BiometricSetupScreen(),
-          ),
-        );
-        return;
-
-      case TokenService.stateCompleted:
-        if (hasToken && telephone != null && telephone.isNotEmpty) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const PinScreen(
-                mode: "unlock",
-                showBackButton: false,
-              ),
-            ),
-          );
-          return;
-        }
-        break;
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const PhoneAuthScreen(),
-      ),
-    );
+    widget.onFinish();
   }
 
   @override
@@ -162,8 +73,8 @@ class _SplashScreenState extends State<SplashScreen> {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.darkBlue,
-                  AppColors.darkBlue,
+                  AppColors.background,
+                  AppColors.background,
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -187,17 +98,17 @@ class _SplashScreenState extends State<SplashScreen> {
                   text: const TextSpan(
                     children: [
                       TextSpan(
-                        text: "Payme ",
+                        text: "Sika ",
                         style: TextStyle(
-                          color: AppColors.white,
+                          color: Colors.white,
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       TextSpan(
-                        text: "Chap",
+                        text: "Assistant",
                         style: TextStyle(
-                          color: AppColors.success,
+                          color: AppColors.cyan,
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
@@ -209,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 const SizedBox(height: 10),
 
                 const Text(
-                  "Simple. Rapide. Sécurisé",
+                  "Your Autonomous Financial Agent",
                   style: TextStyle(
                     color: Colors.white70,
                   ),
@@ -254,7 +165,7 @@ class _SplashScreenState extends State<SplashScreen> {
       width: 10,
       height: 10,
       decoration: BoxDecoration(
-        color: activeDot == index ? AppColors.success : AppColors.white,
+        color: activeDot == index ? AppColors.cyan : Colors.white,
         shape: BoxShape.circle,
       ),
     );
