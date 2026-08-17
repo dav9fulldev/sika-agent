@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_colors.dart';
 import 'agent_hub_screen.dart';
 import 'sika_chat_screen.dart';
 import 'insights_screen.dart';
 import 'settings_screen.dart';
+import '../../../profile/presentation/pages/profile_screen.dart';
 
 class SikaMainNavigationPage extends StatefulWidget {
   const SikaMainNavigationPage({super.key});
@@ -24,6 +26,7 @@ class _SikaMainNavigationPageState extends State<SikaMainNavigationPage> {
       const InsightsScreen(),
       const SikaChatScreen(),
       const SettingsScreen(),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
@@ -33,39 +36,47 @@ class _SikaMainNavigationPageState extends State<SikaMainNavigationPage> {
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF1E293B),
-          border: Border(top: BorderSide(color: Color(0xFF334155), width: 1)),
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
-          backgroundColor: const Color(0xFF1E293B),
-          selectedItemColor: const Color(0xFF10B981), // Emerald accent
-          unselectedItemColor: const Color(0xFF64748B),
+          backgroundColor: AppColors.surface,
+          selectedItemColor: AppColors.emerald,
+          unselectedItemColor: AppColors.textMuted,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.smart_toy_outlined),
-              activeIcon: Icon(Icons.smart_toy),
-              label: 'Agent',
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home_filled),
+              label: 'Hub',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.lightbulb_outline),
-              activeIcon: Icon(Icons.lightbulb),
+              icon: Icon(Icons.insights_outlined),
+              activeIcon: Icon(Icons.insights),
               label: 'Insights',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
+              icon: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.indigo,
+                child: Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+              ),
               label: 'Chat',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings),
-              label: 'Settings',
+              label: 'Réglages',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profil',
             ),
           ],
         ),

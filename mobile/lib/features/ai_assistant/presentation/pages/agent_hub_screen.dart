@@ -114,7 +114,99 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+
+                    // SOLDE TOTAL MULTI-WALLET CARD (Screen 3 from Design Specs)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF334155)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Solde total',
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Text(
+                                  '3 portefeuilles',
+                                  style: TextStyle(
+                                    color: Color(0xFF10B981),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            '45 000 FCFA',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              _buildWalletChip('Wave', '15 000 FCFA', const Color(0xFF38BDF8)),
+                              const SizedBox(width: 6),
+                              _buildWalletChip('Orange Money', '22 000 FCFA', const Color(0xFFF59E0B)),
+                              const SizedBox(width: 6),
+                              _buildWalletChip('MTN MoMo', '8 000 FCFA', const Color(0xFFEAB308)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // QUICK ACTIONS ROW (Screen 3 from Design Specs)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildQuickActionButton(Icons.send, 'Envoyer', () {
+                          _submitQuery('Préparer un transfert', sikaNotifier);
+                        }),
+                        _buildQuickActionButton(Icons.account_balance_wallet, 'Retirer', () {
+                          _submitQuery('Combien ai-je au total ?', sikaNotifier);
+                        }),
+                        _buildQuickActionButton(Icons.receipt_long, 'Payer', () {
+                          _submitQuery('Voir mes factures à payer', sikaNotifier);
+                        }),
+                        _buildQuickActionButton(Icons.qr_code_scanner, 'Scanner', () {}),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
 
                     // AGENT ORB HERO
                     AgentOrbWidget(
@@ -122,7 +214,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
                       onTap: () => sikaNotifier.toggleListening(),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
                     // PROACTIVE ALERT BANNER (If Active)
                     if (_showAlert)
@@ -288,6 +380,69 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWalletChip(String name, String amount, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              name,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              amount,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Icon(icon, color: const Color(0xFF38BDF8), size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
