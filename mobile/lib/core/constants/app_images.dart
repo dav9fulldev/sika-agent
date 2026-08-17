@@ -4,4 +4,5 @@ class AppImages {
   static const String sikaLogo = 'assets/images/sika_logo.png';
   static const String logo = 'assets/images/sika_logo.png';
   static const String splash = 'assets/images/splash.png';
+  static const String bienv = 'assets/images/bienv.png';
 }

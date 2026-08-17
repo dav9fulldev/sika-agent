@@ -18,18 +18,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, String>> _pages = [
     {
       'title': 'Bienvenue chez Sika 👋',
-      'subtitle': 'Votre agent financier autonome qui vous accompagne au quotidien.',
-      'icon': '🤖',
+      'subtitle':
+          'Votre agent financier autonome qui vous accompagne au quotidien.',
+      'image': AppImages.bienv,
     },
     {
       'title': 'Sika comprend vos finances',
-      'subtitle': 'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
-      'icon': '📊',
+      'subtitle':
+          'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
+      'image': AppImages.bienv,
     },
     {
       'title': 'Toujours sous votre contrôle',
-      'subtitle': 'Sika agit avec votre autorisation pour toutes les actions sensibles.',
-      'icon': '🛡️',
+      'subtitle':
+          'Sika agit avec votre autorisation pour toutes les actions sensibles.',
+      'image': AppImages.bienv,
     },
   ];
 
@@ -41,31 +44,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // SIKA BRAND LOGO HEADER
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  AppImages.sikaLogo,
-                  width: 36,
-                  height: 36,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.auto_awesome,
-                    color: AppColors.cyan,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Sika',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -76,60 +54,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemBuilder: (context, index) {
                   final item = _pages[index];
                   return Padding(
-                    padding: const EdgeInsets.all(32.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // HERO ANIMATED ORB / ICON CONTAINER
-                        Container(
-                          width: 160,
-                          height: 160,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                index == 0
-                                    ? AppColors.indigo.withValues(alpha: 0.4)
-                                    : index == 1
-                                        ? AppColors.cyan.withValues(alpha: 0.4)
-                                        : AppColors.emerald.withValues(alpha: 0.4),
-                                Colors.transparent,
-                              ],
-                            ),
-                            border: Border.all(
-                              color: index == 0
-                                  ? AppColors.indigo
-                                  : index == 1
-                                      ? AppColors.cyan
-                                      : AppColors.emerald,
-                              width: 2,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              item['icon']!,
-                              style: const TextStyle(fontSize: 64),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 40),
                         Text(
                           item['title']!,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           item['subtitle']!,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 14,
-                            height: 1.5,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // CENTRAL 3D BOT ORB VISUAL FROM USER ASSETS (assets/images/bienv.png)
+                        SizedBox(
+                          height: 240,
+                          child: Image.asset(
+                            item['image']!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              width: 160,
+                              height: 160,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.indigo.withValues(alpha: 0.2),
+                              ),
+                              child: const Icon(
+                                Icons.auto_awesome,
+                                color: AppColors.cyan,
+                                size: 80,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -158,9 +127,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // ACTION BUTTON
+            // ACTION BUTTON (SUIVANT / COMMENCER)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: SizedBox(
@@ -180,6 +149,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.indigo,
                     foregroundColor: AppColors.white,
+                    elevation: 4,
+                    shadowColor: AppColors.indigo.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
