@@ -59,60 +59,60 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen> {
     final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        elevation: 0,
-        centerTitle: false,
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Bonjour David 👋',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            Text(
-              'Your Personal AI Financial Agent',
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_outlined, color: Colors.white70),
-            onPressed: widget.onOpenInsights,
-            tooltip: 'Insights',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
+return Scaffold(
+backgroundColor: const Color(0xFF0F172A),
+appBar: AppBar(
+backgroundColor: const Color(0xFF0F172A),
+elevation: 0,
+centerTitle: false,
+title: const Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
+Text(
+'Bonjour David 👋',
+style: TextStyle(
+color: Colors.white,
+fontWeight: FontWeight.bold,
+fontSize: 18,
+),
+),
+Text(
+'Your Personal AI Financial Agent',
+style: TextStyle(
+color: Color(0xFF94A3B8),
+fontSize: 12,
+),
+),
+],
+),
+actions: [
+IconButton(
+icon: const Icon(Icons.tune_outlined, color: Colors.white70),
+onPressed: widget.onOpenInsights,
+tooltip: 'Insights',
+),
+],
+),
+body: SafeArea(
+child: Column(
+children: [
+Expanded(
+child: SingleChildScrollView(
+padding: const EdgeInsets.symmetric(horizontal: 20),
+child: Column(
+children: [
+const SizedBox(height: 12),
 
-                    // MAIN TITLE
-                    const Text(
-                      'How can I help you?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
+// MAIN TITLE
+const Text(
+'How can I help you?',
+style: TextStyle(
+color: Colors.white,
+fontSize: 24,
+fontWeight: FontWeight.bold,
+letterSpacing: -0.5,
+),
+),
 
                     const SizedBox(height: 16),
 
