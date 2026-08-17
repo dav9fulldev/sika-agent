@@ -26,7 +26,7 @@ class AuthState {
   final String? errorMessage;
 
   AuthState({
-    this.isAuthenticated = true, // Logged in by default for testing
+    this.isAuthenticated = false, // Par défaut non connecté pour passer par Login/Register après Onboarding
     this.isLoading = false,
     this.user,
     this.errorMessage,
@@ -48,17 +48,7 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier()
-      : super(
-          AuthState(
-            isAuthenticated: true,
-            user: UserProfileData(
-              id: "usr_1001",
-              name: "David YAO",
-              email: "david.yao@email.com",
-            ),
-          ),
-        );
+  AuthNotifier() : super(AuthState(isAuthenticated: false));
 
   /// Connexion classique avec Email et Mot de passe
   Future<bool> loginWithEmail(String email, String password) async {

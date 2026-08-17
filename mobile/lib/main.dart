@@ -27,7 +27,7 @@ class SikaApp extends StatefulWidget {
 }
 
 class _SikaAppState extends State<SikaApp> {
-  int _appStep = 0; // 0 = Splash, 1 = Onboarding, 2 = Main Agent / Auth
+  int _appStep = 0; // 0 = Splash, 1 = Onboarding, 2 = Auth / Login, 3 = Main Agent Hub
 
   @override
   void initState() {
@@ -77,9 +77,9 @@ class _SikaAppState extends State<SikaApp> {
           case 2:
           default:
             if (authState.isAuthenticated) {
-              currentScreen = const SikaMainNavigationPage(key: ValueKey(2));
+              currentScreen = const SikaMainNavigationPage(key: ValueKey(3));
             } else {
-              currentScreen = const LoginScreen(key: ValueKey(3));
+              currentScreen = const LoginScreen(key: ValueKey(2));
             }
             break;
         }
