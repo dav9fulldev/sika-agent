@@ -187,6 +187,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   void _onSpeechComplete() {
+    if (state.state != SikaState.listening) return;
+
     final text = state.currentText;
     if (text != null && text.trim().isNotEmpty) {
       debugPrint('[SIKA VOICE] Final query: $text');
@@ -195,6 +197,16 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA VOICE] No text recognized');
       state = state.copyWith(state: SikaState.idle);
     }
+  }
+
+  void clearConversation() {
+    state = SikaData(
+      state: SikaState.idle,
+      messages: const [],
+      currentText: null,
+      errorMessage: null,
+      isInitialized: state.isInitialized,
+    );
   }
 
   Future<void> processUserQuery(String query) async {
@@ -260,71 +272,48 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
       await _speak(sikaText);
     } catch (e) {
-      debugPrint('[SIKA API] Error processing query: $e');
+      debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
-      final errorMessage = SikaMessage(
-        text:
-            'Désolé, j\'ai rencontré un problème pour me connecter à mon serveur. Peux-tu réessayer ?',
-        isUser: false,
-      );
-
-      final finalMessages = List<SikaMessage>.from(state.messages)..add(errorMessage);
+      const fallbackText =
+          'Désolé, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
+      final sikaMessage = SikaMessage(text: fallbackText, isUser: false);
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
 
       state = state.copyWith(
-        state: SikaState.error,
+        state: SikaState.speaking,
         messages: finalMessages,
-        errorMessage: 'Error connecting to backend: $e',
+        errorMessage: e.toString(),
       );
 
-      await _speak('Désolé, un problème de connexion est survenu.');
+      await _speak(fallbackText);
     }
+  }
+
+  Future<void> sendTextMessage(String text) async {
+    await processUserQuery(text);
   }
 
   Future<void> _speak(String text) async {
     try {
-      final cleanText = text
-          .replaceAll(RegExp(r'[^\w\s\d,.\-!?]'), '')
-          .trim();
-
-      if (cleanText.isEmpty) {
-        state = state.copyWith(state: SikaState.idle);
-        return;
-      }
-
-      debugPrint('[SIKA TTS] Speaking: "$cleanText"');
-      await _flutterTts.speak(cleanText);
+      debugPrint('[SIKA TTS] Speaking: "$text"');
+      await _flutterTts.speak(text);
     } catch (e) {
-      debugPrint('[SIKA TTS] Error playing TTS: $e');
+      debugPrint('[SIKA TTS] Error in TTS speak: $e');
       state = state.copyWith(state: SikaState.idle);
     }
   }
 
-  Future<void> sendTextMessage(String message) async {
-    await processUserQuery(message);
-  }
-
-  void clearConversation() {
-    state = state.copyWith(
-      state: SikaState.idle,
-      messages: [],
-      errorMessage: null,
-    );
-  }
-
-  void clearError() {
-    state = state.copyWith(
-      state: SikaState.idle,
-      errorMessage: null,
-    );
-  }
-
-  void reset() {
-    _speechToText.cancel();
-    _flutterTts.stop();
-    state = const SikaData();
+  Future<void> stopSpeaking() async {
+    try {
+      await _flutterTts.stop();
+      state = state.copyWith(state: SikaState.idle);
+    } catch (e) {
+      debugPrint('[SIKA TTS] Error stopping TTS: $e');
+    }
   }
 }
 
+// Provider global de Riverpod
 final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
   final apiService = ApiService();
   return SikaNotifier(apiService);

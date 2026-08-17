@@ -26,11 +26,21 @@ class _SikaMainNavigationPageState
     final sikaNotifier = ref.read(sikaProvider.notifier);
     final bool isListening = sikaData.state == SikaState.listening;
 
-    // 4 REAL PAGES ALIGNED TO NAVIGATION INDEXES
+    // ÉCOUTEUR DE REDIRECTION AUTOMATIQUE VERS CHAT EN CAS DE TRAITEMENT VOCAL
+    ref.listen<SikaData>(sikaProvider, (previous, next) {
+      if ((next.state == SikaState.processing || next.state == SikaState.speaking) &&
+          _currentIndex != 2) {
+        setState(() {
+          _currentIndex = 2; // Auto-redirection vers l'onglet Chat (Index 2)
+        });
+      }
+    });
+
+    // 4 ÉCRANS RÉELS ALIGNÉS SUR LES ONGLETS DE NAVIGATION
     final List<Widget> pages = [
       AgentHubScreen(
-        onOpenChat: () => setState(() => _currentIndex = 2),     // Chat at Index 2
-        onOpenInsights: () => setState(() => _currentIndex = 1), // Insights at Index 1
+        onOpenChat: () => setState(() => _currentIndex = 2),     // Chat à l'Index 2
+        onOpenInsights: () => setState(() => _currentIndex = 1), // Insights à l'Index 1
       ),
       const InsightsScreen(), // Index 1
       const SikaChatScreen(), // Index 2
