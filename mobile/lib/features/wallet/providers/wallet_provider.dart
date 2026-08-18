@@ -82,6 +82,7 @@ class WalletState {
   final bool isLoading;
   final List<ConnectedWalletItem> wallets;
   final List<WalletMovementItem> movements;
+  final String? pendingOtpSessionId;
   final String? lastPerceptionMessage;
   final String? errorMessage;
 
@@ -89,6 +90,7 @@ class WalletState {
     this.isLoading = false,
     this.wallets = const [],
     this.movements = const [],
+    this.pendingOtpSessionId,
     this.lastPerceptionMessage,
     this.errorMessage,
   });
@@ -97,6 +99,7 @@ class WalletState {
     bool? isLoading,
     List<ConnectedWalletItem>? wallets,
     List<WalletMovementItem>? movements,
+    String? pendingOtpSessionId,
     String? lastPerceptionMessage,
     String? errorMessage,
   }) {
@@ -104,6 +107,7 @@ class WalletState {
       isLoading: isLoading ?? this.isLoading,
       wallets: wallets ?? this.wallets,
       movements: movements ?? this.movements,
+      pendingOtpSessionId: pendingOtpSessionId ?? this.pendingOtpSessionId,
       lastPerceptionMessage: lastPerceptionMessage ?? this.lastPerceptionMessage,
       errorMessage: errorMessage ?? this.errorMessage,
     );
@@ -153,6 +157,53 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
+  Future<String?> initiateWalletConnection({
+    required String provider,
+    required String accountNumber,
+    required String authMethod,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final res = await _apiService.connectWallet(
+        provider: provider,
+        accountNumber: accountNumber,
+        authMethod: authMethod,
+      );
+      final sessionId = res['session_id'] as String?;
+      state = state.copyWith(isLoading: false, pendingOtpSessionId: sessionId);
+      return sessionId;
+    } catch (e) {
+      debugPrint('[WALLET PROVIDER] Error initiating OTP: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return null;
+    }
+  }
+
+  Future<bool> verifyWalletOtp({
+    required String sessionId,
+    required String otpCode,
+    required String provider,
+    required String accountNumber,
+  }) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      await _apiService.verifyWalletOtp(
+        sessionId: sessionId,
+        otpCode: otpCode,
+        provider: provider,
+        accountNumber: accountNumber,
+      );
+      state = state.copyWith(isLoading: false, pendingOtpSessionId: null);
+      await fetchWallets();
+      await fetchMovements();
+      return true;
+    } catch (e) {
+      debugPrint('[WALLET PROVIDER] Error verifying OTP: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
   Future<bool> perceiveSmsNotification(String rawSmsText, {String sender = 'WAVE'}) async {
     state = state.copyWith(isLoading: true);
     try {
@@ -173,24 +224,21 @@ class WalletNotifier extends StateNotifier<WalletState> {
     required String provider,
     required String accountNumber,
     required String authMethod,
-    double initialBalance = 10000.0,
   }) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      await _apiService.connectWallet(
+    final sessId = await initiateWalletConnection(
+      provider: provider,
+      accountNumber: accountNumber,
+      authMethod: authMethod,
+    );
+    if (sessId != null) {
+      return await verifyWalletOtp(
+        sessionId: sessId,
+        otpCode: "123456",
         provider: provider,
         accountNumber: accountNumber,
-        authMethod: authMethod,
-        initialBalance: initialBalance,
       );
-      await fetchWallets();
-      await fetchMovements();
-      return true;
-    } catch (e) {
-      debugPrint('[WALLET PROVIDER] Error connecting wallet: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-      return false;
     }
+    return false;
   }
 
   Future<void> syncAllWallets() async {

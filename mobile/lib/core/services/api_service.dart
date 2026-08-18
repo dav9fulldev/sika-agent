@@ -61,7 +61,6 @@ class ApiService {
     required String provider,
     required String accountNumber,
     required String authMethod,
-    double initialBalance = 10000.0,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/wallets/connect'),
@@ -70,13 +69,34 @@ class ApiService {
         'provider': provider,
         'account_number': accountNumber,
         'auth_method': authMethod,
-        'initial_balance': initialBalance,
       }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception('Failed to connect wallet: ${response.statusCode}');
+    throw Exception('Failed to initiate wallet connection: ${response.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> verifyWalletOtp({
+    required String sessionId,
+    required String otpCode,
+    required String provider,
+    required String accountNumber,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/wallets/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'session_id': sessionId,
+        'otp_code': otpCode,
+        'provider': provider,
+        'account_number': accountNumber,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to verify OTP: ${response.statusCode}');
   }
 
   Future<Map<String, dynamic>> perceiveSms({
