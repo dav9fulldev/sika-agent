@@ -127,7 +127,12 @@ def connect_new_wallet(data: Dict[str, Any]):
     auth_method = data.get("auth_method", "OAUTH2_WAVE")
     user_id = data.get("user_id", "usr_default")
 
-    session_id = f"otp_sess_{int(datetime.utcnow().timestamp())}"
+    if "paymechap" in provider.lower():
+        otp_res = paymechap_api_service.initiate_otp_challenge(account_number)
+        session_id = otp_res.get("session_id") or f"otp_sess_{int(datetime.utcnow().timestamp())}"
+    else:
+        session_id = f"otp_sess_{int(datetime.utcnow().timestamp())}"
+
     PENDING_OTP_SESSIONS[session_id] = {
         "session_id": session_id,
         "user_id": user_id,
@@ -164,15 +169,19 @@ def verify_wallet_otp(data: Dict[str, Any]):
     account_number = session["account_number"]
     user_id = session.get("user_id", "usr_default")
 
+    access_token = None
     prov_lower = provider.lower()
-    if "wave" in prov_lower:
+
+    if "paymechap" in prov_lower:
+        verify_res = paymechap_api_service.verify_otp_code(account_number, otp_code)
+        access_token = verify_res.get("accessToken")
+        fetched = paymechap_api_service.fetch_live_balance(access_token, account_number)
+    elif "wave" in prov_lower:
         fetched = wave_api_service.fetch_live_balance("live_token", account_number)
     elif "orange" in prov_lower:
         fetched = orange_money_api_service.fetch_live_balance("live_token", account_number)
     elif "mtn" in prov_lower:
         fetched = mtn_momo_api_service.fetch_live_balance("live_token", account_number)
-    elif "paymechap" in prov_lower:
-        fetched = paymechap_api_service.fetch_live_balance("live_token", account_number)
     else:
         fetched = {"balance": 15000.0, "currency": "XOF"}
 
@@ -187,6 +196,7 @@ def verify_wallet_otp(data: Dict[str, Any]):
         "currency": "XOF",
         "account_number": account_number,
         "auth_method": session.get("auth_method", "OAUTH2_WAVE"),
+        "access_token": access_token,
         "is_active": True,
         "last_synced_at": datetime.utcnow().isoformat()
     }
