@@ -26,8 +26,6 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   String _authMethod = 'OAUTH2_WAVE';
   final TextEditingController _phoneController =
       TextEditingController(text: '+225 07 00 00 05');
-  final TextEditingController _balanceController =
-      TextEditingController(text: '15000');
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _providers = [
@@ -54,13 +52,11 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   Future<void> _handleConnect() async {
     setState(() => _isSubmitting = true);
     final phone = _phoneController.text.trim();
-    final balance = double.tryParse(_balanceController.text.trim()) ?? 10000.0;
 
     final success = await ref.read(walletProvider.notifier).connectNewWallet(
           provider: _selectedProvider,
           accountNumber: phone,
           authMethod: _authMethod,
-          initialBalance: balance,
         );
 
     if (mounted) {
@@ -112,7 +108,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           ),
           const SizedBox(height: 16),
 
-          // TITRE ÉPURÉ SANS JARGON TECHNIQUE
+          // TITRE ÉPURÉ SANS FRICTION
           Text(
             langNotifier.tr(
               'Connecter un portefeuille',
@@ -127,8 +123,8 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           const SizedBox(height: 6),
           Text(
             langNotifier.tr(
-              'Sélectionnez votre opérateur et entrez votre numéro de compte.',
-              'Select your provider and enter your account number.',
+              'Choisissez votre opérateur et entrez votre numéro de mobile.',
+              'Choose your provider and enter your mobile number.',
             ),
             style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
           ),
@@ -207,7 +203,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
 
           // CHAMP NUMERO DE COMPTE
           Text(
-            langNotifier.tr('Numéro de compte / Téléphone', 'Account Number / Phone'),
+            langNotifier.tr('Numéro de téléphone du compte', 'Account Mobile Number'),
             style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
@@ -233,30 +229,28 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
 
           const SizedBox(height: 16),
 
-          // CHAMP SOLDE DE DEPART
-          Text(
-            langNotifier.tr('Solde initial (FCFA)', 'Initial Balance (FCFA)'),
-            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _balanceController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.surface,
-              hintText: '15000',
-              hintStyle: const TextStyle(color: Color(0xFF64748B)),
-              prefixIcon: const Icon(Icons.account_balance_wallet, color: AppColors.emerald),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
+          // BADGE DE VÉRIFICATION AUTOMATIQUE SÉCURISÉE (ZERO FRICTION UX)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.emerald.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_user, color: AppColors.emerald, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    langNotifier.tr(
+                      'Vérification automatique et sécurisée avec l\'opérateur. SIKA récupère vos soldes sans aucune saisie manuelle.',
+                      'Secure automatic operator verification. SIKA fetches your balances without any manual typing.',
+                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+                  ),
+                ),
+              ],
             ),
           ),
 
