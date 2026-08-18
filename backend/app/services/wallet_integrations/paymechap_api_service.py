@@ -227,36 +227,90 @@ class PayMeChapAPIService:
             "last_synced_at": datetime.utcnow().isoformat(),
         }
 
-    def fetch_live_transactions(self, access_token: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Collecte le relevé des transactions (GET /api/v1/transactions/recent ou /api/v1/partners/transactions)."""
-        token = access_token or self.get_partner_access_token()
-        endpoint = f"{self.base_url}/api/v1/transactions/recent"
+    def categorize_transaction(self, tx_type: str, recipient: str, description: str, motif: str, amount: float) -> str:
+        """Moteur d'Auto-Catégorisation Intelligente SIKA.
+        Analyse le type, destinataire, description et motif pour classer la transaction dans l'une des catégories SIKA.
+        """
+        text = f"{recipient} {description} {motif}".lower()
+        t_type = tx_type.lower()
 
-        if token and not token.startswith("pmc_token_"):
-            try:
-                headers = {"Authorization": f"Bearer {token}"}
-                resp = requests.get(endpoint, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    tx_list = data.get("transactions") or data if isinstance(data, list) else []
-                    movements = []
-                    for item in tx_list[:limit]:
-                        movements.append({
-                            "id": str(item.get("id") or item.get("transaction_id") or f"tx_pmc_{int(datetime.utcnow().timestamp())}"),
-                            "wallet_provider": "PayMeChap",
-                            "type": "payment" if float(item.get("montant") or item.get("amount") or 0) < 0 else "deposit",
-                            "amount": abs(float(item.get("montant") or item.get("amount") or 0.0)),
-                            "currency": item.get("currency") or "XOF",
-                            "category": item.get("motif") or item.get("category") or "PayMeChap",
-                            "recipient": item.get("telephoneDestination") or item.get("recipient") or "PayMeChap",
-                            "description": item.get("description") or item.get("motif") or "Mouvement PayMeChap",
-                            "status": (item.get("status") or "COMPLETED").upper(),
-                            "timestamp": item.get("created_at") or item.get("timestamp") or datetime.utcnow().isoformat(),
-                        })
-                    if movements:
-                        return movements
-            except Exception as e:
-                logger.warning(f"[PayMeChap Transactions API] Exception: {e}")
+        if any(kw in text for kw in ["carrefour", "supermarché", "supermarche", "restaurant", "repas", "boulangerie", "nourriture", "glovo", "food", "alimentation", "pain", "marché", "marche", "fastfood"]):
+            return "Alimentation"
+        elif any(kw in text for kw in ["yango", "uber", "vtc", "total", "totalenergies", "essence", "carburant", "péage", "peage", "transport", "bus", "express", "shell", "ola", "taxi"]):
+            return "Transport"
+        elif any(kw in text for kw in ["cinema", "cinéma", "majestic", "canal", "canal+", "netflix", "spotify", "loisir", "spectacle", "concert", "jeux", "divertissement"]):
+            return "Loisirs"
+        elif any(kw in text for kw in ["cie", "sodeci", "facture", "electricite", "électricité", "eau", "canalbox", "internet", "wifi", "mobile"]):
+            return "Factures & Services"
+        elif t_type in ["deposit", "recharge", "depot", "dépôt"] or "dépôt" in text or "rechargement" in text:
+            return "Dépôt"
+        elif t_type in ["transfer", "transfert", "virement"] or "transfert" in text:
+            return "Transfert"
+        else:
+            return "Autres"
+
+    def fetch_live_transactions(self, access_token: str, account_number: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+        """Collecte l'historique des transactions depuis l'API PayMeChap et applique la catégorisation dynamique."""
+        tokens_to_try = []
+        if access_token:
+            tokens_to_try.append(access_token)
+        partner_tok = self.get_partner_access_token()
+        if partner_tok and partner_tok not in tokens_to_try:
+            tokens_to_try.append(partner_tok)
+
+        endpoints = [
+            f"{self.base_url}/api/v1/transactions/recent",
+            f"{self.base_url}/api/v1/transactions/me?page=0&size={limit}",
+        ]
+        if account_number:
+            clean_phone = account_number.replace(" ", "").replace("+225", "")
+            endpoints.append(f"{self.base_url}/api/v1/partners/transactions/{clean_phone}")
+
+        for tok in tokens_to_try:
+            if not tok or tok.startswith("pmc_token_"):
+                continue
+            headers = {"Authorization": f"Bearer {tok}"}
+            for ep in endpoints:
+                try:
+                    resp = requests.get(ep, headers=headers, timeout=8)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        raw_list = []
+                        if isinstance(data, list):
+                            raw_list = data
+                        elif isinstance(data, dict):
+                            raw_list = data.get("transactions") or data.get("content") or data.get("data") or []
+                            if isinstance(raw_list, dict):
+                                raw_list = [raw_list]
+
+                        movements = []
+                        for item in raw_list[:limit]:
+                            raw_amt = float(item.get("montant") or item.get("amount") or 0.0)
+                            tx_type_raw = str(item.get("type") or item.get("transactionType") or ("deposit" if raw_amt > 0 else "payment"))
+                            recip = str(item.get("telephoneDestination") or item.get("recipient") or item.get("destinataire") or "PayMeChap")
+                            desc = str(item.get("description") or item.get("libelle") or "Mouvement PayMeChap")
+                            motif = str(item.get("motif") or "")
+
+                            category = self.categorize_transaction(tx_type_raw, recip, desc, motif, abs(raw_amt))
+
+                            movements.append({
+                                "id": str(item.get("id") or item.get("reference") or f"tx_pmc_{int(datetime.utcnow().timestamp())}"),
+                                "wallet_provider": "PayMeChap",
+                                "type": "deposit" if "dépôt" in category.lower() or tx_type_raw.lower() in ["deposit", "recharge"] else "payment",
+                                "amount": abs(raw_amt),
+                                "currency": item.get("devise") or item.get("currency") or "XOF",
+                                "category": category,
+                                "recipient": recip,
+                                "description": desc,
+                                "status": str(item.get("statut") or item.get("status") or "COMPLETED").upper(),
+                                "timestamp": item.get("dateCreation") or item.get("created_at") or item.get("timestamp") or datetime.utcnow().isoformat(),
+                            })
+
+                        if movements:
+                            logger.info(f"[PayMeChap Transactions] {len(movements)} transaction(s) collectée(s) et catégorisée(s) depuis {ep}")
+                            return movements
+                except Exception as e:
+                    logger.warning(f"[PayMeChap Transactions API] Exception sur {ep}: {e}")
 
         return []
 

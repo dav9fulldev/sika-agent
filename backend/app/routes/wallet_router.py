@@ -104,7 +104,7 @@ def get_all_wallets_transaction_history(
         elif "mtn" in prov:
             movements.extend(mtn_momo_api_service.fetch_live_transactions(token, limit=limit))
         elif "paymechap" in prov:
-            movements.extend(paymechap_api_service.fetch_live_transactions(token, limit=limit))
+            movements.extend(paymechap_api_service.fetch_live_transactions(token, account_number=wallet.get("account_number"), limit=limit))
 
     movements.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     movements = movements[:limit]
