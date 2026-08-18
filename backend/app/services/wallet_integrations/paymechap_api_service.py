@@ -132,11 +132,11 @@ class PayMeChapAPIService:
                 resp = requests.get(endpoint, headers=headers, timeout=8)
                 if resp.status_code == 200:
                     data = resp.json()
-                    balance = float(data.get("solde") or data.get("balance") or data.get("montant") or 35000.0)
+                    balance = float(data.get("solde") or data.get("balance") or data.get("montant") or 0.0)
                     return {
                         "success": True,
                         "provider": "PayMeChap",
-                        "account_number": account_number or "+225 07 00 00 05",
+                        "account_number": account_number or "",
                         "balance": balance,
                         "currency": data.get("currency") or "XOF",
                         "last_synced_at": datetime.utcnow().isoformat(),
@@ -147,8 +147,8 @@ class PayMeChapAPIService:
         return {
             "success": True,
             "provider": "PayMeChap",
-            "account_number": account_number or "+225 07 00 00 05",
-            "balance": 35000.0,
+            "account_number": account_number or "",
+            "balance": 0.0,
             "currency": "XOF",
             "last_synced_at": datetime.utcnow().isoformat(),
         }

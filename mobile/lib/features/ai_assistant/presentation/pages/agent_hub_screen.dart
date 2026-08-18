@@ -11,6 +11,7 @@ import '../widgets/wallet_rebalance_card.dart';
 import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
+import '../../../wallet/providers/wallet_provider.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenChat;
@@ -86,6 +87,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
+    final walletState = ref.watch(walletProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xff020614),
@@ -148,7 +150,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            currNotifier.format(45000),
+                            currNotifier.format(walletState.totalBalanceFcfa),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 30,
@@ -157,7 +159,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            langNotifier.tr('sur 3 portefeuilles', 'across 3 wallets'),
+                            walletState.wallets.isEmpty
+                                ? langNotifier.tr('Aucun portefeuille connecté', 'No wallets connected')
+                                : langNotifier.tr('sur ${walletState.wallets.length} portefeuille(s)', 'across ${walletState.wallets.length} wallet(s)'),
                             style: const TextStyle(
                               color: Color(0xFF475569),
                               fontSize: 12,

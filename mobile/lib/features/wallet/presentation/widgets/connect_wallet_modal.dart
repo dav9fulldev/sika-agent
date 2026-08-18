@@ -27,10 +27,8 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   String _authMethod = 'OAUTH2_WAVE';
   String? _sessionId;
 
-  final TextEditingController _phoneController =
-      TextEditingController(text: '+225 07 00 00 05');
-  final TextEditingController _otpController =
-      TextEditingController(text: '123456');
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
 
   bool _isSubmitting = false;
 
@@ -389,31 +387,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
             ),
 
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.emerald.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.emerald.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified, color: AppColors.emerald, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      langNotifier.tr(
-                        'Code démo suggéré : 123456 (Validation instantanée par l\'opérateur).',
-                        'Suggested demo code: 123456 (Instant operator verification).',
-                      ),
-                      style: const TextStyle(color: AppColors.emerald, fontSize: 11.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
 
             const SizedBox(height: 24),
 

@@ -12,42 +12,8 @@ router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 # Sessions d'OTP en attente de vérification
 PENDING_OTP_SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-# Portefeuilles utilisateurs connectés via Méthode 1 (APIs OAuth2 / Partenaires) et Méthode 3 (Perception SMS/Push)
-CONNECTED_USER_WALLETS: List[Dict[str, Any]] = [
-    {
-        "id": "w_wave_1",
-        "user_id": "usr_default",
-        "provider": "Wave",
-        "balance": 15000.0,
-        "currency": "XOF",
-        "account_number": "+225 07 00 00 01",
-        "auth_method": "OAUTH2_WAVE",
-        "is_active": True,
-        "last_synced_at": datetime.utcnow().isoformat()
-    },
-    {
-        "id": "w_orange_2",
-        "user_id": "usr_default",
-        "provider": "Orange Money",
-        "balance": 22000.0,
-        "currency": "XOF",
-        "account_number": "+225 07 00 00 02",
-        "auth_method": "ORANGE_DEVELOPER_API",
-        "is_active": True,
-        "last_synced_at": datetime.utcnow().isoformat()
-    },
-    {
-        "id": "w_mtn_3",
-        "user_id": "usr_default",
-        "provider": "MTN MoMo",
-        "balance": 8000.0,
-        "currency": "XOF",
-        "account_number": "+225 05 00 00 03",
-        "auth_method": "MTN_MOMO_API",
-        "is_active": True,
-        "last_synced_at": datetime.utcnow().isoformat()
-    }
-]
+# Portefeuilles utilisateurs RÉELLEMENT connectés (zéro donnée mock initiale)
+CONNECTED_USER_WALLETS: List[Dict[str, Any]] = []
 
 @router.get("/me")
 def get_my_wallets(user_id: str = "usr_default"):
@@ -67,13 +33,22 @@ def get_all_wallets_transaction_history(
     user_id: str = "usr_default",
     limit: int = Query(default=30, ge=1, le=100)
 ):
-    """API de collecte d'historique et des mouvements de comptes (Wave, Orange, MTN, PayMeChap)."""
-    wave_txs = wave_api_service.fetch_live_transactions("token", limit=limit)
-    orange_txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
-    mtn_txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
-    pmc_txs = paymechap_api_service.fetch_live_transactions("token", limit=limit)
+    """API de collecte d'historique et des mouvements des comptes réellement enrôlés."""
+    user_wallets = [w for w in CONNECTED_USER_WALLETS if w["user_id"] == user_id and w["is_active"]]
+    movements: List[Dict[str, Any]] = []
 
-    movements = wave_txs + orange_txs + mtn_txs + pmc_txs
+    for wallet in user_wallets:
+        prov = wallet["provider"].lower()
+        token = wallet.get("access_token") or "token"
+        if "wave" in prov:
+            movements.extend(wave_api_service.fetch_live_transactions(token, limit=limit))
+        elif "orange" in prov:
+            movements.extend(orange_money_api_service.fetch_live_transactions(token, limit=limit))
+        elif "mtn" in prov:
+            movements.extend(mtn_momo_api_service.fetch_live_transactions(token, limit=limit))
+        elif "paymechap" in prov:
+            movements.extend(paymechap_api_service.fetch_live_transactions(token, limit=limit))
+
     movements.sort(key=lambda x: x["timestamp"], reverse=True)
     movements = movements[:limit]
 
@@ -100,16 +75,17 @@ def get_specific_wallet_transactions(
         raise HTTPException(status_code=404, detail="Portefeuille non trouvé.")
 
     provider = wallet["provider"].lower()
+    token = wallet.get("access_token") or "token"
     if "wave" in provider:
-        txs = wave_api_service.fetch_live_transactions("token", limit=limit)
+        txs = wave_api_service.fetch_live_transactions(token, limit=limit)
     elif "orange" in provider:
-        txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
+        txs = orange_money_api_service.fetch_live_transactions(token, limit=limit)
     elif "mtn" in provider:
-        txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
+        txs = mtn_momo_api_service.fetch_live_transactions(token, limit=limit)
     elif "paymechap" in provider:
-        txs = paymechap_api_service.fetch_live_transactions("token", limit=limit)
+        txs = paymechap_api_service.fetch_live_transactions(token, limit=limit)
     else:
-        txs = wave_api_service.fetch_live_transactions("token", limit=limit)
+        txs = wave_api_service.fetch_live_transactions(token, limit=limit)
 
     return {
         "status": "SUCCESS",
@@ -123,15 +99,14 @@ def get_specific_wallet_transactions(
 def connect_new_wallet(data: Dict[str, Any]):
     """Étape 1 : Demande de connexion d'un portefeuille partenaire avec envoi d'OTP de sécurité."""
     provider = data.get("provider", "Wave")
-    account_number = data.get("account_number", "+225 07 00 00 99")
+    account_number = data.get("account_number", "")
     auth_method = data.get("auth_method", "OAUTH2_WAVE")
     user_id = data.get("user_id", "usr_default")
 
+    session_id = f"otp_sess_{int(datetime.utcnow().timestamp())}"
     if "paymechap" in provider.lower():
         otp_res = paymechap_api_service.initiate_otp_challenge(account_number)
-        session_id = otp_res.get("session_id") or f"otp_sess_{int(datetime.utcnow().timestamp())}"
-    else:
-        session_id = f"otp_sess_{int(datetime.utcnow().timestamp())}"
+        session_id = otp_res.get("session_id") or session_id
 
     PENDING_OTP_SESSIONS[session_id] = {
         "session_id": session_id,
@@ -139,7 +114,6 @@ def connect_new_wallet(data: Dict[str, Any]):
         "provider": provider,
         "account_number": account_number,
         "auth_method": auth_method,
-        "demo_code": "123456",
         "created_at": datetime.utcnow().isoformat()
     }
 
@@ -147,8 +121,7 @@ def connect_new_wallet(data: Dict[str, Any]):
     return {
         "status": "OTP_REQUIRED",
         "session_id": session_id,
-        "message": f"🔑 Code de sécurité OTP à 6 chiffres envoyé {delivery_channel} au {account_number} par {provider} !",
-        "demo_otp_hint": "123456"
+        "message": f"🔑 Code de sécurité OTP à 6 chiffres envoyé {delivery_channel} au {account_number} par {provider} !"
     }
 
 @router.post("/verify-otp")
@@ -160,9 +133,9 @@ def verify_wallet_otp(data: Dict[str, Any]):
     session = PENDING_OTP_SESSIONS.get(session_id)
     if not session:
         session = {
-            "provider": data.get("provider", "Wave"),
-            "account_number": data.get("account_number", "+225 07 00 00 05"),
-            "auth_method": "OAUTH2_WAVE",
+            "provider": data.get("provider", "PayMeChap"),
+            "account_number": data.get("account_number", ""),
+            "auth_method": "PAYMECHAP_PARTNER_API",
             "user_id": "usr_default"
         }
 
@@ -184,9 +157,13 @@ def verify_wallet_otp(data: Dict[str, Any]):
     elif "mtn" in prov_lower:
         fetched = mtn_momo_api_service.fetch_live_balance("live_token", account_number)
     else:
-        fetched = {"balance": 15000.0, "currency": "XOF"}
+        fetched = {"balance": 0.0, "currency": "XOF"}
 
-    real_balance = float(fetched.get("balance", 15000.0))
+    real_balance = float(fetched.get("balance", 0.0))
+
+    # Suppression de tout ancien doublon du même compte
+    global CONNECTED_USER_WALLETS
+    CONNECTED_USER_WALLETS = [w for w in CONNECTED_USER_WALLETS if not (w["provider"] == provider and w["account_number"] == account_number)]
 
     new_id = f"w_{provider.lower().replace(' ', '')}_{int(datetime.utcnow().timestamp())}"
     wallet_entry = {
@@ -196,7 +173,7 @@ def verify_wallet_otp(data: Dict[str, Any]):
         "balance": real_balance,
         "currency": "XOF",
         "account_number": account_number,
-        "auth_method": session.get("auth_method", "OAUTH2_WAVE"),
+        "auth_method": session.get("auth_method", "OAUTH2_API"),
         "access_token": access_token,
         "is_active": True,
         "last_synced_at": datetime.utcnow().isoformat()
@@ -205,68 +182,36 @@ def verify_wallet_otp(data: Dict[str, Any]):
     CONNECTED_USER_WALLETS.append(wallet_entry)
     return {
         "status": "VERIFIED_AND_CONNECTED",
-        "message": f"✅ Code OTP validé ! Votre compte {provider} est maintenant raccordé à SIKA.",
+        "message": f"✅ Code OTP validé ! Votre compte {provider} ({account_number}) est maintenant raccordé à SIKA.",
         "wallet": wallet_entry
     }
 
 @router.post("/sync")
 def sync_user_wallets(user_id: str = "usr_default"):
-    """Effectue une synchronisation d'API en direct avec Wave, Orange, MTN et PayMeChap."""
-    wave_data = wave_api_service.fetch_live_balance("token")
-    orange_data = orange_money_api_service.fetch_live_balance("token")
-    mtn_data = mtn_momo_api_service.fetch_live_balance("token")
-    pmc_data = paymechap_api_service.fetch_live_balance("token")
+    """Synchronise les soldes en direct des comptes réellement connectés."""
+    synced_wallets = []
+    for w in CONNECTED_USER_WALLETS:
+        if w["user_id"] == user_id and w["is_active"]:
+            prov = w["provider"].lower()
+            token = w.get("access_token") or "token"
+            if "paymechap" in prov:
+                data = paymechap_api_service.fetch_live_balance(token, w["account_number"])
+            elif "wave" in prov:
+                data = wave_api_service.fetch_live_balance(token, w["account_number"])
+            elif "orange" in prov:
+                data = orange_money_api_service.fetch_live_balance(token, w["account_number"])
+            elif "mtn" in prov:
+                data = mtn_momo_api_service.fetch_live_balance(token, w["account_number"])
+            else:
+                data = {"balance": w["balance"], "currency": "XOF"}
 
-    synced_wallets = [
-        {
-            "id": "w_wave_1",
-            "user_id": user_id,
-            "provider": "Wave",
-            "balance": wave_data["balance"],
-            "currency": wave_data["currency"],
-            "account_number": wave_data["account_number"],
-            "auth_method": "OAUTH2_WAVE",
-            "is_active": True,
-            "last_synced_at": wave_data["last_synced_at"]
-        },
-        {
-            "id": "w_orange_2",
-            "user_id": user_id,
-            "provider": "Orange Money",
-            "balance": orange_data["balance"],
-            "currency": orange_data["currency"],
-            "account_number": orange_data["account_number"],
-            "auth_method": "ORANGE_DEVELOPER_API",
-            "is_active": True,
-            "last_synced_at": orange_data["last_synced_at"]
-        },
-        {
-            "id": "w_mtn_3",
-            "user_id": user_id,
-            "provider": "MTN MoMo",
-            "balance": mtn_data["balance"],
-            "currency": mtn_data["currency"],
-            "account_number": mtn_data["account_number"],
-            "auth_method": "MTN_MOMO_API",
-            "is_active": True,
-            "last_synced_at": mtn_data["last_synced_at"]
-        },
-        {
-            "id": "w_paymechap_4",
-            "user_id": user_id,
-            "provider": "PayMeChap",
-            "balance": pmc_data["balance"],
-            "currency": pmc_data["currency"],
-            "account_number": pmc_data["account_number"],
-            "auth_method": "PAYMECHAP_PARTNER_API",
-            "is_active": True,
-            "last_synced_at": pmc_data["last_synced_at"]
-        }
-    ]
+            w["balance"] = float(data.get("balance", w["balance"]))
+            w["last_synced_at"] = datetime.utcnow().isoformat()
+            synced_wallets.append(w)
 
     return {
         "status": "SYNCED",
-        "message": "✅ Soldes et transactions synchronisés en temps réel via les APIs officielles !",
+        "message": "✅ Soldes des comptes connectés synchronisés en temps réel !",
         "timestamp": datetime.utcnow().isoformat(),
         "wallets": synced_wallets
     }
