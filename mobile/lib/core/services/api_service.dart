@@ -10,7 +10,7 @@ class ApiService {
 
   bool get hasToken => true;
 
-  Future<Map<String, dynamic>> sikaChat(String query) async {
+  Future<Map<String, dynamic>> sikaChat(String query, {String? userFirstName}) async {
     final response = await http.post(
       Uri.parse('$baseUrl${ApiConstants.sikaChat}'),
       headers: {'Content-Type': 'application/json'},
@@ -18,7 +18,7 @@ class ApiService {
         'query': query,
         'context': {
           'user_id': 1,
-          'user_firstname': "l'ami",
+          'user_firstname': userFirstName ?? "David",
         }
       }),
     );

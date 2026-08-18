@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/services/api_service.dart';
 
 enum SikaState { idle, listening, processing, speaking, error }
@@ -211,12 +212,17 @@ class SikaNotifier extends StateNotifier<SikaData> {
     );
   }
 
-  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec détection dynamique de langue
+  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec reconnaissance de l'utilisateur connecté
   Future<void> processUserQuery(String query, {String? ttsLocale}) async {
     if (query.trim().isEmpty) return;
 
     final isEnglish = _isEnglishText(query);
     final activeTtsLocale = ttsLocale ?? (isEnglish ? 'en-US' : 'fr-FR');
+
+    // Récupération dynamique du prénom de l'utilisateur connecté
+    final authState = _ref.read(authProvider);
+    final rawName = authState.user?.name ?? 'David';
+    final userFirstName = rawName.trim().isNotEmpty ? rawName.trim().split(' ').first : 'David';
 
     String cleanQuery = query.trim();
     final lower = cleanQuery.toLowerCase();
@@ -224,8 +230,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
     // 1. SALUTATION / MOT CLÉ SIKA
     if (lower == 'sika' || lower == 'dis sika' || lower == 'hey sika' || lower == 'hello sika') {
       final greetingText = isEnglish
-          ? 'Yes David, I am listening! How can I assist with your finances today?'
-          : 'Oui David, je vous écoute ! Que puis-je faire pour vos finances aujourd\'hui ?';
+          ? 'Yes $userFirstName, I am listening! How can I assist with your finances today?'
+          : 'Oui $userFirstName, je vous écoute ! Que puis-je faire pour vos finances aujourd\'hui ?';
 
       final sikaMsg = SikaMessage(text: greetingText, isUser: false);
       final updatedMsgs = List<SikaMessage>.from(state.messages)..add(SikaMessage(text: query, isUser: true))..add(sikaMsg);
@@ -267,8 +273,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         queryLower.contains('authorize')) {
 
       final confirmText = isEnglish
-          ? 'Alright David, the transfer rebalance from Orange Money to Wave is now confirmed and completed!'
-          : 'D\'accord David, le transfert d\'équilibrage depuis Orange Money vers Wave est maintenant confirmé et exécuté !';
+          ? 'Alright $userFirstName, the transfer rebalance from Orange Money to Wave is now confirmed and completed!'
+          : 'D\'accord $userFirstName, le transfert d\'équilibrage depuis Orange Money vers Wave est maintenant confirmé et exécuté !';
 
       final sikaMessage = SikaMessage(text: confirmText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
@@ -282,15 +288,15 @@ class SikaNotifier extends StateNotifier<SikaData> {
       return;
     }
 
-    // 3. ENVOI AU BACKEND SIKA
+    // 3. ENVOI AU BACKEND SIKA AVEC LE PRÉNOM DE L'UTILISATEUR CONNECTÉ
     try {
-      debugPrint('[SIKA API] Querying backend agent ($activeTtsLocale): "$cleanQuery"');
-      final response = await _apiService.sikaChat(cleanQuery);
+      debugPrint('[SIKA API] Querying backend agent ($userFirstName, $activeTtsLocale): "$cleanQuery"');
+      final response = await _apiService.sikaChat(cleanQuery, userFirstName: userFirstName);
 
       final String sikaText = response['response'] ??
           (isEnglish
-              ? 'Sorry, I didn\'t quite catch that. Could you please repeat?'
-              : 'Pardon, je n\'ai pas bien compris. Peux-tu répéter ?');
+              ? 'Sorry $userFirstName, I didn\'t quite catch that. Could you please repeat?'
+              : 'Pardon $userFirstName, je n\'ai pas bien compris. Peux-tu répéter ?');
 
       Map<String, dynamic>? suggestedTx;
       bool canAddTx = false;
@@ -319,8 +325,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
       final fallbackText = isEnglish
-          ? 'Sorry, I am experiencing a connection issue with my server. Could you please try again?'
-          : 'Désolé, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
+          ? 'Sorry $userFirstName, I am experiencing a connection issue with my server. Could you please try again?'
+          : 'Désolé $userFirstName, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
 
       final sikaMessage = SikaMessage(text: fallbackText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
