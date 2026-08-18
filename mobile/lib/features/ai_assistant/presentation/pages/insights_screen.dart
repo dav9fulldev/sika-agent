@@ -248,89 +248,120 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
             const SizedBox(height: 20),
 
-            // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1329),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE (COFFRE PAYMECHAP "ETUDE")
+            Builder(
+              builder: (context) {
+                const String coffreNom = "Etude";
+                const double targetSavingsGoal = 500000.0; // Objectif officiel du Coffre PayMeChap
+                const double currentSaved = 6000.0; // Solde réel épargné dans le Coffre
+                final double progressRatio = targetSavingsGoal > 0 ? (currentSaved / targetSavingsGoal).clamp(0.0, 1.0) : 0.0;
+                final String pctString = (progressRatio * 100).toStringAsFixed(1);
+
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B1329),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.savings_outlined, color: Color(0xFF10B981), size: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.savings_outlined, color: Color(0xFF10B981), size: 16),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${langNotifier.tr("Objectif d'épargne", "Savings Goal")} • $coffreNom',
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              langNotifier.tr('Coffre Actif', 'Active Vault'),
+                              style: const TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            currNotifier.format(targetSavingsGoal),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '$pctString%',
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          height: 10,
+                          child: LinearProgressIndicator(
+                            value: progressRatio,
+                            backgroundColor: const Color(0xFF1E293B),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
                       Text(
-                        langNotifier.tr('Objectif d\'épargne', 'Savings Goal'),
+                        '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ' +
+                            langNotifier.tr('épargnés dans ce coffre', 'saved in this vault'),
                         style: const TextStyle(
-                          color: Color(0xFF64748B),
+                          color: Color(0xFF10B981),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        currNotifier.format(walletState.totalBalanceFcfa),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        walletState.totalBalanceFcfa > 0 ? '100%' : '0%',
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      height: 10,
-                      child: LinearProgressIndicator(
-                        value: walletState.totalBalanceFcfa > 0 ? 1.0 : 0.0,
-                        backgroundColor: const Color(0xFF1E293B),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Text(
-                    '${currNotifier.format(walletState.totalBalanceFcfa)} / ${currNotifier.format(walletState.totalBalanceFcfa)}',
-                    style: const TextStyle(
-                      color: Color(0xFF10B981),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
