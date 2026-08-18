@@ -293,14 +293,17 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA API] Querying backend agent ($userFirstName, $activeTtsLocale): "$cleanQuery"');
       final response = await _apiService.sikaChat(cleanQuery, userFirstName: userFirstName);
 
-      final String sikaText = response['response'] ??
+      final String sikaText = (response['message'] as String?) ??
+          (response['response'] as String?) ??
           (isEnglish
               ? 'Sorry $userFirstName, I didn\'t quite catch that. Could you please repeat?'
               : 'Pardon $userFirstName, je n\'ai pas bien compris. Peux-tu répéter ?');
 
+      final action = response['intent'] ?? response['action'];
+
       Map<String, dynamic>? suggestedTx;
       bool canAddTx = false;
-      if (response['action'] == 'add_transaction' &&
+      if (action == 'add_transaction' &&
           response['action_data'] != null) {
         suggestedTx = Map<String, dynamic>.from(response['action_data']);
         canAddTx = true;
@@ -378,7 +381,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       'hello', 'hi', 'hey', 'how are you', 'say hello', 'good morning', 'thanks', 'thank',
       'how much', 'money', 'total', 'balance', 'transfer', 'rebalance',
       'save', 'savings', 'add', 'goal', 'how is my', 'what is my',
-      'analyze', 'recent', 'expenses', 'spend', 'wallet', 'dollars', 'usd'
+      'analyze', 'recent', 'expenses', 'spend', 'wallet', 'dollars', 'usd',
+      'are you okay', 'are you fine', 'are you good', 'you okay', 'doing', 'okay', 'ok'
     ];
 
     int frCount = 0;
