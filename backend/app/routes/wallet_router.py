@@ -1,11 +1,11 @@
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Query
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..services.wallet_integrations.wave_api_service import wave_api_service
 from ..services.wallet_integrations.orange_money_api_service import orange_money_api_service
-from ..services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
-from ..services.wallet_integrations.aggregator_service import aggregator_service
+from ..services.wallet_integrations/mtn_momo_api_service import mtn_momo_api_service
+from ..services.wallet_integrations/aggregator_service import aggregator_service
 
 router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 
@@ -57,6 +57,56 @@ def get_my_wallets(user_id: str = "usr_default"):
         "count": len(user_wallets),
         "total_balance_xof": total_balance,
         "wallets": user_wallets
+    }
+
+@router.get("/transactions/history")
+def get_all_wallets_transaction_history(
+    user_id: str = "usr_default",
+    limit: int = Query(default=30, ge=1, le=100)
+):
+    """API de collecte d'historique et des mouvements de comptes (Méthodes 1 & 2).
+
+    Exécute une collecte centralisée de l'historique depuis les APIs de Wave, Orange, MTN et l'Agrégateur Panafricain.
+    """
+    movements = aggregator_service.fetch_aggregated_account_movements(user_id=user_id, limit=limit)
+    total_spent = sum(t["amount"] for t in movements if t["type"] in ["payment", "transfer", "withdrawal"])
+    total_received = sum(t["amount"] for t in movements if t["type"] == "deposit")
+
+    return {
+        "status": "SUCCESS",
+        "user_id": user_id,
+        "movement_count": len(movements),
+        "total_spent_xof": total_spent,
+        "total_received_xof": total_received,
+        "movements": movements
+    }
+
+@router.get("/{wallet_id}/transactions")
+def get_specific_wallet_transactions(
+    wallet_id: str,
+    limit: int = Query(default=20, ge=1, le=50)
+):
+    """Collecte l'historique spécifique des mouvements d'un portefeuille connecté."""
+    wallet = next((w for w in CONNECTED_USER_WALLETS if w["id"] == wallet_id), None)
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Portefeuille non trouvé.")
+
+    provider = wallet["provider"].lower()
+    if "wave" in provider:
+        txs = wave_api_service.fetch_live_transactions("token", limit=limit)
+    elif "orange" in provider:
+        txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
+    elif "mtn" in provider:
+        txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
+    else:
+        txs = aggregator_service.fetch_aggregated_account_movements(limit=limit)
+
+    return {
+        "status": "SUCCESS",
+        "wallet_id": wallet_id,
+        "provider": wallet["provider"],
+        "count": len(txs),
+        "transactions": txs
     }
 
 @router.post("/connect")

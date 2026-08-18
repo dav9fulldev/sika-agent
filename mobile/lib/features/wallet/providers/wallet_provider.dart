@@ -37,25 +37,70 @@ class ConnectedWalletItem {
   }
 }
 
+class WalletMovementItem {
+  final String id;
+  final String walletProvider;
+  final String type;
+  final double amount;
+  final String currency;
+  final String category;
+  final String recipient;
+  final String description;
+  final String status;
+  final String timestamp;
+
+  WalletMovementItem({
+    required this.id,
+    required this.walletProvider,
+    required this.type,
+    required this.amount,
+    required this.currency,
+    required this.category,
+    required this.recipient,
+    required this.description,
+    required this.status,
+    required this.timestamp,
+  });
+
+  factory WalletMovementItem.fromJson(Map<String, dynamic> json) {
+    return WalletMovementItem(
+      id: json['id'] ?? '',
+      walletProvider: json['wallet_provider'] ?? 'Wave',
+      type: json['type'] ?? 'payment',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      currency: json['currency'] ?? 'XOF',
+      category: json['category'] ?? 'Autre',
+      recipient: json['recipient'] ?? '',
+      description: json['description'] ?? '',
+      status: json['status'] ?? 'COMPLETED',
+      timestamp: json['timestamp'] ?? '',
+    );
+  }
+}
+
 class WalletState {
   final bool isLoading;
   final List<ConnectedWalletItem> wallets;
+  final List<WalletMovementItem> movements;
   final String? errorMessage;
 
   WalletState({
     this.isLoading = false,
     this.wallets = const [],
+    this.movements = const [],
     this.errorMessage,
   });
 
   WalletState copyWith({
     bool? isLoading,
     List<ConnectedWalletItem>? wallets,
+    List<WalletMovementItem>? movements,
     String? errorMessage,
   }) {
     return WalletState(
       isLoading: isLoading ?? this.isLoading,
       wallets: wallets ?? this.wallets,
+      movements: movements ?? this.movements,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -70,6 +115,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
   WalletNotifier(this._apiService) : super(WalletState()) {
     fetchWallets();
+    fetchMovements();
   }
 
   Future<void> fetchWallets() async {
@@ -90,6 +136,19 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
+  Future<void> fetchMovements() async {
+    try {
+      final res = await _apiService.fetchWalletTransactionHistory();
+      final List rawMovements = res['movements'] ?? [];
+      final List<WalletMovementItem> items =
+          rawMovements.map((e) => WalletMovementItem.fromJson(e)).toList();
+
+      state = state.copyWith(movements: items);
+    } catch (e) {
+      debugPrint('[WALLET PROVIDER] Error fetching movements: $e');
+    }
+  }
+
   Future<bool> connectNewWallet({
     required String provider,
     required String accountNumber,
@@ -105,6 +164,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
         initialBalance: initialBalance,
       );
       await fetchWallets();
+      await fetchMovements();
       return true;
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error connecting wallet: $e');
@@ -118,6 +178,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     try {
       await _apiService.syncWallets();
       await fetchWallets();
+      await fetchMovements();
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error syncing wallets: $e');
       state = state.copyWith(isLoading: false);

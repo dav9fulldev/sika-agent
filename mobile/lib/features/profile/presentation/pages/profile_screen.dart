@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
@@ -56,6 +57,146 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMovementsModal(BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
+    final walletState = ref.read(walletProvider);
+    final currency = ref.read(currencyProvider);
+    final movements = walletState.movements;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceDarker,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  langNotifier.tr('Mouvements & Historique API', 'API Movements & History'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: AppColors.cyan),
+                  onPressed: () => ref.read(walletProvider.notifier).fetchMovements(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              langNotifier.tr(
+                'Mouvements collectés en temps réel via les APIs Wave, Orange, MTN et Agrégateurs.',
+                'Real-time movements collected via Wave, Orange, MTN, and Aggregator APIs.',
+              ),
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: movements.isEmpty
+                  ? Center(
+                      child: Text(
+                        langNotifier.tr('Aucun mouvement trouvé', 'No movements found'),
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: movements.length,
+                      separatorBuilder: (ctx, i) => const Divider(color: AppColors.border),
+                      itemBuilder: (ctx, index) {
+                        final item = movements[index];
+                        final isDeposit = item.type == 'deposit';
+                        final amountVal = (item.amount * currency.rateFromFcfa).toStringAsFixed(
+                          currency == AppCurrency.fcfa ? 0 : 2,
+                        );
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: isDeposit
+                                ? AppColors.emerald.withValues(alpha: 0.15)
+                                : AppColors.rose.withValues(alpha: 0.15),
+                            child: Icon(
+                              isDeposit ? Icons.arrow_downward : Icons.arrow_upward,
+                              color: isDeposit ? AppColors.emerald : AppColors.rose,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(
+                            item.recipient.isNotEmpty ? item.recipient : item.description,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${item.walletProvider} • ${item.category}',
+                            style: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
+                                style: TextStyle(
+                                  color: isDeposit ? AppColors.emerald : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.status,
+                                  style: const TextStyle(
+                                    color: AppColors.cyan,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -213,7 +354,10 @@ class ProfileScreen extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.history,
             title: langNotifier.tr('Historique des transactions', 'Transaction History'),
-            onTap: () {},
+            trailingText: '${walletState.movements.length} ' + langNotifier.tr('mouvements', 'movements'),
+            onTap: () {
+              _showMovementsModal(context, ref, langNotifier);
+            },
           ),
 
           const SizedBox(height: 32),

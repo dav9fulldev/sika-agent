@@ -18,7 +18,7 @@ logger = logging.getLogger("AggregatorAPI")
 class AggregatorService:
     """Service d'Agrégation Financière Panafricaine (Méthode 2).
 
-    Permet de centraliser et de synchroniser en une seule requête les soldes et transactions
+    Permet de centraliser et de synchroniser en une seule requête les soldes et l'historique des mouvements
     de multiples fournisseurs (Wave, Orange, MTN, Moov, Banques) via une passerelle unique.
     """
 
@@ -69,6 +69,18 @@ class AggregatorService:
                 "last_synced_at": mtn_data["last_synced_at"]
             }
         ]
+
+    def fetch_aggregated_account_movements(self, user_id: str = "usr_default", limit: int = 50) -> List[Dict[str, Any]]:
+        """Collecte et agrège l'historique complet des mouvements de compte depuis tous les fournisseurs d'APIs."""
+        logger.info(f"[{self.aggregator_name}] Collecte des mouvements de tous les comptes pour {user_id}")
+
+        wave_txs = wave_api_service.fetch_live_transactions("live_token", limit=limit)
+        orange_txs = orange_money_api_service.fetch_live_transactions("live_token", limit=limit)
+        mtn_txs = mtn_momo_api_service.fetch_live_transactions("live_token", limit=limit)
+
+        all_txs = wave_txs + orange_txs + mtn_txs
+        all_txs.sort(key=lambda x: x["timestamp"], reverse=True)
+        return all_txs[:limit]
 
 
 aggregator_service = AggregatorService()

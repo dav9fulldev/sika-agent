@@ -46,6 +46,17 @@ class ApiService {
     throw Exception('Failed to fetch wallets: ${response.statusCode}');
   }
 
+  Future<Map<String, dynamic>> fetchWalletTransactionHistory({int limit = 30}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/v1/wallets/transactions/history?limit=$limit'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to fetch transaction movements: ${response.statusCode}');
+  }
+
   Future<Map<String, dynamic>> connectWallet({
     required String provider,
     required String accountNumber,
