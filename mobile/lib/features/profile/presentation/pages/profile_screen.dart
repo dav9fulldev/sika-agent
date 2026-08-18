@@ -5,6 +5,8 @@ import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
+import '../../../wallet/providers/wallet_provider.dart';
+import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -68,6 +70,9 @@ class ProfileScreen extends ConsumerWidget {
     final userName = user?.name ?? 'David YAO';
     final userEmail = user?.email ?? 'david.yao@email.com';
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'D';
+
+    final walletState = ref.watch(walletProvider);
+    final connectedCount = walletState.wallets.length;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
@@ -186,7 +191,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
-          // MENU OPTIONS (LISTE ÉPURÉE SANS DOUBLON DE PARAMÈTRES)
+          // MENU OPTIONS (LISTE ÉPURÉE ET INTERACTIVE)
           _buildMenuItem(
             icon: Icons.person_outline,
             title: langNotifier.tr('Informations personnelles', 'Personal Information'),
@@ -195,8 +200,10 @@ class ProfileScreen extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.account_balance_wallet_outlined,
             title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-            trailingText: langNotifier.tr('3 connectés', '3 connected'),
-            onTap: () {},
+            trailingText: '$connectedCount ' + langNotifier.tr('connectés', 'connected'),
+            onTap: () {
+              ConnectWalletModal.show(context);
+            },
           ),
           _buildMenuItem(
             icon: Icons.credit_card_outlined,
