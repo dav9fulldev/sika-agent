@@ -1,101 +1,45 @@
-"""
-Sika AI Service - LLM conversationnel intelligent Multilingue (Français & English)
-"""
-
 import os
-import json
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional
 
-try:
-    from google import genai
-    from google.genai import types
-    HAS_GOOGLE_GENAI = True
-except ImportError:
-    HAS_GOOGLE_GENAI = False
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("SikaAI")
+logger = logging.getLogger(__name__)
 
 
-class SikaAI:
-    """Service IA conversationnel de Sika avec support multilingue et multi-devises."""
+class SikaAIService:
+    """Service Sika AI 2.0.
 
-    SYSTEM_PROMPT_FR = """Tu es Sika, l'assistant financier intelligent personnel.
-- Tu réponds TOUJOURS dans la langue du dernier message de l'utilisateur (si l'utilisateur écrit en français, réponds en FRANÇAIS, s'il écrit en anglais, réponds en ANGLAIS).
-- Tu es courtois, chaleureux, clair et concis.
-- Tu analyses les portefeuilles de l'utilisateur et formates les montants dans sa DEVISE ACTIVE (USD $, EUR €, GBP £, FCFA).
-- Tu gères les salutations ("Bonjour", "Comment tu vas ?", "Hello") avec bienveillance.
-"""
-
-    SYSTEM_PROMPT_EN = """You are Sika, the personal intelligent financial assistant.
-- You ALWAYS reply in the exact language used by the user in their message (if French, reply in FRENCH; if English, reply in ENGLISH).
-- You are polite, warm, clear, and concise.
-- You analyze the user's connected wallets and format all amounts in their ACTIVE CURRENCY (USD $, EUR €, GBP £, FCFA).
-- You handle greetings ("Hello", "How are you?", "Are you okay?", "Bonjour") warmly.
-"""
+    Gère le modèle Gemini, le fallback ReAct et la détection d'intention multilingue avec mise à jour dynamique des soldes.
+    """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.provider = os.getenv("AI_PROVIDER", "gemini").lower()
-        self.gemini_api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
-        self.model = self.gemini_model
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
+        self.provider = "gemini"
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        self._init_gemini_client()
 
-        self.use_gemini = False
-        if (self.provider == "gemini" or self.gemini_api_key) and HAS_GOOGLE_GENAI and self.gemini_api_key:
-            try:
-                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
-                self.use_gemini = True
-                logger.info(f"SIKA AI initialisé avec Google Gemini ({self.gemini_model})")
-            except Exception as e:
-                logger.error(f"Erreur initialisation Gemini: {e}")
+    @property
+    def use_gemini(self) -> bool:
+        return self.client is not None
 
-    async def chat(
-        self,
-        user_message: str,
-        financial_context: Optional[Dict] = None,
-        conversation_history: Optional[List[Dict]] = None,
-        user_firstname: str = "David"
-    ) -> Dict:
-        """Point d'entrée principal pour chatter avec Sika AI."""
-        context = financial_context or {}
-        is_english = self._is_english_message(user_message)
+    def _init_gemini_client(self):
+        """Initialise le client Gemini SDK si la clé d'API est valide."""
+        try:
+            if self.api_key:
+                from google import genai
+                self.client = genai.Client(api_key=self.api_key)
+                logger.info(f"Gemini Client v2 (genai) initialisé avec modèle {self.model}")
+            else:
+                self.client = None
+                logger.info("Clé GEMINI_API_KEY absente, mode ReAct avec fallback actif.")
+        except Exception as e:
+            logger.warning(f"Erreur d'initialisation Gemini SDK: {e}. Fallback réactif activé.")
+            self.client = None
 
-        if self.use_gemini:
-            try:
-                prompt_base = self.SYSTEM_PROMPT_EN if is_english else self.SYSTEM_PROMPT_FR
-                system_prompt = f"{prompt_base}\nUser name: {user_firstname}\nContext: {json.dumps(context)}"
-
-                response = self.gemini_client.models.generate_content(
-                    model=self.gemini_model,
-                    contents=f"{system_prompt}\nUser message: {user_message}"
-                )
-                if response and response.text:
-                    return self._format_response(response.text, user_message, context, is_english)
-            except Exception as e:
-                logger.error(f"Erreur appel Gemini: {e}")
-
-        # Fallback intelligent par règles multilingue avec détection dynamique de devise
-        return self._chat_basic(user_message, context, user_firstname, is_english)
-
-    def _is_english_message(self, message: str) -> bool:
-        """Détecte dynamiquement si le message de l'utilisateur est en anglais ou en français."""
+    def _is_english(self, message: str) -> bool:
+        """Détecte la langue (anglais vs français)."""
         msg_lower = message.lower()
-
-        french_indicators = [
-            "bonjour", "salut", "coucou", "bonsoir", "comment", "vas", "va", "ça va", "ca va",
-            "solde", "combien", "portefeuille", "dépense", "depense", "épargne", "epargne",
-            "transfert", "transférer", "argent", "merci", "oui", "non", "je", "tu", "moi", "toi",
-            "suis", "vais", "bien", "comment tu vas", "est-ce que", "tu vas bien"
-        ]
-        english_indicators = [
-            "hello", "hi", "hey", "how are you", "say hello", "good morning", "thanks", "thank",
-            "how much", "money", "total", "balance", "transfer", "rebalance",
-            "save", "savings", "add", "goal", "how is my", "what is my",
-            "analyze", "recent", "expenses", "spend", "wallet", "dollars", "usd",
-            "are you okay", "are you fine", "are you good", "you okay", "doing", "okay", "ok"
-        ]
+        french_indicators = ["solde", "dépense", "combien", "épargne", "bonjour", "salut", "transfert", "transférer", "mon", "ma", "mes"]
+        english_indicators = ["balance", "spending", "how much", "savings", "hello", "hi", "transfer", "my", "wallet"]
 
         fr_count = sum(1 for kw in french_indicators if kw in msg_lower)
         en_count = sum(1 for kw in english_indicators if kw in msg_lower)
@@ -144,17 +88,60 @@ class SikaAI:
         user_firstname: str,
         is_english: bool
     ) -> Dict:
-        """Réponses basiques et intelligentes multilingues avec formatage dynamique selon la devise active."""
+        """Réponses basiques et intelligentes multilingues avec formatage dynamique des VRAIS comptes connectés."""
         msg_lower = user_message.lower()
         action, action_data = self._extract_action("", user_message)
 
-        # Formateurs de montant dynamiques selon la devise choisie
-        fmt_total = self._format_currency(45000, financial_context)
-        fmt_wave = self._format_currency(15000, financial_context)
-        fmt_orange = self._format_currency(22000, financial_context)
-        fmt_mtn = self._format_currency(8000, financial_context)
+        # Récupération dynamique des vrais comptes connectés dans le système SIKA
+        from ..routes.wallet_router import CONNECTED_USER_WALLETS
+        active_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("is_active", True)]
+        total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
+        fmt_total = self._format_currency(total_balance_fcfa, financial_context)
 
-        # 0. SALUTATIONS ET POLITESSE (GREETINGS & CONVERSATIONAL RESPONSES)
+        # Mots-clés d'intention financière
+        financial_intent_keywords = [
+            "solde", "combien j'ai", "combien", "portefeuille", "total", "balance", "money",
+            "how much", "compte", "argent", "paymechap", "wave", "orange", "mtn"
+        ]
+
+        # 1. INTENTION FINANCIÈRE : SOLDE TOTAL & PORTEFEUILLES (Priorité absolue avant les simples salutations)
+        if any(w in msg_lower for w in financial_intent_keywords):
+            if len(active_wallets) == 0:
+                if is_english:
+                    response = f"Hi {user_firstname}! You don't have any connected wallets yet. Click on 'Connect my Wallets' to link PayMeChap, Wave, Orange Money, or MTN MoMo!"
+                else:
+                    response = f"Salut {user_firstname} ! Tu n'as encore aucun portefeuille connecté. Clique sur 'Connecter mes comptes' pour raccorder PayMeChap, Wave, Orange Money ou MTN MoMo !"
+                suggestions = ["Connect a wallet", "How does SIKA work?", "Help"]
+            else:
+                # Formatage détaillé de chaque portefeuille connecté
+                wallet_details = []
+                for w in active_wallets:
+                    b_fmt = self._format_currency(w.get("balance", 0.0), financial_context)
+                    p_name = w.get("provider", "Wallet")
+                    acc_num = w.get("account_number", "")
+                    num_str = f" ({acc_num})" if acc_num else ""
+                    wallet_details.append(f"{p_name}{num_str} : {b_fmt}")
+
+                details_str = ", ".join(wallet_details)
+
+                if is_english:
+                    response = f"Hi {user_firstname}! You have a total balance of {fmt_total} across {len(active_wallets)} connected wallet(s): {details_str}."
+                    suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]
+                else:
+                    response = f"Salut {user_firstname} ! Tu as un solde total de **{fmt_total}** réparti ainsi : {details_str}."
+                    suggestions = ["Voir mes dépenses récentes", "Effectuer un transfert", "Objectif d'épargne"]
+
+            return {
+                "response": response,
+                "action": "get_total_balance",
+                "action_data": action_data,
+                "sentiment": "positive",
+                "suggestions": suggestions,
+                "provider": "GEMINI",
+                "model": self.model
+            }
+
+        # 2. SALUTATIONS SIMPLES ET POLITESSES (SEULEMENT SI PAS D'INTENTION FINANCIÈRE)
         greeting_keywords = [
             "bonjour", "salut", "coucou", "bonsoir", "comment tu vas", "ça va", "ca va", "comment vas-tu",
             "tu vas bien", "est-ce que tu vas bien",
@@ -180,45 +167,26 @@ class SikaAI:
                 "model": self.model
             }
 
-        # 1. SOLDE TOTAL & PORTEFEUILLES (TOTAL BALANCE & WALLETS)
-        elif any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much", "transact"]):
-            if is_english:
-                response = f"Hi {user_firstname}! You have a total balance of {fmt_total} across 3 wallets: Wave ({fmt_wave}), Orange Money ({fmt_orange}), and MTN MoMo ({fmt_mtn})."
-                suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]
-            else:
-                response = f"Salut {user_firstname} ! Tu as un solde total de {fmt_total} réparti ainsi : Wave ({fmt_wave}), Orange Money ({fmt_orange}) et MTN Mobile Money ({fmt_mtn})."
-                suggestions = ["Voir mes dépenses récentes", "Effectuer un transfert", "Objectif d'épargne"]
-
-            return {
-                "response": response,
-                "action": "get_total_balance",
-                "action_data": action_data,
-                "sentiment": "positive",
-                "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
-            }
-
-        # 2. TRANSFERT & RÉÉQUILIBRAGE (TRANSFER & AUTO-REBALANCE)
+        # 3. TRANSFERT & RÉÉQUILIBRAGE (TRANSFER & AUTO-REBALANCE)
         elif any(w in msg_lower for w in ["transfert", "envoie", "transférer", "paye", "kouamé", "transfer", "rebalance"]):
             if is_english:
-                response = f"I am preparing the wallet rebalance transfer from Orange Money to Wave. Security validation is required before execution."
+                response = f"I am preparing the wallet rebalance transfer. Security validation is required before execution."
                 suggestions = ["I confirm the transfer", "Cancel transfer"]
             else:
-                response = f"Je prépare le transfert d'équilibrage depuis Orange Money vers Wave. Une validation de sécurité est requise avant exécution."
+                response = f"Je prépare le transfert d'équilibrage. Une validation de sécurité est requise avant exécution."
                 suggestions = ["Je confirme le transfert", "Annuler le transfert"]
 
             return {
                 "response": response,
                 "action": "prepare_transfer",
-                "action_data": {"amount": 7000, "recipient": "Wave", "wallet_provider": "Orange Money"},
+                "action_data": {"amount": 7000, "recipient": "Wave", "wallet_provider": "PayMeChap"},
                 "sentiment": "neutral",
                 "suggestions": suggestions,
                 "provider": "GEMINI",
                 "model": self.model
             }
 
-        # 3. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST)
+        # 4. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST)
         elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add"]):
             if is_english:
                 response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding to your savings brings you 5 days closer to your target!"
@@ -237,7 +205,7 @@ class SikaAI:
                 "model": self.model
             }
 
-        # 4. ANALYSE DÉPENSE & DÉPENSES RÉCENTES (EXPENSE ANALYSIS)
+        # 5. ANALYSE DÉPENSE & DÉPENSES RÉCENTES (EXPENSE ANALYSIS)
         elif any(w in msg_lower for w in ["dépense", "dépensé", "acheté", "budget", "analyze", "recent", "expenses"]):
             if is_english:
                 response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have {fmt_total} remaining for the month."
@@ -256,7 +224,7 @@ class SikaAI:
                 "model": self.model
             }
 
-        # 5. RÉPONSE D'ERREUR OU MESSAGE CORRESPONDANT MAL (FALLBACK MULTILINGUE)
+        # 6. FALLBACK MULTILINGUE
         else:
             if is_english:
                 response = f"Sorry {user_firstname}, I didn't quite catch that. Could you please repeat or select one of the suggested options below?"
@@ -291,3 +259,37 @@ class SikaAI:
             "provider": "GEMINI",
             "model": self.model
         }
+
+    async def chat(
+        self,
+        user_message: str,
+        financial_context: Optional[Dict] = None,
+        conversation_history: Optional[List] = None,
+        user_firstname: Optional[str] = None
+    ) -> Dict:
+        """Point d'entrée principal pour traiter les messages de l'utilisateur."""
+        context = financial_context or {}
+        fname = user_firstname or context.get("user_firstname") or "David"
+        is_english = self._is_english(user_message)
+
+        if self.client:
+            try:
+                system_instruction = (
+                    f"Tu es Sika AI, un assistant financier autonome et bienveillant pour l'utilisateur {fname}. "
+                    f"Sois précis, poli et chaleureux. Si l'utilisateur demande son solde ou salue, réponds de façon claire et encourageante."
+                )
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=user_message,
+                    config={"system_instruction": system_instruction}
+                )
+                if response and response.text:
+                    return self._format_response(response.text, user_message, context, is_english)
+            except Exception as e:
+                logger.warning(f"Erreur lors de l'appel Gemini SDK: {e}. Basculement sur le mode intelligent local.")
+
+        return self._chat_basic(user_message, context, fname, is_english)
+
+
+sika_ai_service = SikaAIService()
+SikaAI = SikaAIService

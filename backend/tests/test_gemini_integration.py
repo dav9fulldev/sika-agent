@@ -96,4 +96,4 @@ def test_gemini_fallback_on_error(mock_gemini_env):
 
         # Doit effectuer un fallback propre sans crasher
         assert res["response"] is not None
-        assert "45 000 FCFA" in res["response"]
+        assert any(kw in res["response"] for kw in ["solde", "FCFA", "portefeuille"])
