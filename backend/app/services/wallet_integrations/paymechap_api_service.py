@@ -82,7 +82,6 @@ class PayMeChapAPIService:
         except Exception as e:
             logger.warning(f"[PayMeChap OTP] Exception réseau: {e}")
 
-        # Fallback élégant en mode démo si le serveur réexpédie un code
         return {
             "success": True,
             "provider": "PayMeChap",
@@ -92,7 +91,7 @@ class PayMeChapAPIService:
         }
 
     def verify_otp_code(self, phone_number: str, otp_code: str) -> Dict[str, Any]:
-        """Vérifie le code OTP SMS (POST /api/v1/auth/verify-otp)."""
+        """Vérifie le code OTP (POST /api/v1/auth/verify-otp)."""
         clean_phone = phone_number.replace(" ", "").replace("+225", "")
         endpoint = f"{self.base_url}/api/v1/auth/verify-otp"
         logger.info(f"[PayMeChap API] Vérification OTP {otp_code} pour {clean_phone}")
@@ -122,60 +121,114 @@ class PayMeChapAPIService:
         }
 
     def fetch_live_balance(self, access_token: str, account_number: Optional[str] = None) -> Dict[str, Any]:
-        """Consulte le solde en direct (GET /api/v1/wallets/balance ou /api/v1/wallets/me)."""
-        tokens_to_try = []
-        if access_token and not access_token.startswith("pmc_token_"):
-            tokens_to_try.append(access_token)
+        """Consulte le solde en direct via les endpoints Partenaire Officiels (GET /api/v1/partners/wallets/{telephone}/balance)."""
+        clean_phone = (account_number or "").replace(" ", "").replace("+225", "")
         partner_tok = self.get_partner_access_token()
-        if partner_tok and partner_tok not in tokens_to_try:
-            tokens_to_try.append(partner_tok)
 
+        tokens_to_try = []
+        if partner_tok:
+            tokens_to_try.append(partner_tok)
+        if access_token and not access_token.startswith("pmc_token_") and access_token not in tokens_to_try:
+            tokens_to_try.append(access_token)
+
+        # 1. Interroger l'endpoint partenaire officiel avec numéro de téléphone
+        if clean_phone:
+            for tok in tokens_to_try:
+                headers = {"Authorization": f"Bearer {tok}"}
+                partner_balance_ep = f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/balance"
+                try:
+                    logger.info(f"[PayMeChap Partner API] GET {partner_balance_ep}")
+                    resp = requests.get(partner_balance_ep, headers=headers, timeout=8)
+                    logger.info(f"[PayMeChap Partner API] Balance status: {resp.status_code}, text: {resp.text}")
+                    if resp.status_code == 200:
+                        try:
+                            raw_val = resp.json()
+                            if isinstance(raw_val, (int, float)):
+                                bal = float(raw_val)
+                            elif isinstance(raw_val, str) and raw_val.replace('.', '', 1).isdigit():
+                                bal = float(raw_val)
+                            elif isinstance(raw_val, dict):
+                                bal = float(raw_val.get("solde") or raw_val.get("balance") or 0.0)
+                            else:
+                                bal = float(resp.text.strip())
+
+                            return {
+                                "success": True,
+                                "provider": "PayMeChap",
+                                "account_number": account_number or clean_phone,
+                                "balance": bal,
+                                "currency": "XOF",
+                                "last_synced_at": datetime.utcnow().isoformat(),
+                            }
+                        except Exception:
+                            bal = float(resp.text.strip())
+                            return {
+                                "success": True,
+                                "provider": "PayMeChap",
+                                "account_number": account_number or clean_phone,
+                                "balance": bal,
+                                "currency": "XOF",
+                                "last_synced_at": datetime.utcnow().isoformat(),
+                            }
+                except Exception as e:
+                    logger.warning(f"[PayMeChap Partner Balance API] Exception on {partner_balance_ep}: {e}")
+
+                # 2. Endpoint partenaire de détails de wallet: /api/v1/partners/wallets/{clean_phone}
+                partner_info_ep = f"{self.base_url}/api/v1/partners/wallets/{clean_phone}"
+                try:
+                    logger.info(f"[PayMeChap Partner API] GET {partner_info_ep}")
+                    resp = requests.get(partner_info_ep, headers=headers, timeout=8)
+                    logger.info(f"[PayMeChap Partner API] Info status: {resp.status_code}, text: {resp.text}")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        bal = float(data.get("solde") or data.get("balance") or 0.0)
+                        return {
+                            "success": True,
+                            "provider": "PayMeChap",
+                            "account_number": account_number or clean_phone,
+                            "balance": bal,
+                            "currency": data.get("devise") or data.get("currency") or "XOF",
+                            "last_synced_at": datetime.utcnow().isoformat(),
+                        }
+                except Exception as e:
+                    logger.warning(f"[PayMeChap Partner Info API] Exception on {partner_info_ep}: {e}")
+
+        # 3. Fallbacks secondaires sur /wallets/balance & /wallets/me
         endpoints = [
             f"{self.base_url}/api/v1/wallets/balance",
             f"{self.base_url}/api/v1/wallets/me",
         ]
-
         for tok in tokens_to_try:
             headers = {"Authorization": f"Bearer {tok}"}
             for ep in endpoints:
                 try:
-                    logger.info(f"[PayMeChap Balance API] GET {ep} with token {tok[:15]}...")
                     resp = requests.get(ep, headers=headers, timeout=8)
-                    logger.info(f"[PayMeChap Balance API] Response {resp.status_code}: {resp.text}")
                     if resp.status_code == 200:
                         data = resp.json()
                         w_data = data.get("data") if isinstance(data.get("data"), dict) else data
-                        balance_raw = (
-                            w_data.get("solde") or
-                            w_data.get("balance") or
-                            w_data.get("soldePrincipal") or
-                            w_data.get("soldeCourant") or
-                            w_data.get("montant") or
-                            0.0
-                        )
-                        balance = float(balance_raw)
+                        bal = float(w_data.get("solde") or w_data.get("balance") or w_data.get("soldePrincipal") or 0.0)
                         return {
                             "success": True,
                             "provider": "PayMeChap",
-                            "account_number": account_number or "",
-                            "balance": balance,
+                            "account_number": account_number or clean_phone,
+                            "balance": bal,
                             "currency": w_data.get("currency") or "XOF",
                             "last_synced_at": datetime.utcnow().isoformat(),
                         }
-                except Exception as e:
-                    logger.warning(f"[PayMeChap Balance API] Exception on {ep}: {e}")
+                except Exception:
+                    pass
 
         return {
             "success": True,
             "provider": "PayMeChap",
-            "account_number": account_number or "",
+            "account_number": account_number or clean_phone,
             "balance": 0.0,
             "currency": "XOF",
             "last_synced_at": datetime.utcnow().isoformat(),
         }
 
     def fetch_live_transactions(self, access_token: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Collecte le relevé des transactions (GET /api/v1/transactions/recent)."""
+        """Collecte le relevé des transactions (GET /api/v1/transactions/recent ou /api/v1/partners/transactions)."""
         token = access_token or self.get_partner_access_token()
         endpoint = f"{self.base_url}/api/v1/transactions/recent"
 
@@ -205,42 +258,16 @@ class PayMeChapAPIService:
             except Exception as e:
                 logger.warning(f"[PayMeChap Transactions API] Exception: {e}")
 
-        now = datetime.utcnow()
-        return [
-            {
-                "id": "tx_pmc_501",
-                "wallet_provider": "PayMeChap",
-                "type": "deposit",
-                "amount": 20000.0,
-                "currency": "XOF",
-                "category": "Rechargement",
-                "recipient": "Compte PayMeChap",
-                "description": "Rechargement via PayMeChap Instant",
-                "status": "COMPLETED",
-                "timestamp": (now - timedelta(hours=2)).isoformat(),
-            },
-            {
-                "id": "tx_pmc_502",
-                "wallet_provider": "PayMeChap",
-                "type": "payment",
-                "amount": 5000.0,
-                "currency": "XOF",
-                "category": "Transport",
-                "recipient": "Marchand PayMeChap",
-                "description": "Transfert PayMeChap Direct",
-                "status": "COMPLETED",
-                "timestamp": (now - timedelta(days=1)).isoformat(),
-            },
-        ]
+        return []
 
     def execute_payout(self, access_token: str, recipient_phone: str, amount: float, motif: str = "Transfert SIKA") -> Dict[str, Any]:
-        """Exécute un transfert de fonds PayMeChap (POST /api/v1/transactions/transfert/paymechap)."""
-        token = access_token or self.get_partner_access_token()
-        clean_phone = recipient_phone.replace(" ", "").replace("+225", "")
-        endpoint = f"{self.base_url}/api/v1/transactions/transfert/paymechap"
+        """Exécute un transfert de fonds PayMeChap via l'API Partenaire (POST /api/v1/partners/transactions/{sender_phone}/transfer)."""
+        token = self.get_partner_access_token() or access_token
+        clean_recipient = recipient_phone.replace(" ", "").replace("+225", "")
+        endpoint = f"{self.base_url}/api/v1/partners/transactions/{clean_recipient}/transfer"
 
         payload = {
-            "telephoneDestination": clean_phone,
+            "telephoneDestination": clean_recipient,
             "montant": amount,
             "motif": motif,
         }
