@@ -115,7 +115,7 @@ class CoffreItem {
       id: json['id'] ?? 0,
       nom: json['nom'] ?? 'Coffre',
       solde: (json['solde'] as num?)?.toDouble() ?? 0.0,
-      objectif: (json['objectif'] as num?)?.toDouble() ?? 500000.0,
+      objectif: (json['objectif'] as num?)?.toDouble() ?? 0.0,
       typeCoffre: json['typeCoffre'] ?? 'EPARGNE',
       statut: json['statut'] ?? 'ACTIF',
     );
