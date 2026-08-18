@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 
-/// SecurityAnimation — Screen 3 Hero Visual
-/// Futuristic digital lock & shield with 3D tilt rotation, pulsing emerald shield, and orbiting security nodes
-class SecurityAnimation extends StatefulWidget {
+/// SecurityAnimation — Screen 3 Hero Visual (Bilingual English & French)
+class SecurityAnimation extends ConsumerStatefulWidget {
   const SecurityAnimation({super.key});
 
   @override
-  State<SecurityAnimation> createState() => _SecurityAnimationState();
+  ConsumerState<SecurityAnimation> createState() => _SecurityAnimationState();
 }
 
-class _SecurityAnimationState extends State<SecurityAnimation>
+class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
     with TickerProviderStateMixin {
   late AnimationController _tiltController;
   late AnimationController _pulseController;
@@ -20,7 +21,6 @@ class _SecurityAnimationState extends State<SecurityAnimation>
   @override
   void initState() {
     super.initState();
-    // Boucle de rotation / inclinaison en 3D
     _tiltController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -33,7 +33,6 @@ class _SecurityAnimationState extends State<SecurityAnimation>
       ),
     );
 
-    // Boucle de pulsation du halo et des ondes de sécurité
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -56,6 +55,9 @@ class _SecurityAnimationState extends State<SecurityAnimation>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
     return AnimatedBuilder(
       animation: Listenable.merge([_tiltController, _pulseController]),
       builder: (context, child) {
@@ -100,7 +102,7 @@ class _SecurityAnimationState extends State<SecurityAnimation>
               // 3. BOUCLIER ET CADENAS CENTRAL AVEC INCLINAISON 3D
               Transform(
                 transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001) // Effet de perspective
+                  ..setEntry(3, 2, 0.001)
                   ..rotateY(_tiltAnimation.value),
                 alignment: Alignment.center,
                 child: Container(
@@ -135,17 +137,29 @@ class _SecurityAnimationState extends State<SecurityAnimation>
               Positioned(
                 top: 50,
                 right: 80,
-                child: _buildBadge(Icons.fingerprint, 'Biométrie', AppColors.emerald),
+                child: _buildBadge(
+                  Icons.fingerprint,
+                  langNotifier.tr('Biométrie', 'Biometrics'),
+                  AppColors.emerald,
+                ),
               ),
               Positioned(
                 bottom: 60,
                 left: 70,
-                child: _buildBadge(Icons.lock_outline_rounded, 'Contrôle Humain', AppColors.cyan),
+                child: _buildBadge(
+                  Icons.lock_outline_rounded,
+                  langNotifier.tr('Contrôle Humain', 'Human-in-the-Loop'),
+                  AppColors.cyan,
+                ),
               ),
               Positioned(
                 top: 50,
                 left: 65,
-                child: _buildBadge(Icons.verified_user_rounded, 'Sécurisé', AppColors.amber),
+                child: _buildBadge(
+                  Icons.verified_user_rounded,
+                  langNotifier.tr('Sécurisé', 'Secured'),
+                  AppColors.amber,
+                ),
               ),
             ],
           ),

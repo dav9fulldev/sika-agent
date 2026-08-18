@@ -1,42 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../widgets/sika_robot_animation.dart';
 import '../widgets/financial_animation.dart';
 import '../widgets/security_animation.dart';
 
 /// OnboardingScreen — Fullscreen Immersive Animated Onboarding Experience
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   final VoidCallback onFinish;
 
   const OnboardingScreen({super.key, required this.onFinish});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
-  final List<Map<String, dynamic>> _onboardingSteps = [
-    {
-      'title': 'Bienvenue chez Sika 👋',
-      'subtitle':
-          'Votre agent financier autonome qui vous accompagne au quotidien.',
-      'widget': const SikaRobotAnimation(),
-    },
-    {
-      'title': 'Sika comprend vos finances',
-      'subtitle':
-          'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
-      'widget': const FinancialAnimation(),
-    },
-    {
-      'title': 'Toujours sous votre contrôle',
-      'subtitle':
-          'Sika agit avec votre autorisation pour toutes les actions sensibles.',
-      'widget': const SecurityAnimation(),
-    },
-  ];
 
   @override
   void dispose() {
@@ -46,8 +27,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
+    final List<Map<String, dynamic>> onboardingSteps = [
+      {
+        'title': langNotifier.tr('Bienvenue chez Sika 👋', 'Welcome to Sika 👋'),
+        'subtitle': langNotifier.tr(
+          'Votre agent financier autonome qui vous accompagne au quotidien.',
+          'Your autonomous financial agent accompanying you daily.',
+        ),
+        'widget': const SikaRobotAnimation(),
+      },
+      {
+        'title': langNotifier.tr('Sika comprend vos finances', 'Sika understands your finances'),
+        'subtitle': langNotifier.tr(
+          'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
+          'It analyzes your transactions, understands your context, and anticipates risks.',
+        ),
+        'widget': const FinancialAnimation(),
+      },
+      {
+        'title': langNotifier.tr('Toujours sous votre contrôle', 'Always under your control'),
+        'subtitle': langNotifier.tr(
+          'Sika agit avec votre autorisation pour toutes les actions sensibles.',
+          'Sika acts with your permission for all sensitive actions.',
+        ),
+        'widget': const SecurityAnimation(),
+      },
+    ];
+
     return Scaffold(
-      backgroundColor: const Color(0xff020614), // Fond bleu nuit officiel de la maquette
+      backgroundColor: const Color(0xff020614),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -58,14 +69,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 center: Alignment(0, 0.3),
                 radius: 1.2,
                 colors: [
-                  Color(0x0a3f8cff), // Halo bleu très discret et diffus
+                  Color(0x0a3f8cff),
                   Colors.transparent,
                 ],
               ),
             ),
           ),
 
-          // 2. CONTENU DU PAGE VIEW AVEC VOS TRANSITIONS DE FONDU PARALLAXE
+          // 2. CONTENU DU PAGE VIEW
           SafeArea(
             child: Column(
               children: [
@@ -75,9 +86,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPageChanged: (index) {
                       setState(() => _currentPage = index);
                     },
-                    itemCount: _onboardingSteps.length,
+                    itemCount: onboardingSteps.length,
                     itemBuilder: (context, index) {
-                      final step = _onboardingSteps[index];
+                      final step = onboardingSteps[index];
 
                       return AnimatedBuilder(
                         animation: _pageController,
@@ -118,7 +129,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     step['subtitle'] as String,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                      color: Color(0xff94a3b8), // Gris bleuté ultra-lisible
+                                      color: Color(0xff94a3b8),
                                       fontSize: 15,
                                       height: 1.45,
                                     ),
@@ -126,7 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                                   const Spacer(),
 
-                                  // COMPOSANT ANIMÉ DÉDIÉ (ROBOT, ECOSYSTEME, CADENAS)
+                                  // COMPOSANT ANIMÉ DÉDIÉ
                                   step['widget'] as Widget,
 
                                   const Spacer(flex: 2),
@@ -140,20 +151,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                 ),
 
-                // 3. INDICATEURS DE PAGE (POINTS HORIZONTAUX MODÈLE MAQUETTE)
+                // 3. INDICATEURS DE PAGE
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
-                    _onboardingSteps.length,
+                    onboardingSteps.length,
                     (index) => AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == index ? 24 : 8, // Effet d'étirement moderne
+                      width: _currentPage == index ? 24 : 8,
                       height: 8,
                       decoration: BoxDecoration(
                         color: _currentPage == index
-                            ? const Color(0xff3f8cff) // Bleu brillant maquette
-                            : const Color(0xff1e293b), // Point inactif sombre
+                            ? const Color(0xff3f8cff)
+                            : const Color(0xff1e293b),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -162,12 +173,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                 const SizedBox(height: 24),
 
-                // 4. MAIN ACTION BUTTON (SUIVANT / COMMENCER EN DEGRADÉ MAQUETTE)
+                // 4. MAIN ACTION BUTTON (SUIVANT / COMMENCER)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () {
-                      if (_currentPage < _onboardingSteps.length - 1) {
+                      if (_currentPage < onboardingSteps.length - 1) {
                         _pageController.nextPage(
                           duration: const Duration(milliseconds: 400),
                           curve: Curves.easeInOutCubic,
@@ -178,13 +189,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     },
                     child: Container(
                       width: double.infinity,
-                      height: 56, // Épaisseur professionnelle
+                      height: 56,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
                         gradient: const LinearGradient(
                           colors: [
-                            Color(0xff3f8cff), // Bleu brillant
-                            Color(0xff635bff), // Violet Sika
+                            Color(0xff3f8cff),
+                            Color(0xff635bff),
                           ],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
@@ -199,9 +210,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          _currentPage == _onboardingSteps.length - 1
-                              ? 'Commencer'
-                              : 'Suivant',
+                          _currentPage == onboardingSteps.length - 1
+                              ? langNotifier.tr('Commencer', 'Get Started')
+                              : langNotifier.tr('Suivant', 'Next'),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,

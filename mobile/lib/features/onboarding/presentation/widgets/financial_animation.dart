@@ -1,16 +1,18 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 
-/// FinancialAnimation — Écran 2 Amélioré avec textes dynamiques textuels
-class FinancialAnimation extends StatefulWidget {
+/// FinancialAnimation — Écran 2 Amélioré avec textes dynamiques multilingues
+class FinancialAnimation extends ConsumerStatefulWidget {
   const FinancialAnimation({super.key});
 
   @override
-  State<FinancialAnimation> createState() => _FinancialAnimationState();
+  ConsumerState<FinancialAnimation> createState() => _FinancialAnimationState();
 }
 
-class _FinancialAnimationState extends State<FinancialAnimation> with TickerProviderStateMixin {
+class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -19,13 +21,11 @@ class _FinancialAnimationState extends State<FinancialAnimation> with TickerProv
   void initState() {
     super.initState();
 
-    // Rotation orbitale fluide (12 secondes pour faire un tour complet)
     _rotationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 12),
     )..repeat();
 
-    // Effet de pulsation continue pour le cœur central
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -48,78 +48,67 @@ class _FinancialAnimationState extends State<FinancialAnimation> with TickerProv
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
     return AnimatedBuilder(
       animation: Listenable.merge([_rotationController, _pulseController]),
       builder: (context, child) {
-        // L'angle global actuel de l'orbite (entre 0 et 2*pi)
         final double globalAngle = _rotationController.value * 2 * math.pi;
 
         return SizedBox(
-          height: 360, // Ajusté à 360 pour donner de l'espace aux bulles de texte
+          height: 360,
           width: double.infinity,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 1. Halo lumineux central ambiant
-              Container(
-                width: 210,
-                height: 210,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.cyan.withValues(alpha: 0.20),
-                      AppColors.indigo.withValues(alpha: 0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-
-              // 2. Ligne orbitale en anneau discret
+              // 1. ANNEAU D'ORBITE LUMINEUX ACCENTUÉ
               Container(
                 width: 220,
                 height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppColors.cyan.withValues(alpha: 0.15),
-                    width: 1.2,
+                    color: AppColors.cyan.withValues(alpha: 0.25),
+                    width: 1.5,
                   ),
                 ),
               ),
 
-              // 3. Cœur central Sika avec sa pulsation magique
+              // 2. CŒUR INTEL SIKA REHAUSSÉ
               ScaleTransition(
                 scale: _pulseAnimation,
                 child: Container(
-                  width: 80,
-                  height: 80,
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [AppColors.cyan, AppColors.indigo],
+                    gradient: const RadialGradient(
+                      colors: [
+                        Color(0xff38bdf8),
+                        Color(0xff3b82f6),
+                      ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.cyan.withValues(alpha: 0.5),
-                        blurRadius: 25,
-                        spreadRadius: 2,
+                        color: const Color(0xff38bdf8).withValues(alpha: 0.6),
+                        blurRadius: 28,
+                        spreadRadius: 4,
                       ),
                     ],
                   ),
                   child: const Center(
                     child: Icon(
-                      Icons.auto_awesome,
+                      Icons.auto_awesome_rounded,
                       color: Colors.white,
-                      size: 38,
+                      size: 44,
                     ),
                   ),
                 ),
               ),
 
-              // 4. Les nœuds financiers en mouvement ET leurs messages respectifs
-              ..._buildOrbitingNodesAndMessages(globalAngle),
+              // 3. NODES ET BULLES DYNAMIQUES DU SYSTÈME SIKA
+              ..._buildOrbitingNodesWithMessages(globalAngle, langNotifier),
             ],
           ),
         );
@@ -127,31 +116,31 @@ class _FinancialAnimationState extends State<FinancialAnimation> with TickerProv
     );
   }
 
-  List<Widget> _buildOrbitingNodesAndMessages(double currentGlobalAngle) {
-    final nodes = [
+  List<Widget> _buildOrbitingNodesWithMessages(double currentGlobalAngle, LanguageNotifier langNotifier) {
+    final List<Map<String, dynamic>> nodes = [
       {
-        'icon': Icons.account_balance_wallet_rounded,
-        'color': AppColors.cyan,
-        'message': 'Suivi du portefeuille en temps réel',
+        'icon': Icons.insights_rounded,
+        'color': AppColors.emerald,
+        'message': langNotifier.tr('Analyses prédictives de vos dépenses', 'Predictive spending analysis'),
         'offsetAngle': 0.0,
       },
       {
-        'icon': Icons.bar_chart_rounded,
-        'color': AppColors.emerald,
-        'message': 'Analyses prédictives de vos dépenses',
-        'offsetAngle': (2 * math.pi) / 4,
+        'icon': Icons.account_balance_wallet_rounded,
+        'color': AppColors.cyan,
+        'message': langNotifier.tr('Gestion multi-portefeuilles Wave & OM', 'Multi-wallet Wave & OM management'),
+        'offsetAngle': math.pi / 2,
       },
       {
         'icon': Icons.notifications_active_rounded,
         'color': AppColors.rose,
-        'message': 'Alertes instantanées en cas d\'anomalie',
-        'offsetAngle': (4 * math.pi) / 4,
+        'message': langNotifier.tr('Alertes instantanées en cas d\'anomalie', 'Instant anomaly alerts'),
+        'offsetAngle': math.pi,
       },
       {
         'icon': Icons.savings_rounded,
         'color': AppColors.amber,
-        'message': 'Optimisation automatique de l\'épargne',
-        'offsetAngle': (6 * math.pi) / 4,
+        'message': langNotifier.tr('Optimisation automatique de l\'épargne', 'Autonomous savings booster'),
+        'offsetAngle': (3 * math.pi) / 2,
       },
     ];
 
@@ -178,7 +167,6 @@ class _FinancialAnimationState extends State<FinancialAnimation> with TickerProv
       return Stack(
         alignment: Alignment.center,
         children: [
-          // A) LA BULLE DE TEXTE DYNAMIQUE
           if (opacityValue > 0.05)
             Transform.translate(
               offset: Offset(dx, dy - 48),
@@ -213,32 +201,23 @@ class _FinancialAnimationState extends State<FinancialAnimation> with TickerProv
               ),
             ),
 
-          // B) L'ICÔNE FINANCIÈRE EN ROTATION
           Transform.translate(
             offset: Offset(dx, dy),
             child: Container(
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: const Color(0xff090d1a),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: opacityValue > 0.5 ? color : color.withValues(alpha: 0.5),
-                  width: opacityValue > 0.5 ? 2.0 : 1.2,
-                ),
+                color: const Color(0xff0b1329),
+                border: Border.all(color: color, width: 1.8),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withValues(alpha: opacityValue > 0.5 ? 0.4 : 0.2),
-                    blurRadius: opacityValue > 0.5 ? 14 : 8,
-                    spreadRadius: opacityValue > 0.5 ? 1 : 0,
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 14,
                   ),
                 ],
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 22,
-              ),
+              child: Icon(icon, color: color, size: 22),
             ),
           ),
         ],
