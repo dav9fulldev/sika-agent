@@ -24,7 +24,7 @@ class MyWalletsModal extends ConsumerWidget {
     if (lower.contains('wave')) return AppImages.waveci;
     if (lower.contains('orange')) return AppImages.orange;
     if (lower.contains('mtn')) return AppImages.mtn;
-    if (lower.contains('paymechap')) return AppImages.sikaLogo;
+    if (lower.contains('paymechap')) return AppImages.paymechap;
     return AppImages.logo;
   }
 

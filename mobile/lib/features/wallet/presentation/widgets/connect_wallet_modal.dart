@@ -55,7 +55,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
     },
     {
       'name': 'PayMeChap',
-      'image': AppImages.sikaLogo,
+      'image': AppImages.paymechap,
       'authMethod': 'PAYMECHAP_PARTNER_API',
       'brandColor': AppColors.cyan,
     },
