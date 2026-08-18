@@ -186,7 +186,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
-          // MENU OPTIONS
+          // MENU OPTIONS (LISTE ÉPURÉE SANS DOUBLON DE PARAMÈTRES)
           _buildMenuItem(
             icon: Icons.person_outline,
             title: langNotifier.tr('Informations personnelles', 'Personal Information'),
@@ -207,16 +207,6 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.history,
             title: langNotifier.tr('Historique des transactions', 'Transaction History'),
             onTap: () {},
-          ),
-          _buildMenuItem(
-            icon: Icons.settings_outlined,
-            title: langNotifier.tr('Paramètres & Perception SIKA', 'Settings & SIKA Perception'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
           ),
 
           const SizedBox(height: 32),
