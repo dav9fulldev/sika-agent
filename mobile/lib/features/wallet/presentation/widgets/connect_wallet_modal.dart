@@ -53,6 +53,12 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
       'authMethod': 'MTN_MOMO_API',
       'brandColor': Colors.amber,
     },
+    {
+      'name': 'PayMeChap',
+      'image': AppImages.sikaLogo,
+      'authMethod': 'PAYMECHAP_PARTNER_API',
+      'brandColor': AppColors.cyan,
+    },
   ];
 
   Future<void> _handleInitiateOtp() async {
@@ -153,15 +159,15 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
             const SizedBox(height: 6),
             Text(
               langNotifier.tr(
-                'Choisissez votre opérateur et entrez votre numéro de mobile.',
-                'Choose your provider and enter your mobile number.',
+                'Choisissez votre partenaire de paiement et entrez votre numéro de mobile.',
+                'Choose your payment partner and enter your mobile number.',
               ),
               style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
 
             const SizedBox(height: 20),
 
-            // SELECTION FOURNISSEUR (WAVE, ORANGE, MTN)
+            // SELECTION FOURNISSEUR (WAVE, ORANGE, MTN, PAYMECHAP)
             SizedBox(
               height: 90,
               child: ListView.separated(

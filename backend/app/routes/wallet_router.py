@@ -5,13 +5,14 @@ from datetime import datetime
 from ..services.wallet_integrations.wave_api_service import wave_api_service
 from ..services.wallet_integrations.orange_money_api_service import orange_money_api_service
 from ..services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
+from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
 
 router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 
 # Sessions d'OTP en attente de vérification
 PENDING_OTP_SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-# Portefeuilles utilisateurs connectés via Méthode 1 (APIs OAuth2) et Méthode 3 (Perception SMS/Push)
+# Portefeuilles utilisateurs connectés via Méthode 1 (APIs OAuth2 / Partenaires) et Méthode 3 (Perception SMS/Push)
 CONNECTED_USER_WALLETS: List[Dict[str, Any]] = [
     {
         "id": "w_wave_1",
@@ -66,15 +67,13 @@ def get_all_wallets_transaction_history(
     user_id: str = "usr_default",
     limit: int = Query(default=30, ge=1, le=100)
 ):
-    """API de collecte d'historique et des mouvements de comptes (Méthodes 1 & 3).
-
-    Exécute une collecte centralisée de l'historique depuis les APIs de Wave, Orange et MTN.
-    """
+    """API de collecte d'historique et des mouvements de comptes (Wave, Orange, MTN, PayMeChap)."""
     wave_txs = wave_api_service.fetch_live_transactions("token", limit=limit)
     orange_txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
     mtn_txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
+    pmc_txs = paymechap_api_service.fetch_live_transactions("token", limit=limit)
 
-    movements = wave_txs + orange_txs + mtn_txs
+    movements = wave_txs + orange_txs + mtn_txs + pmc_txs
     movements.sort(key=lambda x: x["timestamp"], reverse=True)
     movements = movements[:limit]
 
@@ -107,6 +106,8 @@ def get_specific_wallet_transactions(
         txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
     elif "mtn" in provider:
         txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
+    elif "paymechap" in provider:
+        txs = paymechap_api_service.fetch_live_transactions("token", limit=limit)
     else:
         txs = wave_api_service.fetch_live_transactions("token", limit=limit)
 
@@ -120,7 +121,7 @@ def get_specific_wallet_transactions(
 
 @router.post("/connect")
 def connect_new_wallet(data: Dict[str, Any]):
-    """Étape 1 : Demande de connexion d'un portefeuille avec envoi d'OTP de sécurité."""
+    """Étape 1 : Demande de connexion d'un portefeuille partenaire avec envoi d'OTP de sécurité."""
     provider = data.get("provider", "Wave")
     account_number = data.get("account_number", "+225 07 00 00 99")
     auth_method = data.get("auth_method", "OAUTH2_WAVE")
@@ -170,6 +171,8 @@ def verify_wallet_otp(data: Dict[str, Any]):
         fetched = orange_money_api_service.fetch_live_balance("live_token", account_number)
     elif "mtn" in prov_lower:
         fetched = mtn_momo_api_service.fetch_live_balance("live_token", account_number)
+    elif "paymechap" in prov_lower:
+        fetched = paymechap_api_service.fetch_live_balance("live_token", account_number)
     else:
         fetched = {"balance": 15000.0, "currency": "XOF"}
 
@@ -197,10 +200,11 @@ def verify_wallet_otp(data: Dict[str, Any]):
 
 @router.post("/sync")
 def sync_user_wallets(user_id: str = "usr_default"):
-    """Effectue une synchronisation d'API en direct avec Wave, Orange et MTN (Méthodes 1 & 3)."""
+    """Effectue une synchronisation d'API en direct avec Wave, Orange, MTN et PayMeChap."""
     wave_data = wave_api_service.fetch_live_balance("token")
     orange_data = orange_money_api_service.fetch_live_balance("token")
     mtn_data = mtn_momo_api_service.fetch_live_balance("token")
+    pmc_data = paymechap_api_service.fetch_live_balance("token")
 
     synced_wallets = [
         {
@@ -235,6 +239,17 @@ def sync_user_wallets(user_id: str = "usr_default"):
             "auth_method": "MTN_MOMO_API",
             "is_active": True,
             "last_synced_at": mtn_data["last_synced_at"]
+        },
+        {
+            "id": "w_paymechap_4",
+            "user_id": user_id,
+            "provider": "PayMeChap",
+            "balance": pmc_data["balance"],
+            "currency": pmc_data["currency"],
+            "account_number": pmc_data["account_number"],
+            "auth_method": "PAYMECHAP_PARTNER_API",
+            "is_active": True,
+            "last_synced_at": pmc_data["last_synced_at"]
         }
     ]
 
