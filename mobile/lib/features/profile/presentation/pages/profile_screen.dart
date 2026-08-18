@@ -107,7 +107,7 @@ class ProfileScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      langNotifier.tr('Mouvements & Historique API', 'API Movements & History'),
+                      langNotifier.tr('Historique des Mouvements', 'Transactions & History'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -126,8 +126,8 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   langNotifier.tr(
-                    'Mouvements collectés en temps réel via les APIs PayMeChap, Wave, Orange et MTN.',
-                    'Real-time movements collected via PayMeChap, Wave, Orange, and MTN APIs.',
+                    'Synchronisation automatique en temps réel de vos portefeuilles connectés.',
+                    'Real-time automated sync across your connected wallets.',
                   ),
                   style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                 ),
