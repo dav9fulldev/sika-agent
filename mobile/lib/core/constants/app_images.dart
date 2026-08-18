@@ -8,5 +8,6 @@ class AppImages {
   // Mobile Money Provider Logos
   static const String wave = 'assets/images/wave.png';
   static const String orange = 'assets/images/orange.png';
-  static const String mtn = 'assets/images/mtn.jpeg';
+  static const String mtn = 'assets/images/mtn.png';
+  static const String waveci = 'assets/images/waveci.png';
 }

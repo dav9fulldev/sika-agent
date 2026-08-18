@@ -70,7 +70,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
             child: SafeArea(
               child: Column(
                 children: [
-                  // 1. BARRE SUPÉRIEURE (BOUTON RETOUR ET TITRE)
+                  // 1. BARRE SUPÉRIEURE (BOUTON RETOUR)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
@@ -123,7 +123,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
 
                   const Spacer(),
 
-                  // 3. SPHÈRE / ORBE ANIME STYLE SIRI (NEON SPHERE)
+                  // 3. SPHÈRE / ORBE ANIMÉE STYLE SIRI (NEON SPHERE)
                   AnimatedBuilder(
                     animation: _orbPulseAnimation,
                     builder: (context, child) {
@@ -136,9 +136,9 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                             shape: BoxShape.circle,
                             gradient: const RadialGradient(
                               colors: [
-                                Color(0xFF38BDF8), // Cyan center
-                                Color(0xFF635BFF), // Sika Violet
-                                Color(0xFFA855F7), // Purple glow
+                                Color(0xFF38BDF8),
+                                Color(0xFF635BFF),
+                                Color(0xFFA855F7),
                                 Colors.transparent,
                               ],
                               stops: [0.1, 0.45, 0.8, 1.0],
@@ -182,7 +182,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
 
                   // 4. ONDES AUDIO VISUELLES (SOUNDWAVE PAINTER)
                   SizedBox(
-                    height: 60,
+                    height: 80,
                     width: double.infinity,
                     child: AnimatedBuilder(
                       animation: _waveController,
@@ -192,71 +192,6 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                         );
                       },
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 5. BOUTON MICROPHONE ET BOUTON ANNULER
-                  Column(
-                    children: [
-                      // BOUTON MICROPHONE CENTRÉ
-                      GestureDetector(
-                        onTap: () async {
-                          await sikaNotifier.stopListening();
-                        },
-                        child: Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF0B1329),
-                            border: Border.all(
-                              color: const Color(0xFF10B981),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.4),
-                                blurRadius: 16,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.mic_rounded,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // BOUTON ANNULER
-                      SizedBox(
-                        width: 140,
-                        height: 44,
-                        child: TextButton(
-                          onPressed: () async {
-                            await sikaNotifier.stopListening();
-                          },
-                          style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E293B),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                          ),
-                          child: Text(
-                            langNotifier.tr('Annuler', 'Cancel'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
 
                   const SizedBox(height: 30),
@@ -270,7 +205,6 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
   }
 }
 
-/// Custom painter for smooth animated Siri-style audio soundwaves
 class _SiriWavePainter extends CustomPainter {
   final double progress;
 
@@ -278,38 +212,48 @@ class _SiriWavePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double midY = size.height / 2;
+    final midY = size.height / 2;
+    final width = size.width;
 
-    final Paint cyanPaint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.6)
+    // 1. ONDE BLEUE PRINCIPALE
+    final paintBlue = Paint()
+      ..color = const Color(0xFF38BDF8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+
+    final pathBlue = Path();
+    pathBlue.moveTo(0, midY);
+
+    for (double x = 0; x <= width; x += 1) {
+      final normalizedX = x / width;
+      final envelope = math.sin(normalizedX * math.pi);
+      final y = midY +
+          math.sin((normalizedX * 4 * math.pi) + (progress * 2 * math.pi)) *
+              16 *
+              envelope;
+      pathBlue.lineTo(x, y);
+    }
+    canvas.drawPath(pathBlue, paintBlue);
+
+    // 2. ONDE VIOLETTE EN DÉCALAGE DE PHASE
+    final paintPurple = Paint()
+      ..color = const Color(0xFFA855F7)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
 
-    final Paint purplePaint = Paint()
-      ..color = const Color(0xFFA855F7).withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
+    final pathPurple = Path();
+    pathPurple.moveTo(0, midY);
 
-    final Path path1 = Path();
-    final Path path2 = Path();
-
-    path1.moveTo(0, midY);
-    path2.moveTo(0, midY);
-
-    for (double x = 0; x <= size.width; x += 4) {
-      final double normX = x / size.width;
-      // Envelope curve so waves taper at left and right edges
-      final double envelope = math.sin(normX * math.pi);
-
-      final double y1 = midY + math.sin(normX * math.pi * 6 + progress * math.pi * 2) * 18 * envelope;
-      final double y2 = midY + math.cos(normX * math.pi * 4 - progress * math.pi * 2) * 14 * envelope;
-
-      path1.lineTo(x, y1);
-      path2.lineTo(x, y2);
+    for (double x = 0; x <= width; x += 1) {
+      final normalizedX = x / width;
+      final envelope = math.sin(normalizedX * math.pi);
+      final y = midY +
+          math.sin((normalizedX * 3 * math.pi) - (progress * 2 * math.pi)) *
+              12 *
+              envelope;
+      pathPurple.lineTo(x, y);
     }
-
-    canvas.drawPath(path1, cyanPaint);
-    canvas.drawPath(path2, purplePaint);
+    canvas.drawPath(pathPurple, paintPurple);
   }
 
   @override

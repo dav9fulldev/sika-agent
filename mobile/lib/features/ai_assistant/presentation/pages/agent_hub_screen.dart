@@ -165,7 +165,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           const SizedBox(height: 18),
                           Row(
                             children: [
-                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, AppImages.wave),
+                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, AppImages.waveci),
                               const SizedBox(width: 8),
                               _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, AppImages.orange),
                               const SizedBox(width: 8),

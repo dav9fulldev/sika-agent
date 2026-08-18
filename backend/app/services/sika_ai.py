@@ -9,7 +9,9 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 try:
+    # pyrefly: ignore [missing-import]
     from google import genai
+    # pyrefly: ignore [missing-import]
     from google.genai import types
     HAS_GOOGLE_GENAI = True
 except ImportError:
