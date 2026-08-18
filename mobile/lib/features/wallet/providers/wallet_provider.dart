@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/api_service.dart';
 
 class ConnectedWalletItem {
@@ -34,6 +36,19 @@ class ConnectedWalletItem {
       isActive: json['is_active'] ?? true,
       lastSyncedAt: json['last_synced_at'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'provider': provider,
+      'balance': balance,
+      'currency': currency,
+      'account_number': accountNumber,
+      'auth_method': authMethod,
+      'is_active': isActive,
+      'last_synced_at': lastSyncedAt,
+    };
   }
 }
 
@@ -120,10 +135,45 @@ class WalletState {
 
 class WalletNotifier extends StateNotifier<WalletState> {
   final ApiService _apiService;
+  static const String _cachedWalletsKey = 'sika_cached_enrolled_wallets';
 
   WalletNotifier(this._apiService) : super(WalletState()) {
-    fetchWallets();
-    fetchMovements();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await loadCachedWallets();
+    await fetchWallets();
+    await fetchMovements();
+  }
+
+  Future<void> loadCachedWallets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonStr = prefs.getString(_cachedWalletsKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List decoded = jsonDecode(jsonStr);
+        final List<ConnectedWalletItem> cachedItems =
+            decoded.map((e) => ConnectedWalletItem.fromJson(e)).toList();
+        if (cachedItems.isNotEmpty) {
+          state = state.copyWith(wallets: cachedItems);
+          debugPrint('[WALLET CACHE] Loaded ${cachedItems.length} wallet(s) from device storage.');
+        }
+      }
+    } catch (e) {
+      debugPrint('[WALLET CACHE] Error loading cached wallets: $e');
+    }
+  }
+
+  Future<void> saveCachedWallets(List<ConnectedWalletItem> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String jsonStr = jsonEncode(items.map((e) => e.toJson()).toList());
+      await prefs.setString(_cachedWalletsKey, jsonStr);
+      debugPrint('[WALLET CACHE] Saved ${items.length} wallet(s) to device storage.');
+    } catch (e) {
+      debugPrint('[WALLET CACHE] Error saving cached wallets: $e');
+    }
   }
 
   Future<void> fetchWallets() async {
@@ -135,6 +185,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
           rawList.map((e) => ConnectedWalletItem.fromJson(e)).toList();
 
       state = state.copyWith(isLoading: false, wallets: items);
+      await saveCachedWallets(items);
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching wallets: $e');
       state = state.copyWith(
