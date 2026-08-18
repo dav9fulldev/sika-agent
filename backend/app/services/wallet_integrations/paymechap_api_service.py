@@ -219,16 +219,16 @@ class PayMeChapAPIService:
                     pass
 
         return {
-            "success": True,
+            "success": False,
             "provider": "PayMeChap",
             "account_number": account_number or clean_phone,
-            "balance": 1908000.0,
+            "balance": 0.0,
             "currency": "XOF",
             "last_synced_at": datetime.utcnow().isoformat(),
         }
 
     def fetch_user_coffres(self, access_token: str) -> List[Dict[str, Any]]:
-        """Récupère la liste des Coffres-forts PayMeChap de l'utilisateur."""
+        """Récupère la liste des Coffres-forts PayMeChap de l'utilisateur en direct via l'API."""
         tokens_to_try = []
         if access_token:
             tokens_to_try.append(access_token)
@@ -245,29 +245,14 @@ class PayMeChapAPIService:
                 resp = requests.get(ep, headers=headers, timeout=8)
                 if resp.status_code == 200:
                     data = resp.json()
-                    coffre_list = []
                     if isinstance(data, list):
-                        coffre_list = data
+                        return data
                     elif isinstance(data, dict):
-                        coffre_list = data.get("content") or data.get("data") or []
-
-                    if coffre_list:
-                        return coffre_list
+                        return data.get("content") or data.get("data") or []
             except Exception as e:
                 logger.warning(f"[PayMeChap Coffres API] Exception sur {ep}: {e}")
 
-        # Vraies données du Coffre extraites du compte PayMeChap ("Etude", solde 6000, objectif 500000)
-        return [
-            {
-                "id": 1,
-                "nom": "Etude",
-                "solde": 6000.0,
-                "objectif": 500000.0,
-                "typeCoffre": "EPARGNE",
-                "statut": "ACTIF",
-                "dateCreation": "2026-07-16T12:43:16.911713"
-            }
-        ]
+        return []
 
     def create_coffre(self, access_token: str, nom: str, type_coffre: str = "EPARGNE", objectif: float = 500000.0) -> Dict[str, Any]:
         """Crée un nouveau Coffre-fort sur l'API PayMeChap."""
@@ -390,175 +375,7 @@ class PayMeChapAPIService:
                 except Exception as e:
                     logger.warning(f"[PayMeChap Transactions API] Exception sur {ep}: {e}")
 
-        # Vraies transactions extraites de votre compte de test PayMeChap
-        real_postman_payload = [
-            {
-                "id": "24",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1786024383070",
-                "montant": 500.0,
-                "type": "RECEPTION",
-                "counterpartyName": "GNAN",
-                "counterpartyPhone": "0779996927",
-                "dateTransaction": "2026-08-06T13:53:03.080431",
-            },
-            {
-                "id": "21",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1785883059541",
-                "montant": 30000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "YEPIE",
-                "counterpartyPhone": "0747901945",
-                "dateTransaction": "2026-08-04T22:37:39.624087",
-            },
-            {
-                "id": "19",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1785848785958",
-                "montant": 25000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "KOUADIO",
-                "counterpartyPhone": "0778303342",
-                "dateTransaction": "2026-08-04T13:06:25.958452",
-            },
-            {
-                "id": "17",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1785848455360",
-                "montant": 20000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "GNAN",
-                "counterpartyPhone": "0779996927",
-                "dateTransaction": "2026-08-04T13:00:55.360975",
-            },
-            {
-                "id": "16",
-                "status": "Effectué",
-                "reference": "DEPOT-1784214189351",
-                "montant": 550.0,
-                "type": "DEPOT",
-                "counterpartyName": None,
-                "counterpartyPhone": None,
-                "dateTransaction": "2026-07-16T15:03:09.363391",
-            },
-            {
-                "id": "15",
-                "status": "Effectué",
-                "reference": "DEPOT-1784214061454",
-                "montant": 20000.0,
-                "type": "DEPOT",
-                "counterpartyName": None,
-                "counterpartyPhone": None,
-                "dateTransaction": "2026-07-16T15:01:01.553131",
-            },
-            {
-                "id": "13",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784206051536",
-                "montant": 2500.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Hema",
-                "counterpartyPhone": "0595235631",
-                "dateTransaction": "2026-07-16T12:47:31.536654",
-            },
-            {
-                "id": "11",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784205348403",
-                "montant": 500.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Hema",
-                "counterpartyPhone": "0595235631",
-                "dateTransaction": "2026-07-16T12:35:48.403344",
-            },
-            {
-                "id": "9",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784205282003",
-                "montant": 50000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Hema",
-                "counterpartyPhone": "0595235631",
-                "dateTransaction": "2026-07-16T12:34:42.003475",
-            },
-            {
-                "id": "7",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784201781404",
-                "montant": 2000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Kangah",
-                "counterpartyPhone": "0757656020",
-                "dateTransaction": "2026-07-16T11:36:21.406279",
-            },
-            {
-                "id": "5",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784145012182",
-                "montant": 25000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Kangah",
-                "counterpartyPhone": "0757656020",
-                "dateTransaction": "2026-07-15T19:50:12.182409",
-            },
-            {
-                "id": "4",
-                "status": "Effectué",
-                "reference": "DEPOT-1784133278290",
-                "montant": 2000000.0,
-                "type": "DEPOT",
-                "counterpartyName": None,
-                "counterpartyPhone": None,
-                "dateTransaction": "2026-07-15T16:34:38.290486",
-            },
-            {
-                "id": "2",
-                "status": "Effectué",
-                "reference": "TRANSFERT-1784131666400",
-                "montant": 50000.0,
-                "type": "TRANSFERT",
-                "counterpartyName": "Hema",
-                "counterpartyPhone": "0595235631",
-                "dateTransaction": "2026-07-15T16:07:46.40074",
-            },
-            {
-                "id": "1",
-                "status": "Effectué",
-                "reference": "DEPOT-1784131598001",
-                "montant": 100000.0,
-                "type": "DEPOT",
-                "counterpartyName": None,
-                "counterpartyPhone": None,
-                "dateTransaction": "2026-07-15T16:06:38.004621",
-            },
-        ]
-
-        movements = []
-        for item in real_postman_payload:
-            raw_amt = float(item["montant"])
-            tx_type_raw = item["type"]
-            c_name = item.get("counterpartyName") or ""
-            c_phone = item.get("counterpartyPhone") or ""
-            recip = c_name or c_phone or "PayMeChap"
-            desc = f"Transfert PayMeChap ({recip})" if tx_type_raw == "TRANSFERT" else ("Réception d'argent" if tx_type_raw == "RECEPTION" else "Dépôt d'espèces")
-
-            category = self.categorize_transaction(tx_type_raw, recip, desc, "", raw_amt)
-
-            movements.append({
-                "id": str(item["id"]),
-                "wallet_provider": "PayMeChap",
-                "type": "deposit" if tx_type_raw in ["RECEPTION", "DEPOT"] else "payment",
-                "amount": raw_amt,
-                "currency": "XOF",
-                "category": category,
-                "recipient": recip,
-                "description": desc,
-                "status": "COMPLETED",
-                "timestamp": item["dateTransaction"],
-            })
-
-        return movements
+        return []
 
     def execute_payout(self, access_token: str, recipient_phone: str, amount: float, motif: str = "Transfert SIKA") -> Dict[str, Any]:
         """Exécute un transfert de fonds PayMeChap via l'API Partenaire (POST /api/v1/partners/transactions/{sender_phone}/transfer)."""
