@@ -123,26 +123,47 @@ class PayMeChapAPIService:
 
     def fetch_live_balance(self, access_token: str, account_number: Optional[str] = None) -> Dict[str, Any]:
         """Consulte le solde en direct (GET /api/v1/wallets/balance ou /api/v1/wallets/me)."""
-        token = access_token or self.get_partner_access_token()
-        endpoint = f"{self.base_url}/api/v1/wallets/balance"
+        tokens_to_try = []
+        if access_token and not access_token.startswith("pmc_token_"):
+            tokens_to_try.append(access_token)
+        partner_tok = self.get_partner_access_token()
+        if partner_tok and partner_tok not in tokens_to_try:
+            tokens_to_try.append(partner_tok)
 
-        if token and not token.startswith("pmc_token_"):
-            try:
-                headers = {"Authorization": f"Bearer {token}"}
-                resp = requests.get(endpoint, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    balance = float(data.get("solde") or data.get("balance") or data.get("montant") or 0.0)
-                    return {
-                        "success": True,
-                        "provider": "PayMeChap",
-                        "account_number": account_number or "",
-                        "balance": balance,
-                        "currency": data.get("currency") or "XOF",
-                        "last_synced_at": datetime.utcnow().isoformat(),
-                    }
-            except Exception as e:
-                logger.warning(f"[PayMeChap Balance API] Exception: {e}")
+        endpoints = [
+            f"{self.base_url}/api/v1/wallets/balance",
+            f"{self.base_url}/api/v1/wallets/me",
+        ]
+
+        for tok in tokens_to_try:
+            headers = {"Authorization": f"Bearer {tok}"}
+            for ep in endpoints:
+                try:
+                    logger.info(f"[PayMeChap Balance API] GET {ep} with token {tok[:15]}...")
+                    resp = requests.get(ep, headers=headers, timeout=8)
+                    logger.info(f"[PayMeChap Balance API] Response {resp.status_code}: {resp.text}")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        w_data = data.get("data") if isinstance(data.get("data"), dict) else data
+                        balance_raw = (
+                            w_data.get("solde") or
+                            w_data.get("balance") or
+                            w_data.get("soldePrincipal") or
+                            w_data.get("soldeCourant") or
+                            w_data.get("montant") or
+                            0.0
+                        )
+                        balance = float(balance_raw)
+                        return {
+                            "success": True,
+                            "provider": "PayMeChap",
+                            "account_number": account_number or "",
+                            "balance": balance,
+                            "currency": w_data.get("currency") or "XOF",
+                            "last_synced_at": datetime.utcnow().isoformat(),
+                        }
+                except Exception as e:
+                    logger.warning(f"[PayMeChap Balance API] Exception on {ep}: {e}")
 
         return {
             "success": True,
