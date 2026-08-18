@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
+import '../../../wallet/providers/wallet_provider.dart';
 
 class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
@@ -21,6 +22,48 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
+
+    final walletState = ref.watch(walletProvider);
+    final movements = walletState.movements;
+
+    // Filter expense movements (payment, transfer, withdrawal)
+    final expenseMovements = movements.where((m) {
+      final t = m.type.toLowerCase();
+      return t == 'payment' || t == 'transfer' || t == 'withdrawal' || m.amount > 0;
+    }).toList();
+
+    final double totalExpenseFcfa = expenseMovements.fold(0.0, (sum, m) => sum + m.amount);
+
+    // Dynamic category breakdown if real movements exist
+    Map<String, double> categoryTotals = {};
+    if (totalExpenseFcfa > 0) {
+      for (var m in expenseMovements) {
+        final cat = m.category.isEmpty ? 'Autres' : m.category;
+        categoryTotals[cat] = (categoryTotals[cat] ?? 0.0) + m.amount;
+      }
+    }
+
+    final List<Map<String, dynamic>> categoryDisplay = [];
+    final List<Color> categoryColors = [
+      const Color(0xFF38BDF8), // Food / Blue
+      const Color(0xFF10B981), // Transport / Green
+      const Color(0xFFF59E0B), // Leisure / Orange
+      const Color(0xFF635BFF), // Others / Purple
+    ];
+
+    if (totalExpenseFcfa > 0) {
+      int colorIdx = 0;
+      categoryTotals.forEach((cat, amt) {
+        final double pct = amt / totalExpenseFcfa;
+        categoryDisplay.add({
+          'name': cat,
+          'pctValue': pct,
+          'pctString': '${(pct * 100).toStringAsFixed(0)}%',
+          'color': categoryColors[colorIdx % categoryColors.length],
+        });
+        colorIdx++;
+      });
+    }
 
     final Map<String, String> periodLabels = {
       'Ce mois': langNotifier.tr('Ce mois', 'This month'),
@@ -80,7 +123,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. LE GRAND BLOC PRINCIPAL DES DÉPENSES TOTALES (CONVERSION DEVISE)
+            // 1. DÉPENSES TOTALES DYNAMIQUES
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -124,7 +167,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              currNotifier.format(120000),
+                              currNotifier.format(totalExpenseFcfa),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 26,
@@ -133,22 +176,32 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              langNotifier.tr('+12% vs mois dernier', '+12% vs last month'),
-                              style: const TextStyle(
-                                color: Color(0xFF10B981),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                              totalExpenseFcfa > 0
+                                  ? langNotifier.tr('Basé sur vos transactions récentes', 'Based on recent transactions')
+                                  : langNotifier.tr('Aucune dépense enregistrée', 'No expenses recorded'),
+                              style: TextStyle(
+                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             const SizedBox(height: 20),
 
-                            _buildCategoryRow(langNotifier.tr('Alimentation', 'Food'), '72%', const Color(0xFF38BDF8)),
-                            const SizedBox(height: 10),
-                            _buildCategoryRow(langNotifier.tr('Transport', 'Transport'), '15%', const Color(0xFF10B981)),
-                            const SizedBox(height: 10),
-                            _buildCategoryRow(langNotifier.tr('Loisirs', 'Leisure'), '8%', const Color(0xFFF59E0B)),
-                            const SizedBox(height: 10),
-                            _buildCategoryRow(langNotifier.tr('Autres', 'Others'), '5%', const Color(0xFF635BFF)),
+                            if (categoryDisplay.isNotEmpty) ...[
+                              for (var cat in categoryDisplay) ...[
+                                _buildCategoryRow(
+                                  cat['name'] as String,
+                                  cat['pctString'] as String,
+                                  cat['color'] as Color,
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                            ] else ...[
+                              Text(
+                                langNotifier.tr('Aucune catégorie disponible', 'No categories available'),
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -163,15 +216,18 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                                 width: 100,
                                 height: 100,
                                 child: CustomPaint(
-                                  painter: _BuildCustomDonut(),
+                                  painter: _BuildCustomDonut(
+                                    percentages: categoryDisplay.map((e) => e['pctValue'] as double).toList(),
+                                    colors: categoryDisplay.map((e) => e['color'] as Color).toList(),
+                                  ),
                                 ),
                               ),
-                              const Column(
+                              Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '72%',
-                                    style: TextStyle(
+                                    categoryDisplay.isNotEmpty ? categoryDisplay.first['pctString'] as String : '0%',
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -191,7 +247,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
             const SizedBox(height: 20),
 
-            // 2. LE BLOC DE L'OBJECTIF D'ÉPARGNE (CONVERSION DEVISE)
+            // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -232,16 +288,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        currNotifier.format(80000),
+                        currNotifier.format(walletState.totalBalanceFcfa),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Text(
-                        '60%',
-                        style: TextStyle(
+                      Text(
+                        walletState.totalBalanceFcfa > 0 ? '100%' : '0%',
+                        style: const TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -253,19 +309,19 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: const SizedBox(
+                    child: SizedBox(
                       height: 10,
                       child: LinearProgressIndicator(
-                        value: 0.60,
-                        backgroundColor: Color(0xFF1E293B),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                        value: walletState.totalBalanceFcfa > 0 ? 1.0 : 0.0,
+                        backgroundColor: const Color(0xFF1E293B),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   Text(
-                    '${currNotifier.format(48000)} / ${currNotifier.format(80000)}',
+                    '${currNotifier.format(walletState.totalBalanceFcfa)} / ${currNotifier.format(walletState.totalBalanceFcfa)}',
                     style: const TextStyle(
                       color: Color(0xFF10B981),
                       fontSize: 13,
@@ -320,45 +376,54 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 }
 
 class _BuildCustomDonut extends CustomPainter {
+  final List<double> percentages;
+  final List<Color> colors;
+
+  _BuildCustomDonut({
+    required this.percentages,
+    required this.colors,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double radius = size.width / 2;
     const double thickness = 8.0;
 
-    final Paint paint = Paint()
+    final Paint backgroundPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = thickness
-      ..strokeCap = StrokeCap.round;
+      ..color = const Color(0xFF1E293B);
 
-    paint.color = const Color(0xFF635BFF);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * 0.72,
-      false,
-      paint,
-    );
+    canvas.drawCircle(center, radius, backgroundPaint);
 
-    paint.color = const Color(0xFF10B981);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      (-math.pi / 2) + (2 * math.pi * 0.72),
-      2 * math.pi * 0.15,
-      false,
-      paint,
-    );
+    if (percentages.isEmpty || percentages.every((p) => p == 0)) {
+      return;
+    }
 
-    paint.color = const Color(0xFF38BDF8);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      (-math.pi / 2) + (2 * math.pi * 0.87),
-      2 * math.pi * 0.13,
-      false,
-      paint,
-    );
+    double startAngle = -math.pi / 2;
+
+    for (int i = 0; i < percentages.length; i++) {
+      final sweepAngle = 2 * math.pi * percentages[i];
+      if (sweepAngle > 0) {
+        final paint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = thickness
+          ..strokeCap = StrokeCap.round
+          ..color = colors[i % colors.length];
+
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radius),
+          startAngle,
+          sweepAngle,
+          false,
+          paint,
+        );
+        startAngle += sweepAngle;
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _BuildCustomDonut oldDelegate) => true;
 }

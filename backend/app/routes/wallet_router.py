@@ -39,9 +39,16 @@ def _save_persisted_wallets(wallets: List[Dict[str, Any]]):
     """Sauvegarde les portefeuilles connectés dans le fichier de stockage local."""
     try:
         WALLETS_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+        clean_wallets = []
+        for w in wallets:
+            w_copy = dict(w)
+            if "access_token" in w_copy and w_copy["access_token"]:
+                w_copy["access_token"] = "stored_session_token"
+            clean_wallets.append(w_copy)
+
         with open(WALLETS_DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(wallets, f, ensure_ascii=False, indent=2)
-            logger.info(f"[PERSISTENCE WALLET] {len(wallets)} portefeuille(s) sauvegardé(s).")
+            json.dump(clean_wallets, f, ensure_ascii=False, indent=2)
+            logger.info(f"[PERSISTENCE WALLET] {len(clean_wallets)} portefeuille(s) sauvegardé(s).")
     except Exception as e:
         logger.warning(f"[PERSISTENCE WALLET] Erreur lors de la sauvegarde : {e}")
 

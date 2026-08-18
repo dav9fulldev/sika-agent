@@ -36,35 +36,9 @@ class OrangeMoneyAPIService:
         }
 
     def fetch_live_transactions(self, access_token: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Collecte les mouvements de compte et le relevé de transactions depuis l'API Orange Money."""
-        logger.info(f"[Orange Money API] Extraction du relevé de compte Orange Money (limit={limit})")
-        now = datetime.utcnow()
-        return [
-            {
-                "id": "tx_om_201",
-                "wallet_provider": "Orange Money",
-                "type": "payment",
-                "amount": 12500.0,
-                "currency": "XOF",
-                "category": "Achats",
-                "recipient": "Supermarché Cash Center",
-                "description": "Paiement marchand Orange Money",
-                "status": "COMPLETED",
-                "timestamp": (now - timedelta(hours=8)).isoformat()
-            },
-            {
-                "id": "tx_om_202",
-                "wallet_provider": "Orange Money",
-                "type": "transfer",
-                "amount": 7000.0,
-                "currency": "XOF",
-                "category": "Rééquilibrage",
-                "recipient": "Compte Wave (Auto-Balancer)",
-                "description": "Transfert inter-portefeuilles préventif SIKA",
-                "status": "COMPLETED",
-                "timestamp": (now - timedelta(days=2)).isoformat()
-            }
-        ]
+        """Collecte l'historique des mouvements Orange Money."""
+        logger.info(f"[Orange Money API] Extraction des mouvements OM (limit={limit})")
+        return []
 
     def initiate_payment(self, access_token: str, recipient_phone: str, amount: float) -> Dict[str, Any]:
         """Initie un transfert via Orange Money WebPay API."""

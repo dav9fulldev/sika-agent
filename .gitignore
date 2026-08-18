@@ -58,3 +58,7 @@ mobile/.flutter-plugins-dependencies
 
 # JVM / Android Studio memory dumps
 *.hprof
+
+# Runtime Data / User Storage
+backend/app/data/
+
