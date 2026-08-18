@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/providers/language_provider.dart';
 
 // ÉTATS COMPLETS DE L'AGENT SIKA
 enum SikaState {
@@ -63,12 +64,13 @@ class SikaData {
 
 class SikaNotifier extends StateNotifier<SikaData> {
   final ApiService _apiService;
+  final Ref _ref;
   final SpeechToText _speechToText = SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
 
   bool _speechEnabled = false;
 
-  SikaNotifier(this._apiService) : super(SikaData()) {
+  SikaNotifier(this._apiService, this._ref) : super(SikaData()) {
     _initializeSika();
   }
 
@@ -111,7 +113,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   Future<void> _initTextToSpeech() async {
-    await _flutterTts.setLanguage('fr-FR');
+    final currentLang = _ref.read(languageProvider);
+    await _flutterTts.setLanguage(currentLang.ttsLanguage);
     await _flutterTts.setSpeechRate(0.5);
     await _flutterTts.setVolume(1.0);
     await _flutterTts.setPitch(1.0);
@@ -129,13 +132,15 @@ class SikaNotifier extends StateNotifier<SikaData> {
     });
   }
 
-  /// Déclenche l'écoute avec le locale STT approprié (fr_FR ou en_US)
-  Future<void> startListening({String sttLocale = 'fr_FR'}) async {
+  /// Déclenche l'écoute avec la locale STT active (en_US ou fr_FR)
+  Future<void> startListening({String? sttLocale}) async {
     if (!_speechEnabled) {
       debugPrint('[SIKA VOICE] Cannot listen: STT not enabled');
       await _initializeSika();
       if (!_speechEnabled) return;
     }
+
+    final activeSttLocale = sttLocale ?? _ref.read(languageProvider).sttLocale;
 
     try {
       state = state.copyWith(
@@ -150,7 +155,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
           state = state.copyWith(currentText: result.recognizedWords);
         },
         listenOptions: SpeechListenOptions(
-          localeId: sttLocale,
+          localeId: activeSttLocale,
           listenFor: const Duration(seconds: 15),
           pauseFor: const Duration(seconds: 3),
           cancelOnError: true,
@@ -177,7 +182,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     }
   }
 
-  Future<void> toggleListening({String sttLocale = 'fr_FR'}) async {
+  Future<void> toggleListening({String? sttLocale}) async {
     if (state.state == SikaState.listening) {
       await stopListening();
     } else {
@@ -208,17 +213,22 @@ class SikaNotifier extends StateNotifier<SikaData> {
     );
   }
 
-  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec réponses et Synthèse Vocale TTS
-  Future<void> processUserQuery(String query, {String ttsLocale = 'fr-FR'}) async {
+  /// Traitement d'une requête utilisateur (Vocale ou Textuelle)
+  Future<void> processUserQuery(String query, {String? ttsLocale}) async {
     if (query.trim().isEmpty) return;
 
-    // Nettoyage éventuel du mot clé "Sika", "Dis Sika", "Hey Sika" en début de phrase
+    final isEnglish = _ref.read(languageProvider) == AppLanguage.english || _isEnglishText(query);
+    final activeTtsLocale = ttsLocale ?? (isEnglish ? 'en-US' : 'fr-FR');
+
     String cleanQuery = query.trim();
     final lower = cleanQuery.toLowerCase();
 
+    // 1. SALUTATION / MOT CLÉ SIKA
     if (lower == 'sika' || lower == 'dis sika' || lower == 'hey sika' || lower == 'hello sika') {
-      // Appel simple de SIKA par le prénom !
-      const greetingText = 'Oui David, je vous écoute ! Que puis-je faire pour vos finances aujourd\'hui ?';
+      final greetingText = isEnglish
+          ? 'Yes David, I am listening! How can I assist with your finances today?'
+          : 'Oui David, je vous écoute ! Que puis-je faire pour vos finances aujourd\'hui ?';
+
       final sikaMsg = SikaMessage(text: greetingText, isUser: false);
       final updatedMsgs = List<SikaMessage>.from(state.messages)..add(SikaMessage(text: query, isUser: true))..add(sikaMsg);
 
@@ -226,7 +236,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
         state: SikaState.speaking,
         messages: updatedMsgs,
       );
-      await _speak(greetingText, ttsLocale: ttsLocale);
+      await _speak(greetingText, ttsLocale: activeTtsLocale);
       return;
     }
 
@@ -234,6 +244,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       cleanQuery = cleanQuery.substring(9).trim();
     } else if (lower.startsWith('hey sika ')) {
       cleanQuery = cleanQuery.substring(9).trim();
+    } else if (lower.startsWith('hello sika ')) {
+      cleanQuery = cleanQuery.substring(11).trim();
     } else if (lower.startsWith('sika ')) {
       cleanQuery = cleanQuery.substring(5).trim();
     }
@@ -247,14 +259,19 @@ class SikaNotifier extends StateNotifier<SikaData> {
       currentText: null,
     );
 
-    // Interception pour confirmation rapide de transfert
+    // 2. INTERCEPTION CONFIRMATION SÉCURISÉE
     final queryLower = cleanQuery.toLowerCase();
     if (queryLower.contains('confirme') ||
         queryLower.contains('valide') ||
-        queryLower.contains('oui') ||
-        queryLower.contains('autorise')) {
-      const confirmText =
-          'D\'accord David, j\'ai dicté les informations. Le transfert de 10 000 FCFA vers ta maman sur Wave est maintenant confirmé !';
+        queryLower.contains('confirm') ||
+        queryLower.contains('yes') ||
+        queryLower.contains('approve') ||
+        queryLower.contains('authorize')) {
+
+      final confirmText = isEnglish
+          ? 'Alright David, the transfer rebalance from Orange Money to Wave is now confirmed and completed!'
+          : 'D\'accord David, le transfert d\'équilibrage depuis Orange Money vers Wave est maintenant confirmé et exécuté !';
+
       final sikaMessage = SikaMessage(text: confirmText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
 
@@ -263,16 +280,19 @@ class SikaNotifier extends StateNotifier<SikaData> {
         messages: finalMessages,
       );
 
-      await _speak(confirmText, ttsLocale: ttsLocale);
+      await _speak(confirmText, ttsLocale: activeTtsLocale);
       return;
     }
 
+    // 3. ENVOI AU BACKEND SIKA
     try {
-      debugPrint('[SIKA API] Querying backend agent: "$cleanQuery"');
+      debugPrint('[SIKA API] Querying backend agent ($activeTtsLocale): "$cleanQuery"');
       final response = await _apiService.sikaChat(cleanQuery);
 
       final String sikaText = response['response'] ??
-          'Pardon, je n\'ai pas bien compris. Peux-tu répéter ?';
+          (isEnglish
+              ? 'Sorry, I didn\'t quite catch that. Could you please repeat?'
+              : 'Pardon, je n\'ai pas bien compris. Peux-tu répéter ?');
 
       Map<String, dynamic>? suggestedTx;
       bool canAddTx = false;
@@ -296,13 +316,14 @@ class SikaNotifier extends StateNotifier<SikaData> {
         messages: finalMessages,
       );
 
-      // Réponse Vocale Parlée à voix haute par SIKA !
-      await _speak(sikaText, ttsLocale: ttsLocale);
+      await _speak(sikaText, ttsLocale: activeTtsLocale);
     } catch (e) {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
-      const fallbackText =
-          'Désolé, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
+      final fallbackText = isEnglish
+          ? 'Sorry, I am experiencing a connection issue with my server. Could you please try again?'
+          : 'Désolé, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
+
       final sikaMessage = SikaMessage(text: fallbackText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
 
@@ -312,15 +333,15 @@ class SikaNotifier extends StateNotifier<SikaData> {
         errorMessage: e.toString(),
       );
 
-      await _speak(fallbackText, ttsLocale: ttsLocale);
+      await _speak(fallbackText, ttsLocale: activeTtsLocale);
     }
   }
 
-  Future<void> sendTextMessage(String text, {String ttsLocale = 'fr-FR'}) async {
+  Future<void> sendTextMessage(String text, {String? ttsLocale}) async {
     await processUserQuery(text, ttsLocale: ttsLocale);
   }
 
-  Future<void> _speak(String text, {String ttsLocale = 'fr-FR'}) async {
+  Future<void> _speak(String text, {required String ttsLocale}) async {
     try {
       debugPrint('[SIKA TTS] Speaking ($ttsLocale): "$text"');
       await _flutterTts.setLanguage(ttsLocale);
@@ -339,10 +360,21 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA TTS] Error stopping TTS: $e');
     }
   }
+
+  bool _isEnglishText(String text) {
+    final lower = text.toLowerCase();
+    return lower.contains('transfer') ||
+        lower.contains('money') ||
+        lower.contains('how much') ||
+        lower.contains('goal') ||
+        lower.contains('add') ||
+        lower.contains('savings') ||
+        lower.contains('balance');
+  }
 }
 
 // Provider global de Riverpod
 final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
   final apiService = ApiService();
-  return SikaNotifier(apiService);
+  return SikaNotifier(apiService, ref);
 });
