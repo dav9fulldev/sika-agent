@@ -26,10 +26,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final walletState = ref.watch(walletProvider);
     final movements = walletState.movements;
 
-    // Filter expense movements (payment, transfer, withdrawal)
+    // Filter expense movements only (exclude deposits / income)
     final expenseMovements = movements.where((m) {
       final t = m.type.toLowerCase();
-      return t == 'payment' || t == 'transfer' || t == 'withdrawal' || m.amount > 0;
+      final cat = m.category.toLowerCase();
+      return t != 'deposit' && cat != 'dépôt' && cat != 'depot' && (t == 'payment' || t == 'transfer' || t == 'withdrawal' || t == 'expense');
     }).toList();
 
     final double totalExpenseFcfa = expenseMovements.fold(0.0, (sum, m) => sum + m.amount);
