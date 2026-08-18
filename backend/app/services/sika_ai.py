@@ -33,7 +33,7 @@ class SikaAI:
 - You ALWAYS reply in the exact language used by the user in their message (if French, reply in FRENCH; if English, reply in ENGLISH).
 - You are polite, warm, clear, and concise.
 - You analyze wallets, advise on savings, and prevent financial risks.
-- You handle greetings ("Hello", "How are you?", "Bonjour") warmly.
+- You handle greetings ("Hello", "How are you?", "Are you okay?", "Bonjour") warmly.
 """
 
     def __init__(self, api_key: Optional[str] = None):
@@ -87,13 +87,14 @@ class SikaAI:
             "bonjour", "salut", "coucou", "bonsoir", "comment", "vas", "va", "ça va", "ca va",
             "solde", "combien", "portefeuille", "dépense", "depense", "épargne", "epargne",
             "transfert", "transférer", "argent", "merci", "oui", "non", "je", "tu", "moi", "toi",
-            "suis", "vais", "bien", "comment tu vas"
+            "suis", "vais", "bien", "comment tu vas", "est-ce que", "tu vas bien"
         ]
         english_indicators = [
             "hello", "hi", "hey", "how are you", "say hello", "good morning", "thanks", "thank",
             "how much", "money", "total", "balance", "transfer", "rebalance",
             "save", "savings", "add", "goal", "how is my", "what is my",
-            "analyze", "recent", "expenses", "spend", "wallet", "dollars", "usd"
+            "analyze", "recent", "expenses", "spend", "wallet", "dollars", "usd",
+            "are you okay", "are you fine", "are you good", "you okay", "doing", "okay", "ok"
         ]
 
         fr_count = sum(1 for kw in french_indicators if kw in msg_lower)
@@ -131,12 +132,19 @@ class SikaAI:
         action, action_data = self._extract_action("", user_message)
 
         # 0. SALUTATIONS ET POLITESSE (GREETINGS & CONVERSATIONAL RESPONSES)
-        if any(w in msg_lower for w in ["bonjour", "salut", "coucou", "bonsoir", "comment tu vas", "ça va", "ca va", "comment vas-tu", "hello", "hi", "hey", "how are you", "say hello"]):
+        greeting_keywords = [
+            "bonjour", "salut", "coucou", "bonsoir", "comment tu vas", "ça va", "ca va", "comment vas-tu",
+            "tu vas bien", "est-ce que tu vas bien",
+            "hello", "hi", "hey", "how are you", "say hello", "are you okay", "are you fine", "are you good",
+            "you okay", "how are you doing", "what's up", "whats up"
+        ]
+
+        if any(w in msg_lower for w in greeting_keywords):
             if is_english:
-                response = f"Hello {user_firstname}! I am doing great, thank you. I am ready to assist with your finances today. How can I help you?"
+                response = f"Hello {user_firstname}! I am doing great and operating normally, thank you for asking! I am ready to assist with your finances today. How can I help you?"
                 suggestions = ["How much money do I have in total?", "Analyze my recent expenses", "How is my savings goal progressing?"]
             else:
-                response = f"Bonjour {user_firstname} ! Je vais très bien, merci. Je suis ravi de vous retrouver pour veiller sur vos finances. Que souhaitez-vous vérifier aujourd'hui ?"
+                response = f"Bonjour {user_firstname} ! Je vais très bien et tout fonctionne parfaitement, merci de demander ! Je suis ravi de vous retrouver pour veiller sur vos finances. Que souhaitez-vous vérifier aujourd'hui ?"
                 suggestions = ["Quel est mon solde total ?", "Analyser mes dépenses récentes", "Comment avance mon épargne ?"]
 
             return {
