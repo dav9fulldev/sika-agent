@@ -238,13 +238,25 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      await _apiService.verifyWalletOtp(
+      final res = await _apiService.verifyWalletOtp(
         sessionId: sessionId,
         otpCode: otpCode,
         provider: provider,
         accountNumber: accountNumber,
       );
-      state = state.copyWith(isLoading: false, pendingOtpSessionId: null);
+
+      if (res['wallet'] != null && res['wallet'] is Map) {
+        final newWallet = ConnectedWalletItem.fromJson(Map<String, dynamic>.from(res['wallet']));
+        final List<ConnectedWalletItem> updatedList = state.wallets
+            .where((w) => w.accountNumber != newWallet.accountNumber || w.provider != newWallet.provider)
+            .toList();
+        updatedList.add(newWallet);
+        state = state.copyWith(wallets: updatedList, isLoading: false, pendingOtpSessionId: null);
+        await saveCachedWallets(updatedList);
+      } else {
+        state = state.copyWith(isLoading: false, pendingOtpSessionId: null);
+      }
+
       await fetchWallets();
       await fetchMovements();
       return true;
