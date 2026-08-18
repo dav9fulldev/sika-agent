@@ -125,7 +125,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   children: [
                     const SizedBox(height: 15),
 
-                    // 1. BLOC SOLDE TOTAL (SANS EMOJIS - AVEC ICÔNES FLUTTER PROPREMENT DÉSIGNÉES)
+                    // 1. BLOC SOLDE TOTAL AVEC LOGOS OFFICIELS WAVE, ORANGE MONEY & MTN MOMO
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -165,11 +165,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           const SizedBox(height: 18),
                           Row(
                             children: [
-                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, Icons.water_drop_rounded),
+                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, AppImages.wave),
                               const SizedBox(width: 8),
-                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, Icons.phone_android_rounded),
+                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, AppImages.orange),
                               const SizedBox(width: 8),
-                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, Icons.account_balance_wallet_rounded),
+                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, AppImages.mtn),
                             ],
                           ),
                         ],
@@ -411,7 +411,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-  Widget _buildWalletCard(String name, String amount, Color brandColor, IconData iconData) {
+  Widget _buildWalletCard(String name, String amount, Color brandColor, String imagePath) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -425,7 +425,18 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
           children: [
             Row(
               children: [
-                Icon(iconData, color: brandColor, size: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.asset(
+                    imagePath,
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(Icons.account_balance_wallet_rounded, color: brandColor, size: 16);
+                    },
+                  ),
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
