@@ -14,7 +14,9 @@ class GoalDTO(BaseModel):
 
 class FinancialContextDTO(BaseModel):
     user_id: int = 1
-    user_firstname: str = "l'ami"
+    user_firstname: str = "David"
+    currency_code: str = "USD"
+    currency_symbol: str = "$"
     monthly_income: Optional[float] = None
     budgets: List[BudgetDTO] = []
     goals: List[GoalDTO] = []
@@ -23,7 +25,7 @@ class FinancialContextDTO(BaseModel):
 
 class SikaQueryDTO(BaseModel):
     query: str
-    context: Optional[FinancialContextDTO] = None
+    context: Optional[Dict[str, Any]] = None
 
 class SikaConfirmTransactionDTO(BaseModel):
     amount: float

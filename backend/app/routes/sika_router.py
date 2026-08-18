@@ -74,8 +74,8 @@ def auth_me(authorization: Optional[str] = Header(None)):
 @router.post("/chat", response_model=SikaResponseDTO)
 async def sika_chat(data: SikaQueryDTO):
     """Endpoint principal SIKA AI."""
-    ctx_dict = data.context.dict() if data.context else {}
-    firstname = data.context.user_firstname if data.context else "l'ami"
+    ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
+    firstname = ctx_dict.get("user_firstname", "David")
 
     result = await sika_ai.chat(
         user_message=data.query,
@@ -118,61 +118,5 @@ async def sika_agent_process(data: Dict[str, Any]):
 async def sika_agent_confirm(data: Dict[str, Any]):
     """Endpoint de validation humaine pour l'agent SIKA."""
     action_id = data.get("action_id", "")
-    confirmed = data.get("confirmed", False)
-    tool_name = data.get("tool_name", "confirm_transfer")
-    arguments = data.get("arguments", {})
-
-    if confirmed and tool_name:
-        res = sika_orchestrator.execute_tool(tool_name, arguments, user_confirmed=True)
-        return {
-            "status": "CONFIRMED",
-            "action_id": action_id,
-            "applied": True,
-            "result": res.to_dict()
-        }
-
-    return {
-        "status": "CANCELLED",
-        "action_id": action_id,
-        "applied": False
-    }
-
-@router.post("/events")
-async def sika_ingest_event(data: Dict[str, Any]):
-    """Endpoint d'ingestion asynchrone des événements financiers."""
     user_id = data.get("user_id", 1)
-    return await sika_orchestrator.process_financial_event(user_id=user_id, event_data=data)
-
-@router.post("/background/perceive-notification")
-async def perceive_background_notification(data: Dict[str, Any]):
-    """Endpoint d'arrière-plan pour la perception des SMS & Notifications Mobile Money."""
-    user_id = data.get("user_id", "default_user")
-    notification_text = data.get("notification_text", "")
-    provider_name = data.get("provider", "Wave")
-
-    if "wave" in provider_name.lower():
-        user_learning_service.update_user_habit(user_id, "Mobile Money Wave", 5000.0)
-    elif "orange" in provider_name.lower():
-        user_learning_service.update_user_habit(user_id, "Mobile Money Orange", 10000.0)
-
-    return {
-        "status": "PROCESSED",
-        "user_id": user_id,
-        "notification_received": notification_text,
-        "learned_insight": f"Transaction {provider_name} capturée en arrière-plan et assimilée."
-    }
-
-@router.get("/habits")
-def get_user_learned_habits(user_id: str = "default_user"):
-    """Retourne le profil d'apprentissage et la mémoire comportementale du client."""
-    return user_learning_service.get_user_profile(user_id)
-
-@router.post("/backup")
-def trigger_memory_backup(user_id: str = "default_user"):
-    """Crée un snapshot de sauvegarde complet de la mémoire IA pour ré-entraînement."""
-    snapshot = backup_service.create_backup_snapshot(user_id)
-    return {
-        "status": "SUCCESS",
-        "message": "Snapshot de mémoire IA généré avec succès.",
-        "backup": snapshot
-    }
+    return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)

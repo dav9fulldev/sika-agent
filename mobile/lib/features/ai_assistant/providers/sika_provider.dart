@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/services/api_service.dart';
 
@@ -212,7 +213,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     );
   }
 
-  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec reconnaissance de l'utilisateur connecté
+  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec reconnaissance de l'utilisateur et de sa devise active
   Future<void> processUserQuery(String query, {String? ttsLocale}) async {
     if (query.trim().isEmpty) return;
 
@@ -223,6 +224,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
     final authState = _ref.read(authProvider);
     final rawName = authState.user?.name ?? 'David';
     final userFirstName = rawName.trim().isNotEmpty ? rawName.trim().split(' ').first : 'David';
+
+    // Récupération dynamique de la devise active de l'utilisateur
+    final activeCurrency = _ref.read(currencyProvider);
+    final currencyCode = activeCurrency.code;
+    final currencySymbol = activeCurrency.symbol;
 
     String cleanQuery = query.trim();
     final lower = cleanQuery.toLowerCase();
@@ -288,10 +294,15 @@ class SikaNotifier extends StateNotifier<SikaData> {
       return;
     }
 
-    // 3. ENVOI AU BACKEND SIKA AVEC LE PRÉNOM DE L'UTILISATEUR CONNECTÉ
+    // 3. ENVOI AU BACKEND SIKA AVEC PRÉNOM ET DEVISE ACTIVE
     try {
-      debugPrint('[SIKA API] Querying backend agent ($userFirstName, $activeTtsLocale): "$cleanQuery"');
-      final response = await _apiService.sikaChat(cleanQuery, userFirstName: userFirstName);
+      debugPrint('[SIKA API] Querying backend agent ($userFirstName, $currencyCode, $activeTtsLocale): "$cleanQuery"');
+      final response = await _apiService.sikaChat(
+        cleanQuery,
+        userFirstName: userFirstName,
+        currencyCode: currencyCode,
+        currencySymbol: currencySymbol,
+      );
 
       final String sikaText = (response['message'] as String?) ??
           (response['response'] as String?) ??

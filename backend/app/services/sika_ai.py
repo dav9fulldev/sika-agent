@@ -25,14 +25,14 @@ class SikaAI:
     SYSTEM_PROMPT_FR = """Tu es Sika, l'assistant financier intelligent personnel.
 - Tu réponds TOUJOURS dans la langue du dernier message de l'utilisateur (si l'utilisateur écrit en français, réponds en FRANÇAIS, s'il écrit en anglais, réponds en ANGLAIS).
 - Tu es courtois, chaleureux, clair et concis.
-- Tu analyses les portefeuilles, conseilles sur l'épargne et préviens les risques financiers.
+- Tu analyses les portefeuilles de l'utilisateur et formates les montants dans sa DEVISE ACTIVE (USD $, EUR €, GBP £, FCFA).
 - Tu gères les salutations ("Bonjour", "Comment tu vas ?", "Hello") avec bienveillance.
 """
 
     SYSTEM_PROMPT_EN = """You are Sika, the personal intelligent financial assistant.
 - You ALWAYS reply in the exact language used by the user in their message (if French, reply in FRENCH; if English, reply in ENGLISH).
 - You are polite, warm, clear, and concise.
-- You analyze wallets, advise on savings, and prevent financial risks.
+- You analyze the user's connected wallets and format all amounts in their ACTIVE CURRENCY (USD $, EUR €, GBP £, FCFA).
 - You handle greetings ("Hello", "How are you?", "Are you okay?", "Bonjour") warmly.
 """
 
@@ -76,7 +76,7 @@ class SikaAI:
             except Exception as e:
                 logger.error(f"Erreur appel Gemini: {e}")
 
-        # Fallback intelligent par règles multilingue avec détection dynamique
+        # Fallback intelligent par règles multilingue avec détection dynamique de devise
         return self._chat_basic(user_message, context, user_firstname, is_english)
 
     def _is_english_message(self, message: str) -> bool:
@@ -107,6 +107,23 @@ class SikaAI:
 
         return False
 
+    def _format_currency(self, amount_fcfa: float, context: Dict) -> str:
+        """Formate dynamiquement le montant selon la devise active transmise par le client."""
+        code = (context.get("currency_code") or "XOF").upper()
+        symbol = context.get("currency_symbol") or "FCFA"
+
+        if code == "USD" or symbol == "$":
+            val = amount_fcfa / 600.0
+            return f"${val:.2f}"
+        elif code == "EUR" or symbol == "€":
+            val = amount_fcfa / 655.957
+            return f"{val:.2f} €"
+        elif code == "GBP" or symbol == "£":
+            val = amount_fcfa / 770.0
+            return f"£{val:.2f}"
+        else:
+            return f"{int(amount_fcfa):,} FCFA".replace(",", " ")
+
     def _extract_action(self, response: str, user_message: str) -> tuple:
         """Détecte si Sika suggère une action."""
         res_lower = response.lower()
@@ -127,9 +144,15 @@ class SikaAI:
         user_firstname: str,
         is_english: bool
     ) -> Dict:
-        """Réponses basiques et intelligentes multilingues pour tous les workflows SIKA."""
+        """Réponses basiques et intelligentes multilingues avec formatage dynamique selon la devise active."""
         msg_lower = user_message.lower()
         action, action_data = self._extract_action("", user_message)
+
+        # Formateurs de montant dynamiques selon la devise choisie
+        fmt_total = self._format_currency(45000, financial_context)
+        fmt_wave = self._format_currency(15000, financial_context)
+        fmt_orange = self._format_currency(22000, financial_context)
+        fmt_mtn = self._format_currency(8000, financial_context)
 
         # 0. SALUTATIONS ET POLITESSE (GREETINGS & CONVERSATIONAL RESPONSES)
         greeting_keywords = [
@@ -158,12 +181,12 @@ class SikaAI:
             }
 
         # 1. SOLDE TOTAL & PORTEFEUILLES (TOTAL BALANCE & WALLETS)
-        elif any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much"]):
+        elif any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much", "transact"]):
             if is_english:
-                response = f"Hi {user_firstname}! You have a total balance of 45,000 FCFA ($75.00) across 3 wallets: Wave (15,000 FCFA), Orange Money (22,000 FCFA), and MTN MoMo (8,000 FCFA)."
+                response = f"Hi {user_firstname}! You have a total balance of {fmt_total} across 3 wallets: Wave ({fmt_wave}), Orange Money ({fmt_orange}), and MTN MoMo ({fmt_mtn})."
                 suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]
             else:
-                response = f"Salut {user_firstname} ! Tu as 45 000 FCFA au total répartis ainsi : 15 000 FCFA sur Wave, 22 000 FCFA sur Orange Money et 8 000 FCFA sur MTN Mobile Money."
+                response = f"Salut {user_firstname} ! Tu as un solde total de {fmt_total} réparti ainsi : Wave ({fmt_wave}), Orange Money ({fmt_orange}) et MTN Mobile Money ({fmt_mtn})."
                 suggestions = ["Voir mes dépenses récentes", "Effectuer un transfert", "Objectif d'épargne"]
 
             return {
@@ -198,11 +221,11 @@ class SikaAI:
         # 3. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST)
         elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add"]):
             if is_english:
-                response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding this amount brings you 5 days closer to your target!"
+                response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding to your savings brings you 5 days closer to your target!"
                 suggestions = ["Add $1 to savings", "Adjust savings target"]
             else:
                 response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif !"
-                suggestions = ["Ajouter 500 FCFA à l'épargne", "Ajuster l'objectif"]
+                suggestions = ["Ajouter à l'épargne", "Ajuster l'objectif"]
 
             return {
                 "response": response,
@@ -217,10 +240,10 @@ class SikaAI:
         # 4. ANALYSE DÉPENSE & DÉPENSES RÉCENTES (EXPENSE ANALYSIS)
         elif any(w in msg_lower for w in ["dépense", "dépensé", "acheté", "budget", "analyze", "recent", "expenses"]):
             if is_english:
-                response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have 45,000 FCFA ($75.00) remaining for the month."
+                response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have {fmt_total} remaining for the month."
                 suggestions = ["Set spending limit", "View transaction history"]
             else:
-                response = f"Voici l'analyse de tes dépenses récentes : ta catégorie principale est Restauration. Il te reste 45 000 FCFA pour finir le mois."
+                response = f"Voici l'analyse de tes dépenses récentes : ta catégorie principale est Restauration. Il te reste {fmt_total} pour finir le mois."
                 suggestions = ["Définir une limite", "Voir l'historique"]
 
             return {
