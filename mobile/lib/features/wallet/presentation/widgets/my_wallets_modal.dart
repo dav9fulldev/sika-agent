@@ -75,13 +75,30 @@ class MyWalletsModal extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.add_circle, color: AppColors.cyan, size: 28),
-                tooltip: langNotifier.tr('Connecter un portefeuille', 'Connect Wallet'),
-                onPressed: () {
-                  Navigator.pop(context);
-                  ConnectWalletModal.show(context);
-                },
+              Row(
+                children: [
+                  IconButton(
+                    icon: walletState.isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan),
+                          )
+                        : const Icon(Icons.refresh, color: Colors.white70, size: 24),
+                    tooltip: langNotifier.tr('Actualiser les soldes', 'Refresh Balances'),
+                    onPressed: walletState.isLoading
+                        ? null
+                        : () => ref.read(walletProvider.notifier).syncAllWallets(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle, color: AppColors.cyan, size: 28),
+                    tooltip: langNotifier.tr('Connecter un portefeuille', 'Connect Wallet'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ConnectWalletModal.show(context);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
