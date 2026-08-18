@@ -93,10 +93,40 @@ class WalletMovementItem {
   }
 }
 
+class CoffreItem {
+  final int id;
+  final String nom;
+  final double solde;
+  final double objectif;
+  final String typeCoffre;
+  final String statut;
+
+  CoffreItem({
+    required this.id,
+    required this.nom,
+    required this.solde,
+    required this.objectif,
+    required this.typeCoffre,
+    required this.statut,
+  });
+
+  factory CoffreItem.fromJson(Map<String, dynamic> json) {
+    return CoffreItem(
+      id: json['id'] ?? 0,
+      nom: json['nom'] ?? 'Coffre',
+      solde: (json['solde'] as num?)?.toDouble() ?? 0.0,
+      objectif: (json['objectif'] as num?)?.toDouble() ?? 500000.0,
+      typeCoffre: json['typeCoffre'] ?? 'EPARGNE',
+      statut: json['statut'] ?? 'ACTIF',
+    );
+  }
+}
+
 class WalletState {
   final bool isLoading;
   final List<ConnectedWalletItem> wallets;
   final List<WalletMovementItem> movements;
+  final List<CoffreItem> coffres;
   final String? pendingOtpSessionId;
   final String? lastPerceptionMessage;
   final String? errorMessage;
@@ -105,6 +135,7 @@ class WalletState {
     this.isLoading = false,
     this.wallets = const [],
     this.movements = const [],
+    this.coffres = const [],
     this.pendingOtpSessionId,
     this.lastPerceptionMessage,
     this.errorMessage,
@@ -114,6 +145,7 @@ class WalletState {
     bool? isLoading,
     List<ConnectedWalletItem>? wallets,
     List<WalletMovementItem>? movements,
+    List<CoffreItem>? coffres,
     String? pendingOtpSessionId,
     String? lastPerceptionMessage,
     String? errorMessage,
@@ -122,6 +154,7 @@ class WalletState {
       isLoading: isLoading ?? this.isLoading,
       wallets: wallets ?? this.wallets,
       movements: movements ?? this.movements,
+      coffres: coffres ?? this.coffres,
       pendingOtpSessionId: pendingOtpSessionId ?? this.pendingOtpSessionId,
       lastPerceptionMessage: lastPerceptionMessage ?? this.lastPerceptionMessage,
       errorMessage: errorMessage ?? this.errorMessage,
@@ -145,6 +178,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
     await loadCachedWallets();
     await fetchWallets();
     await fetchMovements();
+    await fetchCoffres();
   }
 
   Future<void> loadCachedWallets() async {
@@ -205,6 +239,19 @@ class WalletNotifier extends StateNotifier<WalletState> {
       state = state.copyWith(movements: items);
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching movements: $e');
+    }
+  }
+
+  Future<void> fetchCoffres() async {
+    try {
+      final res = await _apiService.fetchUserCoffres();
+      final List rawCoffres = res['coffres'] ?? [];
+      final List<CoffreItem> items =
+          rawCoffres.map((e) => CoffreItem.fromJson(e)).toList();
+
+      state = state.copyWith(coffres: items);
+    } catch (e) {
+      debugPrint('[WALLET PROVIDER] Error fetching coffres: $e');
     }
   }
 

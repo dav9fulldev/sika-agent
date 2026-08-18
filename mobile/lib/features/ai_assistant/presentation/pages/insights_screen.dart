@@ -248,12 +248,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
             const SizedBox(height: 20),
 
-            // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE (COFFRE PAYMECHAP "ETUDE")
+            // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE (COFFRE PAYMECHAP)
             Builder(
               builder: (context) {
-                const String coffreNom = "Etude";
-                const double targetSavingsGoal = 500000.0; // Objectif officiel du Coffre PayMeChap
-                const double currentSaved = 6000.0; // Solde réel épargné dans le Coffre
+                final firstCoffre = walletState.coffres.isNotEmpty ? walletState.coffres.first : null;
+                final String coffreNom = firstCoffre?.nom ?? "Etude";
+                final double targetSavingsGoal = firstCoffre != null && firstCoffre.objectif > 0 ? firstCoffre.objectif : 500000.0;
+                final double currentSaved = firstCoffre != null ? firstCoffre.solde : 6000.0;
                 final double progressRatio = targetSavingsGoal > 0 ? (currentSaved / targetSavingsGoal).clamp(0.0, 1.0) : 0.0;
                 final String pctString = (progressRatio * 100).toStringAsFixed(1);
 

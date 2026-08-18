@@ -57,6 +57,17 @@ class ApiService {
     throw Exception('Failed to fetch transaction movements: ${response.statusCode}');
   }
 
+  Future<Map<String, dynamic>> fetchUserCoffres() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/v1/wallets/coffres'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to fetch user coffres: ${response.statusCode}');
+  }
+
   Future<Map<String, dynamic>> connectWallet({
     required String provider,
     required String accountNumber,
