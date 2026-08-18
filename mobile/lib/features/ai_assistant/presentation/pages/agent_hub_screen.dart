@@ -10,6 +10,7 @@ import '../widgets/runway_card_widget.dart';
 import '../widgets/wallet_rebalance_card.dart';
 import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
+import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenChat;
@@ -162,15 +163,29 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                               fontSize: 12,
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, AppImages.waveci),
-                              const SizedBox(width: 8),
-                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, AppImages.orange),
-                              const SizedBox(width: 8),
-                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, AppImages.mtn),
-                            ],
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                ConnectWalletModal.show(context);
+                              },
+                              icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                              label: Text(
+                                langNotifier.tr('Connecter mes comptes', 'Connect my Wallets'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF00B4D8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -411,61 +426,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-  Widget _buildWalletCard(String name, String amount, Color brandColor, String imagePath) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xff020614).withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: brandColor.withValues(alpha: 0.12), width: 1.2),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.asset(
-                    imagePath,
-                    width: 18,
-                    height: 18,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(Icons.account_balance_wallet_rounded, color: brandColor, size: 16);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              amount,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildSuggestionPill({
     required IconData iconData,

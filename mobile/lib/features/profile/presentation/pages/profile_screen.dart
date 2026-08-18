@@ -7,7 +7,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
 import '../../../wallet/providers/wallet_provider.dart';
-import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
+import '../../../wallet/presentation/widgets/my_wallets_modal.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -110,8 +110,8 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               langNotifier.tr(
-                'Mouvements collectés en temps réel via les APIs Wave, Orange, MTN et Agrégateurs.',
-                'Real-time movements collected via Wave, Orange, MTN, and Aggregator APIs.',
+                'Mouvements collectés en temps réel via les APIs Wave, Orange et MTN.',
+                'Real-time movements collected via Wave, Orange, and MTN APIs.',
               ),
               style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
             ),
@@ -343,7 +343,7 @@ class ProfileScreen extends ConsumerWidget {
             title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
             trailingText: '$connectedCount ' + langNotifier.tr('connectés', 'connected'),
             onTap: () {
-              ConnectWalletModal.show(context);
+              MyWalletsModal.show(context);
             },
           ),
           _buildMenuItem(
