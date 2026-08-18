@@ -9,9 +9,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 try:
-    # pyrefly: ignore [missing-import]
     from google import genai
-    # pyrefly: ignore [missing-import]
     from google.genai import types
     HAS_GOOGLE_GENAI = True
 except ImportError:
@@ -25,15 +23,17 @@ class SikaAI:
     """Service IA conversationnel de Sika avec support multilingue et multi-devises."""
 
     SYSTEM_PROMPT_FR = """Tu es Sika, l'assistant financier intelligent personnel.
-- Tu réponds avec clarté, bienveillance et concision en FRANÇAIS.
-- Tu analyses les portefeuilles, conseilles sur l'épargne et préviens les risques.
-- Tu respectes la devise de l'utilisateur.
+- Tu réponds TOUJOURS dans la langue du dernier message de l'utilisateur (si l'utilisateur écrit en français, réponds en FRANÇAIS, s'il écrit en anglais, réponds en ANGLAIS).
+- Tu es courtois, chaleureux, clair et concis.
+- Tu analyses les portefeuilles, conseilles sur l'épargne et préviens les risques financiers.
+- Tu gères les salutations ("Bonjour", "Comment tu vas ?", "Hello") avec bienveillance.
 """
 
     SYSTEM_PROMPT_EN = """You are Sika, the personal intelligent financial assistant.
-- You respond clearly, helpfully, and concisely in ENGLISH.
+- You ALWAYS reply in the exact language used by the user in their message (if French, reply in FRENCH; if English, reply in ENGLISH).
+- You are polite, warm, clear, and concise.
 - You analyze wallets, advise on savings, and prevent financial risks.
-- You respect the user's preferred currency.
+- You handle greetings ("Hello", "How are you?", "Bonjour") warmly.
 """
 
     def __init__(self, api_key: Optional[str] = None):
@@ -76,18 +76,35 @@ class SikaAI:
             except Exception as e:
                 logger.error(f"Erreur appel Gemini: {e}")
 
-        # Fallback intelligent par règles multilingue
+        # Fallback intelligent par règles multilingue avec détection dynamique
         return self._chat_basic(user_message, context, user_firstname, is_english)
 
     def _is_english_message(self, message: str) -> bool:
-        """Détecte si le message de l'utilisateur est en anglais."""
+        """Détecte dynamiquement si le message de l'utilisateur est en anglais ou en français."""
         msg_lower = message.lower()
-        english_keywords = [
+
+        french_indicators = [
+            "bonjour", "salut", "coucou", "bonsoir", "comment", "vas", "va", "ça va", "ca va",
+            "solde", "combien", "portefeuille", "dépense", "depense", "épargne", "epargne",
+            "transfert", "transférer", "argent", "merci", "oui", "non", "je", "tu", "moi", "toi",
+            "suis", "vais", "bien", "comment tu vas"
+        ]
+        english_indicators = [
+            "hello", "hi", "hey", "how are you", "say hello", "good morning", "thanks", "thank",
             "how much", "money", "total", "balance", "transfer", "rebalance",
             "save", "savings", "add", "goal", "how is my", "what is my",
             "analyze", "recent", "expenses", "spend", "wallet", "dollars", "usd"
         ]
-        return any(kw in msg_lower for kw in english_keywords)
+
+        fr_count = sum(1 for kw in french_indicators if kw in msg_lower)
+        en_count = sum(1 for kw in english_indicators if kw in msg_lower)
+
+        if fr_count > en_count:
+            return False
+        if en_count > fr_count:
+            return True
+
+        return False
 
     def _extract_action(self, response: str, user_message: str) -> tuple:
         """Détecte si Sika suggère une action."""
@@ -113,8 +130,27 @@ class SikaAI:
         msg_lower = user_message.lower()
         action, action_data = self._extract_action("", user_message)
 
+        # 0. SALUTATIONS ET POLITESSE (GREETINGS & CONVERSATIONAL RESPONSES)
+        if any(w in msg_lower for w in ["bonjour", "salut", "coucou", "bonsoir", "comment tu vas", "ça va", "ca va", "comment vas-tu", "hello", "hi", "hey", "how are you", "say hello"]):
+            if is_english:
+                response = f"Hello {user_firstname}! I am doing great, thank you. I am ready to assist with your finances today. How can I help you?"
+                suggestions = ["How much money do I have in total?", "Analyze my recent expenses", "How is my savings goal progressing?"]
+            else:
+                response = f"Bonjour {user_firstname} ! Je vais très bien, merci. Je suis ravi de vous retrouver pour veiller sur vos finances. Que souhaitez-vous vérifier aujourd'hui ?"
+                suggestions = ["Quel est mon solde total ?", "Analyser mes dépenses récentes", "Comment avance mon épargne ?"]
+
+            return {
+                "response": response,
+                "action": None,
+                "action_data": None,
+                "sentiment": "positive",
+                "suggestions": suggestions,
+                "provider": "GEMINI",
+                "model": self.model
+            }
+
         # 1. SOLDE TOTAL & PORTEFEUILLES (TOTAL BALANCE & WALLETS)
-        if any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much"]):
+        elif any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much"]):
             if is_english:
                 response = f"Hi {user_firstname}! You have a total balance of 45,000 FCFA ($75.00) across 3 wallets: Wave (15,000 FCFA), Orange Money (22,000 FCFA), and MTN MoMo (8,000 FCFA)."
                 suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]

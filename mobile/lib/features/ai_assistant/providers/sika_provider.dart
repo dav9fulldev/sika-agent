@@ -2,32 +2,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import '../../../core/services/api_service.dart';
-import '../../../core/providers/language_provider.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/services/api_service.dart';
 
-// ÉTATS COMPLETS DE L'AGENT SIKA
-enum SikaState {
-  idle,       // En attente
-  listening,  // En écoute active (STT)
-  processing, // Traitement ReAct par Gemini backend
-  speaking,   // En train de parler (TTS)
-  error,      // Erreur
-}
+enum SikaState { idle, listening, processing, speaking, error }
 
 class SikaMessage {
   final String text;
   final bool isUser;
-  final DateTime timestamp;
   final Map<String, dynamic>? suggestedTransaction;
   final bool canAddTransaction;
 
   SikaMessage({
     required this.text,
     required this.isUser,
-    DateTime? timestamp,
     this.suggestedTransaction,
     this.canAddTransaction = false,
-  }) : timestamp = timestamp ?? DateTime.now();
+  });
 }
 
 class SikaData {
@@ -38,8 +29,8 @@ class SikaData {
   final bool isInitialized;
 
   SikaData({
-    this.state = SikaState.idle,
-    this.messages = const [],
+    required this.state,
+    required this.messages,
     this.currentText,
     this.errorMessage,
     this.isInitialized = false,
@@ -65,12 +56,18 @@ class SikaData {
 class SikaNotifier extends StateNotifier<SikaData> {
   final ApiService _apiService;
   final Ref _ref;
+
   final SpeechToText _speechToText = SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
 
   bool _speechEnabled = false;
 
-  SikaNotifier(this._apiService, this._ref) : super(SikaData()) {
+  SikaNotifier(this._apiService, this._ref)
+      : super(SikaData(
+          state: SikaState.idle,
+          messages: const [],
+          isInitialized: false,
+        )) {
     _initializeSika();
   }
 
@@ -80,21 +77,22 @@ class SikaNotifier extends StateNotifier<SikaData> {
       await _initTextToSpeech();
       state = state.copyWith(isInitialized: true);
     } catch (e) {
-      debugPrint('[SIKA INIT] Error initializing SIKA: $e');
+      debugPrint('[SIKA INIT] Error initializing SIKA services: $e');
       state = state.copyWith(
         state: SikaState.error,
-        errorMessage: 'Error initializing SIKA: $e',
+        errorMessage: 'Failed to initialize SIKA: $e',
+        isInitialized: false,
       );
     }
   }
 
   Future<void> _initSpeechToText() async {
     _speechEnabled = await _speechToText.initialize(
-      onError: (error) {
-        debugPrint('[SIKA STT] Speech error: ${error.errorMsg}');
+      onError: (val) {
+        debugPrint('[SIKA STT] Speech error: ${val.errorMsg}');
         state = state.copyWith(
           state: SikaState.error,
-          errorMessage: 'Speech error: ${error.errorMsg}',
+          errorMessage: val.errorMsg,
         );
       },
       onStatus: (status) {
@@ -213,11 +211,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
     );
   }
 
-  /// Traitement d'une requête utilisateur (Vocale ou Textuelle)
+  /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec détection dynamique de langue
   Future<void> processUserQuery(String query, {String? ttsLocale}) async {
     if (query.trim().isEmpty) return;
 
-    final isEnglish = _ref.read(languageProvider) == AppLanguage.english || _isEnglishText(query);
+    final isEnglish = _isEnglishText(query);
     final activeTtsLocale = ttsLocale ?? (isEnglish ? 'en-US' : 'fr-FR');
 
     String cleanQuery = query.trim();
@@ -363,13 +361,34 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   bool _isEnglishText(String text) {
     final lower = text.toLowerCase();
-    return lower.contains('transfer') ||
-        lower.contains('money') ||
-        lower.contains('how much') ||
-        lower.contains('goal') ||
-        lower.contains('add') ||
-        lower.contains('savings') ||
-        lower.contains('balance');
+
+    final frenchIndicators = [
+      'bonjour', 'salut', 'coucou', 'bonsoir', 'comment', 'vas', 'va', 'ça va', 'ca va',
+      'solde', 'combien', 'portefeuille', 'dépense', 'depense', 'épargne', 'epargne',
+      'transfert', 'transférer', 'argent', 'merci', 'oui', 'non', 'je', 'tu', 'moi', 'toi',
+      'suis', 'vais', 'bien', 'comment tu vas'
+    ];
+    final englishIndicators = [
+      'hello', 'hi', 'hey', 'how are you', 'say hello', 'good morning', 'thanks', 'thank',
+      'how much', 'money', 'total', 'balance', 'transfer', 'rebalance',
+      'save', 'savings', 'add', 'goal', 'how is my', 'what is my',
+      'analyze', 'recent', 'expenses', 'spend', 'wallet', 'dollars', 'usd'
+    ];
+
+    int frCount = 0;
+    for (final kw in frenchIndicators) {
+      if (lower.contains(kw)) frCount++;
+    }
+
+    int enCount = 0;
+    for (final kw in englishIndicators) {
+      if (lower.contains(kw)) enCount++;
+    }
+
+    if (frCount > enCount) return false;
+    if (enCount > frCount) return true;
+
+    return _ref.read(languageProvider) == AppLanguage.english;
   }
 }
 
