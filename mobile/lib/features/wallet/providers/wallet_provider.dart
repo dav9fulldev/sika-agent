@@ -82,12 +82,14 @@ class WalletState {
   final bool isLoading;
   final List<ConnectedWalletItem> wallets;
   final List<WalletMovementItem> movements;
+  final String? lastPerceptionMessage;
   final String? errorMessage;
 
   WalletState({
     this.isLoading = false,
     this.wallets = const [],
     this.movements = const [],
+    this.lastPerceptionMessage,
     this.errorMessage,
   });
 
@@ -95,12 +97,14 @@ class WalletState {
     bool? isLoading,
     List<ConnectedWalletItem>? wallets,
     List<WalletMovementItem>? movements,
+    String? lastPerceptionMessage,
     String? errorMessage,
   }) {
     return WalletState(
       isLoading: isLoading ?? this.isLoading,
       wallets: wallets ?? this.wallets,
       movements: movements ?? this.movements,
+      lastPerceptionMessage: lastPerceptionMessage ?? this.lastPerceptionMessage,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -146,6 +150,22 @@ class WalletNotifier extends StateNotifier<WalletState> {
       state = state.copyWith(movements: items);
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching movements: $e');
+    }
+  }
+
+  Future<bool> perceiveSmsNotification(String rawSmsText, {String sender = 'WAVE'}) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final res = await _apiService.perceiveSms(text: rawSmsText, sender: sender);
+      final msg = res['message'] ?? 'SMS intercepté avec succès !';
+      state = state.copyWith(isLoading: false, lastPerceptionMessage: msg);
+      await fetchWallets();
+      await fetchMovements();
+      return true;
+    } catch (e) {
+      debugPrint('[WALLET PERCEPTION] Error perceiving SMS: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
     }
   }
 

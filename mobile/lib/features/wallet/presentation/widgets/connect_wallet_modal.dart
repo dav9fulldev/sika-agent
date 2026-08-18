@@ -21,13 +21,19 @@ class ConnectWalletModal extends ConsumerStatefulWidget {
   ConsumerState<ConnectWalletModal> createState() => _ConnectWalletModalState();
 }
 
-class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
+class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   String _selectedProvider = 'Wave';
   String _authMethod = 'OAUTH2_WAVE';
   final TextEditingController _phoneController =
       TextEditingController(text: '+225 07 00 00 05');
   final TextEditingController _balanceController =
       TextEditingController(text: '12000');
+
+  final TextEditingController _smsSimulatorController = TextEditingController(
+    text: 'Vous avez reçu 15 000 FCFA de Kouamé via Wave. Votre nouveau solde est de 45 000 FCFA.',
+  );
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _providers = [
@@ -53,15 +59,30 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
       'brandColor': Colors.amber,
     },
     {
-      'name': 'Bizao Gateway',
+      'name': 'Perception Engine',
       'image': AppImages.logo,
-      'authMethod': 'BIZAO_GATEWAY',
-      'type': 'Agrégateur Panafricain (Méthode 2)',
+      'authMethod': 'PERCEIVE_SMS_PUSH',
+      'type': 'Moteur de Perception SMS & Push (Méthode 3)',
       'brandColor': AppColors.emerald,
     },
   ];
 
-  Future<void> _handleConnect() async {
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _phoneController.dispose();
+    _balanceController.dispose();
+    _smsSimulatorController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleConnectApi() async {
     setState(() => _isSubmitting = true);
     final phone = _phoneController.text.trim();
     final balance = double.tryParse(_balanceController.text.trim()) ?? 10000.0;
@@ -80,7 +101,29 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.emerald,
-            content: Text('✅ Compte $_selectedProvider connecté avec succès !'),
+            content: Text('✅ Compte $_selectedProvider connecté via Méthode 1 !'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSimulatePerception() async {
+    setState(() => _isSubmitting = true);
+    final smsText = _smsSimulatorController.text.trim();
+
+    final success = await ref
+        .read(walletProvider.notifier)
+        .perceiveSmsNotification(smsText, sender: _selectedProvider.toUpperCase());
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      if (success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.emerald,
+            content: Text('🚀 Moteur de Perception (Méthode 3) : SMS analysé et solde mis à jour !'),
           ),
         );
       }
@@ -120,198 +163,247 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // TITRE ET EXPLICATION MÉTHODES 1 & 2
+          // TITRE ET EXPLICATION MÉTHODES 1 & 3
           Text(
             langNotifier.tr(
-              'Connecter un Portefeuille Mobile',
-              'Connect Mobile Wallet',
+              'Connexion Portefeuilles (Méthodes 1 & 3)',
+              'Wallet Connection (Methods 1 & 3)',
             ),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             langNotifier.tr(
-              'Méthodes 1 & 2 : Connexion sécurisée via APIs officielles (OAuth2) ou Agrégateur Panafricain (Bizao/Mono).',
-              'Methods 1 & 2: Secure connection via official APIs (OAuth2) or Pan-African Aggregator.',
+              'Méthode 1 : APIs & OAuth2 Officiels (Wave, Orange, MTN)\nMéthode 3 : Moteur de Perception SIKA (SMS & Notifications Push Android 🚀)',
+              'Method 1: Official APIs & OAuth2 (Wave, Orange, MTN)\nMethod 3: SIKA Perception Engine (SMS & Push Notifications 🚀)',
             ),
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 13,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // SÉLECTION DU FOURNISSEUR
-          SizedBox(
-            height: 90,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _providers.length,
-              separatorBuilder: (ctx, i) => const SizedBox(width: 12),
-              itemBuilder: (ctx, index) {
-                final prov = _providers[index];
-                final bool isSelected = _selectedProvider == prov['name'];
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedProvider = prov['name'] as String;
-                      _authMethod = prov['authMethod'] as String;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 110,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? (prov['brandColor'] as Color).withValues(alpha: 0.15)
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected
-                            ? (prov['brandColor'] as Color)
-                            : AppColors.border,
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.asset(
-                            prov['image'] as String,
-                            width: 24,
-                            height: 24,
-                            fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, stack) => Icon(
-                              Icons.account_balance_wallet,
-                              color: prov['brandColor'] as Color,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          prov['name'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontSize: 12,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // CHAMP NUMÉRO DE TÉLÉPHONE / COMPTE
-          Text(
-            langNotifier.tr('Numéro de compte / Téléphone', 'Account Number / Phone'),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _phoneController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.surface,
-              hintText: '+225 07 00 00 00',
-              hintStyle: const TextStyle(color: Color(0xFF64748B)),
-              prefixIcon: const Icon(Icons.phone, color: AppColors.cyan),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-            ),
+            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
           ),
 
           const SizedBox(height: 16),
 
-          // CHAMP SOLDE INITIAL
-          Text(
-            langNotifier.tr('Solde initial du compte (FCFA)', 'Initial Account Balance (FCFA)'),
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _balanceController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.surface,
-              hintText: '15000',
-              hintStyle: const TextStyle(color: Color(0xFF64748B)),
-              prefixIcon: const Icon(Icons.account_balance_wallet, color: AppColors.emerald),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
+          // TAB BAR POUR MÉTHODES 1 & 3
+          TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.cyan,
+            labelColor: AppColors.cyan,
+            unselectedLabelColor: Colors.white60,
+            tabs: [
+              Tab(
+                text: langNotifier.tr('Méthode 1 : APIs OAuth2', 'Method 1: OAuth2 APIs'),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
+              Tab(
+                text: langNotifier.tr('Méthode 3 : SMS Perception', 'Method 3: SMS Perception'),
               ),
-            ),
+            ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // BOUTON VALIDER CONNEXION API OAUTH2
           SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _handleConnect,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.cyan,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            height: 310,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // TAB 1 : MÉTHODE 1 (APIS ET OAUTH2 DIRECT)
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // SÉLECTION PROVIDER
+                      SizedBox(
+                        height: 76,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 3,
+                          separatorBuilder: (ctx, i) => const SizedBox(width: 10),
+                          itemBuilder: (ctx, index) {
+                            final prov = _providers[index];
+                            final bool isSelected = _selectedProvider == prov['name'];
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedProvider = prov['name'] as String;
+                                  _authMethod = prov['authMethod'] as String;
+                                });
+                              },
+                              child: Container(
+                                width: 105,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? (prov['brandColor'] as Color).withValues(alpha: 0.15)
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected ? (prov['brandColor'] as Color) : AppColors.border,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Image.asset(
+                                        prov['image'] as String,
+                                        width: 22,
+                                        height: 22,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (ctx, err, stack) => Icon(
+                                          Icons.account_balance_wallet,
+                                          color: prov['brandColor'] as Color,
+                                          size: 22,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      prov['name'] as String,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : Colors.white70,
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      TextField(
+                        controller: _phoneController,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          hintText: '+225 07 00 00 00',
+                          prefixIcon: const Icon(Icons.phone, color: AppColors.cyan, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      TextField(
+                        controller: _balanceController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          hintText: 'Solde initial (FCFA)',
+                          prefixIcon: const Icon(Icons.account_balance_wallet, color: AppColors.emerald, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _handleConnectApi,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.cyan,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: _isSubmitting
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : Text(
+                                  langNotifier.tr('Connecter via OAuth2', 'Connect via OAuth2'),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              child: _isSubmitting
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(
-                      langNotifier.tr(
-                        'Autoriser & Connecter via OAuth2',
-                        'Authorize & Connect via OAuth2',
+
+                // TAB 2 : MÉTHODE 3 (MOTEUR DE PERCEPTION SMS & PUSH NOTIFICATIONS 🚀)
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.emerald.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.emerald),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.notifications_active, color: AppColors.emerald, size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                langNotifier.tr(
+                                  'Perception Automatique SIKA : Interception en arrière-plan des SMS de Wave, Orange et MTN.',
+                                  'SIKA Auto Perception: Background interception of Wave, Orange, and MTN SMS.',
+                                ),
+                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+
+                      const SizedBox(height: 14),
+
+                      Text(
+                        langNotifier.tr('Simuler ou Coller un SMS Telco :', 'Simulate or Paste Telco SMS:'),
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+
+                      TextField(
+                        controller: _smsSimulatorController,
+                        maxLines: 3,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          hintText: 'Collage d\'un SMS de notification...',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSubmitting ? null : _handleSimulatePerception,
+                          icon: const Icon(Icons.bolt, color: Colors.white),
+                          label: Text(
+                            langNotifier.tr('Analyser via Moteur SIKA', 'Analyze via SIKA Engine'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.emerald,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],

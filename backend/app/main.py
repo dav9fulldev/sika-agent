@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.sika_router import router as sika_router
 from app.routes.wallet_router import router as wallet_router
+from app.routes.perception_router import router as perception_router
 from app.database import Base, engine
 from app.repositories.financial_repository import financial_repository
 
@@ -32,6 +33,7 @@ app.add_middleware(
 
 app.include_router(sika_router)
 app.include_router(wallet_router)
+app.include_router(perception_router)
 
 @app.get("/")
 def read_root():

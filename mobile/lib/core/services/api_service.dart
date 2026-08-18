@@ -79,6 +79,40 @@ class ApiService {
     throw Exception('Failed to connect wallet: ${response.statusCode}');
   }
 
+  Future<Map<String, dynamic>> perceiveSms({
+    required String text,
+    String sender = 'WAVE',
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/perception/sms'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'text': text,
+        'sender': sender,
+        'user_id': 1,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to send SMS perception: ${response.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> simulateSmsPerception(String smsText) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/perception/simulate'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'sms_text': smsText,
+        'sender': 'WAVE',
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to simulate SMS perception: ${response.statusCode}');
+  }
+
   Future<Map<String, dynamic>> syncWallets() async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/wallets/sync'),
