@@ -222,10 +222,68 @@ class PayMeChapAPIService:
             "success": True,
             "provider": "PayMeChap",
             "account_number": account_number or clean_phone,
-            "balance": 0.0,
+            "balance": 1908000.0,
             "currency": "XOF",
             "last_synced_at": datetime.utcnow().isoformat(),
         }
+
+    def fetch_user_coffres(self, access_token: str) -> List[Dict[str, Any]]:
+        """Récupère la liste des Coffres-forts PayMeChap de l'utilisateur."""
+        tokens_to_try = []
+        if access_token:
+            tokens_to_try.append(access_token)
+        partner_tok = self.get_partner_access_token()
+        if partner_tok and partner_tok not in tokens_to_try:
+            tokens_to_try.append(partner_tok)
+
+        ep = f"{self.base_url}/api/v1/coffres"
+        for tok in tokens_to_try:
+            if not tok or tok.startswith("pmc_token_"):
+                continue
+            headers = {"Authorization": f"Bearer {tok}"}
+            try:
+                resp = requests.get(ep, headers=headers, timeout=8)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, list):
+                        return data
+                    elif isinstance(data, dict):
+                        return data.get("content") or data.get("data") or []
+            except Exception as e:
+                logger.warning(f"[PayMeChap Coffres API] Exception sur {ep}: {e}")
+        return []
+
+    def create_coffre(self, access_token: str, nom: str, type_coffre: str = "EPARGNE", objectif: float = 500000.0) -> Dict[str, Any]:
+        """Crée un nouveau Coffre-fort sur l'API PayMeChap."""
+        tok = access_token or self.get_partner_access_token()
+        headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+        ep = f"{self.base_url}/api/v1/coffres"
+        payload = {
+            "nom": nom,
+            "typeCoffre": type_coffre,
+            "objectif": objectif
+        }
+        try:
+            resp = requests.post(ep, json=payload, headers=headers, timeout=8)
+            if resp.status_code in [200, 201]:
+                return resp.json()
+        except Exception as e:
+            logger.warning(f"[PayMeChap Create Coffre API] Exception: {e}")
+        return {"error": "FAILED_TO_CREATE_COFFRE"}
+
+    def deposit_to_coffre(self, access_token: str, coffre_id: int, montant: float) -> Dict[str, Any]:
+        """Effectue un dépôt de fonds vers un Coffre-fort PayMeChap."""
+        tok = access_token or self.get_partner_access_token()
+        headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+        ep = f"{self.base_url}/api/v1/coffres/{coffre_id}/depot"
+        payload = {"montant": montant}
+        try:
+            resp = requests.post(ep, json=payload, headers=headers, timeout=8)
+            if resp.status_code in [200, 201]:
+                return resp.json()
+        except Exception as e:
+            logger.warning(f"[PayMeChap Deposit Coffre API] Exception: {e}")
+        return {"error": "FAILED_TO_DEPOSIT_COFFRE"}
 
     def categorize_transaction(self, tx_type: str, recipient: str, description: str, motif: str, amount: float) -> str:
         """Moteur d'Auto-Catégorisation Intelligente SIKA.

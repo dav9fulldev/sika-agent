@@ -122,6 +122,24 @@ def get_all_wallets_transaction_history(
     }
 
 
+@router.get("/coffres")
+def get_user_coffres():
+    """Récupère la liste des Coffres-forts (Objectifs d'Épargne) connectés via PayMeChap."""
+    wallets = _load_persisted_wallets()
+    pmc_token = None
+    for w in wallets:
+        if "paymechap" in w.get("provider", "").lower():
+            pmc_token = w.get("access_token")
+            break
+
+    coffres = paymechap_api_service.fetch_user_coffres(pmc_token)
+    return {
+        "status": "SUCCESS",
+        "count": len(coffres),
+        "coffres": coffres
+    }
+
+
 @router.post("/connect")
 def initiate_wallet_connection(data: Dict[str, Any]):
     """Étape 1 : Demande de connexion d'un portefeuille (Déclenchement OTP SMS/API)."""
