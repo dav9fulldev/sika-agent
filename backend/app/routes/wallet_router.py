@@ -4,12 +4,11 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..services.wallet_integrations.wave_api_service import wave_api_service
 from ..services.wallet_integrations.orange_money_api_service import orange_money_api_service
-from ..services.wallet_integrations/mtn_momo_api_service import mtn_momo_api_service
-from ..services.wallet_integrations/aggregator_service import aggregator_service
+from ..services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
 
 router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 
-# In-memory / DB session repository mock store
+# Portefeuilles utilisateurs connectés via Méthode 1 (APIs OAuth2) et Méthode 3 (Perception SMS/Push)
 CONNECTED_USER_WALLETS: List[Dict[str, Any]] = [
     {
         "id": "w_wave_1",
@@ -64,11 +63,18 @@ def get_all_wallets_transaction_history(
     user_id: str = "usr_default",
     limit: int = Query(default=30, ge=1, le=100)
 ):
-    """API de collecte d'historique et des mouvements de comptes (Méthodes 1 & 2).
+    """API de collecte d'historique et des mouvements de comptes (Méthodes 1 & 3).
 
-    Exécute une collecte centralisée de l'historique depuis les APIs de Wave, Orange, MTN et l'Agrégateur Panafricain.
+    Exécute une collecte centralisée de l'historique depuis les APIs de Wave, Orange et MTN.
     """
-    movements = aggregator_service.fetch_aggregated_account_movements(user_id=user_id, limit=limit)
+    wave_txs = wave_api_service.fetch_live_transactions("token", limit=limit)
+    orange_txs = orange_money_api_service.fetch_live_transactions("token", limit=limit)
+    mtn_txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
+
+    movements = wave_txs + orange_txs + mtn_txs
+    movements.sort(key=lambda x: x["timestamp"], reverse=True)
+    movements = movements[:limit]
+
     total_spent = sum(t["amount"] for t in movements if t["type"] in ["payment", "transfer", "withdrawal"])
     total_received = sum(t["amount"] for t in movements if t["type"] == "deposit")
 
@@ -99,7 +105,7 @@ def get_specific_wallet_transactions(
     elif "mtn" in provider:
         txs = mtn_momo_api_service.fetch_live_transactions("token", limit=limit)
     else:
-        txs = aggregator_service.fetch_aggregated_account_movements(limit=limit)
+        txs = wave_api_service.fetch_live_transactions("token", limit=limit)
 
     return {
         "status": "SUCCESS",
@@ -111,10 +117,10 @@ def get_specific_wallet_transactions(
 
 @router.post("/connect")
 def connect_new_wallet(data: Dict[str, Any]):
-    """Connexion d'un nouveau portefeuille via l'API officielle (Méthode 1) ou l'Agrégateur (Méthode 2)."""
+    """Connexion d'un nouveau portefeuille via l'API officielle (Méthode 1) ou la Perception (Méthode 3)."""
     provider = data.get("provider", "Wave")
     account_number = data.get("account_number", "+225 07 00 00 99")
-    auth_method = data.get("auth_method", "OAUTH2_API")
+    auth_method = data.get("auth_method", "OAUTH2_WAVE")
     user_id = data.get("user_id", "usr_default")
     initial_balance = float(data.get("initial_balance", 10000.0))
 
@@ -140,8 +146,47 @@ def connect_new_wallet(data: Dict[str, Any]):
 
 @router.post("/sync")
 def sync_user_wallets(user_id: str = "usr_default"):
-    """Effectue une synchronisation d'API en direct avec Wave, Orange, MTN et l'Agrégateur Panafricain (Méthodes 1 & 2)."""
-    synced_wallets = aggregator_service.aggregate_all_user_wallets(user_id=user_id)
+    """Effectue une synchronisation d'API en direct avec Wave, Orange et MTN (Méthodes 1 & 3)."""
+    wave_data = wave_api_service.fetch_live_balance("token")
+    orange_data = orange_money_api_service.fetch_live_balance("token")
+    mtn_data = mtn_momo_api_service.fetch_live_balance("token")
+
+    synced_wallets = [
+        {
+            "id": "w_wave_1",
+            "user_id": user_id,
+            "provider": "Wave",
+            "balance": wave_data["balance"],
+            "currency": wave_data["currency"],
+            "account_number": wave_data["account_number"],
+            "auth_method": "OAUTH2_WAVE",
+            "is_active": True,
+            "last_synced_at": wave_data["last_synced_at"]
+        },
+        {
+            "id": "w_orange_2",
+            "user_id": user_id,
+            "provider": "Orange Money",
+            "balance": orange_data["balance"],
+            "currency": orange_data["currency"],
+            "account_number": orange_data["account_number"],
+            "auth_method": "ORANGE_DEVELOPER_API",
+            "is_active": True,
+            "last_synced_at": orange_data["last_synced_at"]
+        },
+        {
+            "id": "w_mtn_3",
+            "user_id": user_id,
+            "provider": "MTN MoMo",
+            "balance": mtn_data["balance"],
+            "currency": mtn_data["currency"],
+            "account_number": mtn_data["account_number"],
+            "auth_method": "MTN_MOMO_API",
+            "is_active": True,
+            "last_synced_at": mtn_data["last_synced_at"]
+        }
+    ]
+
     return {
         "status": "SYNCED",
         "message": "✅ Soldes et transactions synchronisés en temps réel via les APIs officielles !",

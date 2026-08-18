@@ -30,13 +30,13 @@ class WalletModel(Base):
 
     id = Column(String(50), primary_key=True, index=True)
     user_id = Column(String(50), ForeignKey("users.id"), nullable=False)
-    provider = Column(String(50), nullable=False) # Wave, Orange Money, MTN MoMo, Bizao, Mono
+    provider = Column(String(50), nullable=False) # Wave, Orange Money, MTN MoMo
     balance = Column(Float, nullable=False, default=0.0)
     currency = Column(String(10), default="XOF")
     account_number = Column(String(50), nullable=True)
     
-    # Méthodes 1 & 2 : Intégrations API Directes & Agrégateurs
-    auth_method = Column(String(50), default="OAUTH2_API") # OAUTH2_WAVE, ORANGE_DEVELOPER_API, MTN_MOMO_API, BIZAO_GATEWAY
+    # Méthodes 1 & 3 : APIs Directes OAuth2 et Moteur de Perception SMS/Push
+    auth_method = Column(String(50), default="OAUTH2_WAVE") # OAUTH2_WAVE, ORANGE_DEVELOPER_API, MTN_MOMO_API, PERCEIVE_SMS_PUSH
     account_identifier = Column(String(100), nullable=True) # Numéro de téléphone ou ID de compte
     access_token = Column(String(255), nullable=True) # Jeton OAuth2 de session API
     refresh_token = Column(String(255), nullable=True)
