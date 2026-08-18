@@ -8,7 +8,6 @@ from typing import Dict, Any, Optional
 from .tool_models import RiskLevel, ToolResult
 from .mock_data import MOCK_WALLETS, MOCK_TRANSACTIONS
 from ...services.user_learning_service import user_learning_service
-from ...services.backup_service import backup_service
 
 def get_spending_summary(days: int = 30) -> ToolResult:
     """Analyse et synthétise les dépenses observées."""
@@ -97,6 +96,7 @@ def update_user_habit(category: str, amount: float, user_id: str = "default_user
 
 def create_backup_snapshot(user_id: str = "default_user") -> ToolResult:
     """Génère un snapshot de sauvegarde de la mémoire long-terme pour le fine-tuning IA."""
+    from ...services.backup_service import backup_service
     snapshot = backup_service.create_backup_snapshot(user_id)
     return ToolResult(
         success=True,
