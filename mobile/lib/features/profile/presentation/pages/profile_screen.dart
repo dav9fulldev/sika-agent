@@ -62,9 +62,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _showMovementsModal(BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
-    final walletState = ref.read(walletProvider);
-    final currency = ref.read(currencyProvider);
-    final movements = walletState.movements;
+    String selectedProviderFilter = 'ALL';
 
     showModalBottomSheet(
       context: context,
@@ -73,130 +71,198 @@ class ProfileScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final walletState = ref.watch(walletProvider);
+          final currency = ref.watch(currencyProvider);
+          final movements = walletState.movements;
+          final connectedWallets = walletState.wallets;
+
+          final List<WalletMovementItem> filteredMovements = selectedProviderFilter == 'ALL'
+              ? movements
+              : movements.where((m) {
+                  final p = m.walletProvider.toLowerCase();
+                  final target = selectedProviderFilter.toLowerCase();
+                  return p.contains(target) || target.contains(p);
+                }).toList();
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  langNotifier.tr('Mouvements & Historique API', 'API Movements & History'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: AppColors.cyan),
-                  onPressed: () => ref.read(walletProvider.notifier).fetchMovements(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              langNotifier.tr(
-                'Mouvements collectés en temps réel via les APIs Wave, Orange et MTN.',
-                'Real-time movements collected via Wave, Orange, and MTN APIs.',
-              ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: movements.isEmpty
-                  ? Center(
-                      child: Text(
-                        langNotifier.tr('Aucun mouvement trouvé', 'No movements found'),
-                        style: const TextStyle(color: Colors.white54),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      langNotifier.tr('Mouvements & Historique API', 'API Movements & History'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: movements.length,
-                      separatorBuilder: (ctx, i) => const Divider(color: AppColors.border),
-                      itemBuilder: (ctx, index) {
-                        final item = movements[index];
-                        final isDeposit = item.type == 'deposit';
-                        final amountVal = (item.amount * currency.rateFromFcfa).toStringAsFixed(
-                          currency == AppCurrency.fcfa ? 0 : 2,
-                        );
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: AppColors.cyan),
+                      onPressed: () async {
+                        await ref.read(walletProvider.notifier).fetchMovements();
+                        setModalState(() {});
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  langNotifier.tr(
+                    'Mouvements collectés en temps réel via les APIs PayMeChap, Wave, Orange et MTN.',
+                    'Real-time movements collected via PayMeChap, Wave, Orange, and MTN APIs.',
+                  ),
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                ),
+                const SizedBox(height: 16),
 
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundColor: isDeposit
-                                ? AppColors.emerald.withValues(alpha: 0.15)
-                                : AppColors.rose.withValues(alpha: 0.15),
-                            child: Icon(
-                              isDeposit ? Icons.arrow_downward : Icons.arrow_upward,
-                              color: isDeposit ? AppColors.emerald : AppColors.rose,
-                              size: 18,
-                            ),
+                // DROPDOWN FILTER BY WALLET
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B1329),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: selectedProviderFilter,
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF0B1329),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyan),
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: 'ALL',
+                          child: Text(
+                            langNotifier.tr('Tous les comptes', 'All Accounts') + ' (${movements.length})',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
-                          title: Text(
-                            item.recipient.isNotEmpty ? item.recipient : item.description,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                        ),
+                        ...connectedWallets.map((w) {
+                          final label = '${w.provider} (${w.accountNumber})';
+                          return DropdownMenuItem<String>(
+                            value: w.provider,
+                            child: Text(
+                              label,
+                              style: const TextStyle(color: Colors.white),
                             ),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() {
+                            selectedProviderFilter = val;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                Expanded(
+                  child: filteredMovements.isEmpty
+                      ? Center(
+                          child: Text(
+                            langNotifier.tr('Aucun mouvement trouvé', 'No movements found'),
+                            style: const TextStyle(color: Colors.white54),
                           ),
-                          subtitle: Text(
-                            '${item.walletProvider} • ${item.category}',
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 12,
-                            ),
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
-                                style: TextStyle(
-                                  color: isDeposit ? AppColors.emerald : Colors.white,
-                                  fontWeight: FontWeight.bold,
+                        )
+                      : ListView.separated(
+                          itemCount: filteredMovements.length,
+                          separatorBuilder: (ctx, i) => const Divider(color: AppColors.border),
+                          itemBuilder: (ctx, index) {
+                            final item = filteredMovements[index];
+                            final isDeposit = item.type == 'deposit';
+                            final amountVal = (item.amount * currency.rateFromFcfa).toStringAsFixed(
+                              currency == AppCurrency.fcfa ? 0 : 2,
+                            );
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                backgroundColor: isDeposit
+                                    ? AppColors.emerald.withValues(alpha: 0.15)
+                                    : AppColors.rose.withValues(alpha: 0.15),
+                                child: Icon(
+                                  isDeposit ? Icons.arrow_downward : Icons.arrow_upward,
+                                  color: isDeposit ? AppColors.emerald : AppColors.rose,
+                                  size: 18,
+                                ),
+                              ),
+                              title: Text(
+                                item.recipient.isNotEmpty ? item.recipient : item.description,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  item.status,
-                                  style: const TextStyle(
-                                    color: AppColors.cyan,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              subtitle: Text(
+                                '${item.walletProvider} • ${item.category}',
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 12,
                                 ),
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
+                                    style: TextStyle(
+                                      color: isDeposit ? AppColors.emerald : Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      item.status,
+                                      style: const TextStyle(
+                                        color: AppColors.cyan,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
