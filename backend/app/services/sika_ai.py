@@ -114,10 +114,10 @@ class SikaAI:
         # 1. SOLDE TOTAL & PORTEFEUILLES (TOTAL BALANCE & WALLETS)
         if any(w in msg_lower for w in ["solde", "combien j'ai", "portefeuille", "total", "balance", "money", "how much"]):
             if is_english:
-                response = f"Hi {user_firstname}! You have a total balance of 45,000 FCFA ($75.00) across 3 wallets: Wave (15,000 FCFA), Orange Money (22,000 FCFA), and MTN MoMo (8,000 FCFA). 📲"
+                response = f"Hi {user_firstname}! You have a total balance of 45,000 FCFA ($75.00) across 3 wallets: Wave (15,000 FCFA), Orange Money (22,000 FCFA), and MTN MoMo (8,000 FCFA)."
                 suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]
             else:
-                response = f"Salut {user_firstname} ! Tu as 45 000 FCFA au total répartis ainsi : 15 000 FCFA sur Wave, 22 000 FCFA sur Orange Money et 8 000 FCFA sur MTN Mobile Money. 📲"
+                response = f"Salut {user_firstname} ! Tu as 45 000 FCFA au total répartis ainsi : 15 000 FCFA sur Wave, 22 000 FCFA sur Orange Money et 8 000 FCFA sur MTN Mobile Money."
                 suggestions = ["Voir mes dépenses récentes", "Effectuer un transfert", "Objectif d'épargne"]
 
             return {
@@ -133,10 +133,10 @@ class SikaAI:
         # 2. TRANSFERT & RÉÉQUILIBRAGE (TRANSFER & AUTO-REBALANCE)
         elif any(w in msg_lower for w in ["transfert", "envoie", "transférer", "paye", "kouamé", "transfer", "rebalance"]):
             if is_english:
-                response = f"I am preparing the wallet rebalance transfer from Orange Money to Wave. Security validation is required before execution. 🛡️"
+                response = f"I am preparing the wallet rebalance transfer from Orange Money to Wave. Security validation is required before execution."
                 suggestions = ["I confirm the transfer", "Cancel transfer"]
             else:
-                response = f"Je prépare le transfert d'équilibrage depuis Orange Money vers Wave. Une validation de sécurité est requise avant exécution. 🛡️"
+                response = f"Je prépare le transfert d'équilibrage depuis Orange Money vers Wave. Une validation de sécurité est requise avant exécution."
                 suggestions = ["Je confirme le transfert", "Annuler le transfert"]
 
             return {
@@ -152,10 +152,10 @@ class SikaAI:
         # 3. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST)
         elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add"]):
             if is_english:
-                response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding this amount brings you 5 days closer to your target! 🎯"
+                response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding this amount brings you 5 days closer to your target!"
                 suggestions = ["Add $1 to savings", "Adjust savings target"]
             else:
-                response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif ! 🎯"
+                response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif !"
                 suggestions = ["Ajouter 500 FCFA à l'épargne", "Ajuster l'objectif"]
 
             return {
@@ -171,10 +171,10 @@ class SikaAI:
         # 4. ANALYSE DÉPENSE & DÉPENSES RÉCENTES (EXPENSE ANALYSIS)
         elif any(w in msg_lower for w in ["dépense", "dépensé", "acheté", "budget", "analyze", "recent", "expenses"]):
             if is_english:
-                response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have 45,000 FCFA ($75.00) remaining for the month. 📊"
+                response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have 45,000 FCFA ($75.00) remaining for the month."
                 suggestions = ["Set spending limit", "View transaction history"]
             else:
-                response = f"Voici l'analyse de tes dépenses récentes : ta catégorie principale est Restauration. Il te reste 45 000 FCFA pour finir le mois. 📊"
+                response = f"Voici l'analyse de tes dépenses récentes : ta catégorie principale est Restauration. Il te reste 45 000 FCFA pour finir le mois."
                 suggestions = ["Définir une limite", "Voir l'historique"]
 
             return {

@@ -125,7 +125,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   children: [
                     const SizedBox(height: 15),
 
-                    // 1. BLOC SOLDE TOTAL (CONVERTION EN TEMPS RÉEL)
+                    // 1. BLOC SOLDE TOTAL (SANS EMOJIS - AVEC ICÔNES FLUTTER PROPREMENT DÉSIGNÉES)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -165,11 +165,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           const SizedBox(height: 18),
                           Row(
                             children: [
-                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, '🌊'),
+                              _buildWalletCard('Wave', currNotifier.format(15000), Colors.blue, Icons.water_drop_rounded),
                               const SizedBox(width: 8),
-                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, '🍊'),
+                              _buildWalletCard('Orange Money', currNotifier.format(22000), Colors.orange, Icons.phone_android_rounded),
                               const SizedBox(width: 8),
-                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, '🟡'),
+                              _buildWalletCard('MTN MoMo', currNotifier.format(8000), Colors.amber, Icons.account_balance_wallet_rounded),
                             ],
                           ),
                         ],
@@ -308,7 +308,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     const SizedBox(height: 12),
 
                     _buildSuggestionPill(
-                      icon: '💰',
+                      iconData: Icons.account_balance_wallet_outlined,
                       text: langNotifier.tr('Combien d\'argent ai-je au total ?', 'How much money do I have in total?'),
                       onTap: () => _submitQuery(
                         langNotifier.tr('Combien d\'argent ai-je au total ?', 'How much money do I have in total?'),
@@ -317,7 +317,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
 
                     _buildSuggestionPill(
-                      icon: '🎯',
+                      iconData: Icons.track_changes_rounded,
                       text: langNotifier.tr('Comment progresse mon objectif d\'épargne ?', 'How is my savings goal progressing?'),
                       onTap: () => _submitQuery(
                         langNotifier.tr('Comment progresse mon objectif d\'épargne ?', 'How is my savings goal progressing?'),
@@ -326,7 +326,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
 
                     _buildSuggestionPill(
-                      icon: '📊',
+                      iconData: Icons.bar_chart_rounded,
                       text: langNotifier.tr('Quel est mon solde Mobile Money total ?', 'What is my total Mobile Money balance?'),
                       onTap: () => _submitQuery(
                         langNotifier.tr('Quel est mon solde Mobile Money total ?', 'What is my total Mobile Money balance?'),
@@ -335,7 +335,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
 
                     _buildSuggestionPill(
-                      icon: '⚡',
+                      iconData: Icons.bolt_rounded,
                       text: langNotifier.tr('Analyser mes dépenses récentes', 'Analyze my recent expenses'),
                       onTap: () => _submitQuery(
                         langNotifier.tr('Analyser mes dépenses récentes', 'Analyze my recent expenses'),
@@ -411,7 +411,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-  Widget _buildWalletCard(String name, String amount, Color brandColor, String emoji) {
+  Widget _buildWalletCard(String name, String amount, Color brandColor, IconData iconData) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -425,7 +425,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
           children: [
             Row(
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 12)),
+                Icon(iconData, color: brandColor, size: 14),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -457,7 +457,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
   }
 
   Widget _buildSuggestionPill({
-    required String icon,
+    required IconData iconData,
     required String text,
     required VoidCallback onTap,
   }) {
@@ -475,7 +475,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Text(icon, style: const TextStyle(fontSize: 18)),
+              Icon(iconData, color: const Color(0xFF38BDF8), size: 18),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
