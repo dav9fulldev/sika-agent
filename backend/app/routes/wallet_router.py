@@ -143,10 +143,11 @@ def connect_new_wallet(data: Dict[str, Any]):
         "created_at": datetime.utcnow().isoformat()
     }
 
+    delivery_channel = "par Email (Revo)" if "paymechap" in provider.lower() else "par SMS"
     return {
         "status": "OTP_REQUIRED",
         "session_id": session_id,
-        "message": f"📱 Code de sécurité OTP à 6 chiffres envoyé au {account_number} par {provider} !",
+        "message": f"🔑 Code de sécurité OTP à 6 chiffres envoyé {delivery_channel} au {account_number} par {provider} !",
         "demo_otp_hint": "123456"
     }
 

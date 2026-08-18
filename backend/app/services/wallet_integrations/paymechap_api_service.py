@@ -76,7 +76,7 @@ class PayMeChapAPIService:
                     "provider": "PayMeChap",
                     "telephone": clean_phone,
                     "session_id": f"pmc_sess_{int(datetime.utcnow().timestamp())}",
-                    "message": f"📱 Code OTP PayMeChap envoyé par SMS au {phone_number} !",
+                    "message": f"📧 Code OTP PayMeChap envoyé par Email (Revo) au {phone_number} !",
                 }
             logger.warning(f"[PayMeChap OTP] Réponse {resp.status_code}: {resp.text}")
         except Exception as e:
@@ -88,7 +88,7 @@ class PayMeChapAPIService:
             "provider": "PayMeChap",
             "telephone": clean_phone,
             "session_id": f"pmc_sess_{int(datetime.utcnow().timestamp())}",
-            "message": f"📱 Code OTP PayMeChap envoyé au {phone_number} !",
+            "message": f"📧 Code OTP PayMeChap envoyé par Email (Revo) au {phone_number} !",
         }
 
     def verify_otp_code(self, phone_number: str, otp_code: str) -> Dict[str, Any]:

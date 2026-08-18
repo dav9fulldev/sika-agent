@@ -280,10 +280,15 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      langNotifier.tr(
-                        'Un code de sécurité OTP à 6 chiffres vous sera envoyé par SMS pour valider votre identité.',
-                        'A 6-digit OTP security code will be sent via SMS to verify your identity.',
-                      ),
+                      _selectedProvider == 'PayMeChap'
+                          ? langNotifier.tr(
+                              'Un code de sécurité OTP à 6 chiffres vous sera envoyé par Email (Revo) pour valider votre compte.',
+                              'A 6-digit OTP security code will be sent via Email (Revo) to verify your account.',
+                            )
+                          : langNotifier.tr(
+                              'Un code de sécurité OTP à 6 chiffres vous sera envoyé par SMS pour valider votre identité.',
+                              'A 6-digit OTP security code will be sent via SMS to verify your identity.',
+                            ),
                       style: const TextStyle(color: Colors.white70, fontSize: 11.5),
                     ),
                   ),
