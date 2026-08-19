@@ -164,13 +164,40 @@ class SikaAIService:
             # Si le message indique une volonté de déposer ou verser
             is_deposit_action = any(w in msg_lower for w in ["déposer", "depot", "dépôt", "deposit", "deposited", "verser", "ajouter", "mettre"])
 
-            if is_deposit_action:
-                dep_res = paymechap_api_service.deposit_to_coffre("", coffre_id=1, montant=raw_amount, account_number="0799053977")
-                live_coffres = paymechap_api_service.fetch_user_coffres("", account_number="0799053977")
-                c_item = live_coffres[0] if live_coffres else {}
-                c_nom = c_item.get("nom", "Etude")
-                c_solde = float(dep_res.get("nouveauSoldeCoffre") or c_item.get("solde", 66000.0))
-                c_obj = float(c_item.get("objectif", 500000.0))
+            # 1. Extraction dynamique du compte connecté actif
+            from ..routes.wallet_router import CONNECTED_USER_WALLETS
+            active_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("is_active", True) and "paymechap" in w.get("provider", "").lower()]
+            target_account = active_wallets[0].get("account_number") if active_wallets else (financial_context.get("account_number") or "")
+
+            # 2. Récupération dynamique des coffres réels pour ce compte
+            live_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
+            
+            # 3. Sélection dynamique du coffre ciblé (matching par nom ou premier coffre disponible)
+            c_item = {}
+            if live_coffres:
+                for c in live_coffres:
+                    if str(c.get("nom", "")).lower() in msg_lower:
+                        c_item = c
+                        break
+                if not c_item:
+                    c_item = live_coffres[0]
+
+            target_coffre_id = c_item.get("id")
+            c_nom = c_item.get("nom") or "Épargne"
+            c_solde = float(c_item.get("solde") or 0.0)
+            c_obj = float(c_item.get("objectif") or 0.0)
+
+            if is_deposit_action and target_coffre_id is not None:
+                dep_res = paymechap_api_service.deposit_to_coffre("", coffre_id=target_coffre_id, montant=raw_amount, account_number=target_account)
+                c_solde = float(dep_res.get("nouveauSoldeCoffre") or c_solde)
+                
+                # Rafraîchissement direct de l'état réel du coffre
+                updated_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
+                if updated_coffres:
+                    for uc in updated_coffres:
+                        if uc.get("id") == target_coffre_id:
+                            c_solde = float(uc.get("solde") or c_solde)
+                            c_obj = float(uc.get("objectif") or c_obj)
 
                 fmt_dep = self._format_currency(raw_amount, financial_context)
                 fmt_solde = self._format_currency(c_solde, financial_context)
@@ -184,26 +211,21 @@ class SikaAIService:
                     response = f"✅ Dépôt de **{fmt_dep}** vers votre coffre **'{c_nom}'** effectué avec succès ! Votre nouveau solde d'épargne est de **{fmt_solde}** sur **{fmt_obj}** ({pct:.1f}% atteint)."
                     suggestions = ["Voir mon objectif d'épargne", "Faire un autre dépôt", "Vérifier mon solde total"]
             else:
-                live_coffres = paymechap_api_service.fetch_user_coffres("", account_number="0799053977")
-                c_item = live_coffres[0] if live_coffres else {}
-                c_nom = c_item.get("nom", "Etude")
-                c_solde = float(c_item.get("solde", 56000.0))
-                c_obj = float(c_item.get("objectif", 500000.0))
                 fmt_solde = self._format_currency(c_solde, financial_context)
                 fmt_obj = self._format_currency(c_obj, financial_context)
                 pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
 
                 if is_english:
                     response = f"Your **'{c_nom}'** safe currently has **{fmt_solde}** saved out of **{fmt_obj}** ({pct:.1f}% target achieved)."
-                    suggestions = ["Deposit 10 000 FCFA into Etude safe", "Adjust savings goal", "View recent expenses"]
+                    suggestions = ["Deposit 10 000 FCFA into safe", "Adjust savings goal", "View recent expenses"]
                 else:
                     response = f"Votre coffre d'épargne **'{c_nom}'** contient actuellement **{fmt_solde}** sur un objectif de **{fmt_obj}** ({pct:.1f}% de votre objectif)."
-                    suggestions = ["Déposer 10 000 FCFA dans le coffre Etude", "Ajuster l'objectif d'épargne", "Voir mes dépenses"]
+                    suggestions = ["Déposer 10 000 FCFA dans le coffre", "Ajuster l'objectif d'épargne", "Voir mes dépenses"]
 
             return {
                 "response": response,
                 "action": "deposit_to_coffre",
-                "action_data": {"coffre_id": 1, "amount": raw_amount, "coffre_name": "Etude"},
+                "action_data": {"coffre_id": target_coffre_id, "amount": raw_amount, "coffre_name": c_nom},
                 "sentiment": "positive",
                 "suggestions": suggestions,
                 "provider": "GEMINI",
