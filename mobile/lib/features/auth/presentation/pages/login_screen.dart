@@ -144,33 +144,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const Divider(color: Color(0xFF1E293B), height: 1),
 
-              // COMPTE 2
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF10B981),
-                  child: Text('DK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-                title: const Text('David KOUADIO', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: const Text('david.kouadio@gmail.com', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF64748B), size: 14),
-                onTap: () async {
-                  Navigator.pop(modalCtx);
-                  final success = await authNotifier.loginWithGoogle(
-                    email: "david.kouadio@gmail.com",
-                    name: "David KOUADIO",
-                  );
-                  if (success && mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
-                      (route) => false,
-                    );
-                  }
-                },
-              ),
-              const Divider(color: Color(0xFF1E293B), height: 1),
-
               // COMPTE PERSONNALISÉ
               ListTile(
                 contentPadding: EdgeInsets.zero,
