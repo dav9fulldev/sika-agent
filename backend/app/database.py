@@ -21,7 +21,7 @@ INSTANCE_CONNECTION_NAME = os.getenv(
 # URL par défaut: Cloud SQL Proxy local (127.0.0.1:5433) ou variable DATABASE_URL
 DEFAULT_CLOUD_SQL_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg2://sika_user:SikaSecurePassword2026!@127.0.0.1:5433/sika_db"
+    "postgresql+psycopg2://sika_user:JeMappelleDavidYaonee2000jai26ans@127.0.0.1:5433/sika_db"
 )
 DEFAULT_SQLITE_URL = "sqlite:////Users/mac/Desktop/SIKA/backend/sika_local.db"
 DATABASE_URL = DEFAULT_CLOUD_SQL_URL
