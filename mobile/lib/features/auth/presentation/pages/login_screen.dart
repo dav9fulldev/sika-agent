@@ -40,15 +40,205 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _onGoogleLoginPressed(AuthNotifier authNotifier) async {
-    final success = await authNotifier.loginWithGoogle();
-    if (success && mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
-        (route) => false,
-      );
-    }
+  void _showGoogleAccountPicker(AuthNotifier authNotifier) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0B1329),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalCtx) {
+        final TextEditingController customEmailController = TextEditingController();
+
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF334155),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: const Text(
+                      'G',
+                      style: TextStyle(
+                        color: Color(0xFF4285F4),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Se connecter avec Google',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Choisissez un compte Google pour continuer sur SIKA',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(color: Color(0xFF1E293B)),
+              const SizedBox(height: 12),
+
+              // COMPTE 1
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF38BDF8),
+                  child: Text('DY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                title: const Text('David YAO', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('david.yao@gmail.com', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF64748B), size: 14),
+                onTap: () async {
+                  Navigator.pop(modalCtx);
+                  final success = await authNotifier.loginWithGoogle(
+                    email: "david.yao@gmail.com",
+                    name: "David YAO",
+                  );
+                  if (success && mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
+              const Divider(color: Color(0xFF1E293B), height: 1),
+
+              // COMPTE 2
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF10B981),
+                  child: Text('DK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                title: const Text('David KOUADIO', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('david.kouadio@gmail.com', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF64748B), size: 14),
+                onTap: () async {
+                  Navigator.pop(modalCtx);
+                  final success = await authNotifier.loginWithGoogle(
+                    email: "david.kouadio@gmail.com",
+                    name: "David KOUADIO",
+                  );
+                  if (success && mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
+              const Divider(color: Color(0xFF1E293B), height: 1),
+
+              // COMPTE PERSONNALISÉ
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person_add_alt_1_outlined, color: AppColors.cyan, size: 20),
+                ),
+                title: const Text('Utiliser un autre compte Google', style: TextStyle(color: AppColors.cyan, fontSize: 14, fontWeight: FontWeight.w600)),
+                onTap: () {
+                  showDialog(
+                    context: modalCtx,
+                    builder: (dlgCtx) => AlertDialog(
+                      backgroundColor: const Color(0xFF0B1329),
+                      title: const Text('Autre compte Google', style: TextStyle(color: Colors.white, fontSize: 16)),
+                      content: TextField(
+                        controller: customEmailController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: 'adresse@gmail.com',
+                          hintStyle: TextStyle(color: Color(0xFF64748B)),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dlgCtx),
+                          child: const Text('Annuler', style: TextStyle(color: Color(0xFF94A3B8))),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final email = customEmailController.text.trim();
+                            if (email.isNotEmpty) {
+                              Navigator.pop(dlgCtx);
+                              Navigator.pop(modalCtx);
+                              final name = email.split('@').first;
+                              final success = await authNotifier.loginWithGoogle(
+                                email: email,
+                                name: name[0].toUpperCase() + name.substring(1),
+                              );
+                              if (success && mounted) {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
+                                  (route) => false,
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                          child: const Text('Continuer'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _onGoogleLoginPressed(AuthNotifier authNotifier) {
+    _showGoogleAccountPicker(authNotifier);
   }
 
   @override

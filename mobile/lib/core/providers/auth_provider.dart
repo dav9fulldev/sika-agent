@@ -207,11 +207,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Connexion et inscription instantanée via Google Sign-In (OAuth2)
-  Future<bool> loginWithGoogle() async {
+  Future<bool> loginWithGoogle({String email = "david.yao@gmail.com", String name = "David YAO"}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final res = await _apiService.googleLogin(email: "david.yao@gmail.com", name: "David YAO");
+      final res = await _apiService.googleLogin(email: email, name: name);
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
 
@@ -222,8 +222,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accessToken: token,
         user: UserProfileData(
           id: uData["id"] ?? "usr_google_1",
-          name: uData["name"] ?? "David YAO",
-          email: uData["email"] ?? "david.yao@gmail.com",
+          name: uData["name"] ?? name,
+          email: uData["email"] ?? email,
           isGoogleAuth: true,
         ),
       );
