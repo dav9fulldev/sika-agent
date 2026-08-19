@@ -36,19 +36,24 @@ def _load_persisted_wallets() -> List[Dict[str, Any]]:
 
 
 def _save_persisted_wallets(wallets: List[Dict[str, Any]]):
-    """Sauvegarde les portefeuilles connectés dans le fichier de stockage local."""
+    """Sauvegarde uniquement les métadonnées de connexion des portefeuilles (sans soldes ni jetons sensibles)."""
     try:
         WALLETS_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
         clean_wallets = []
         for w in wallets:
-            w_copy = dict(w)
-            if "access_token" in w_copy and w_copy["access_token"]:
-                w_copy["access_token"] = "stored_session_token"
+            w_copy = {
+                "id": w.get("id"),
+                "user_id": w.get("user_id", "usr_default"),
+                "provider": w.get("provider"),
+                "account_number": w.get("account_number"),
+                "auth_method": w.get("auth_method", "PAYMECHAP_PARTNER_API"),
+                "is_active": w.get("is_active", True)
+            }
             clean_wallets.append(w_copy)
 
         with open(WALLETS_DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(clean_wallets, f, ensure_ascii=False, indent=2)
-            logger.info(f"[PERSISTENCE WALLET] {len(clean_wallets)} portefeuille(s) sauvegardé(s).")
+            logger.info(f"[PERSISTENCE WALLET] Métadonnées de {len(clean_wallets)} portefeuille(s) sauvegardées.")
     except Exception as e:
         logger.warning(f"[PERSISTENCE WALLET] Erreur lors de la sauvegarde : {e}")
 
@@ -59,25 +64,22 @@ CONNECTED_USER_WALLETS: List[Dict[str, Any]] = _load_persisted_wallets()
 
 @router.get("/me")
 def get_my_wallets(user_id: str = "usr_default"):
-    """Retourne la liste complète des portefeuilles connectés de l'utilisateur avec mise à jour en direct."""
-    global CONNECTED_USER_WALLETS
-    CONNECTED_USER_WALLETS = _load_persisted_wallets()
-    user_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("user_id") == user_id and w.get("is_active", True)]
+    """Retourne la liste complète des portefeuilles connectés avec calcul du solde 100% en direct via l'API (en mémoire RAM)."""
+    persisted = _load_persisted_wallets()
+    user_wallets = [dict(w) for w in persisted if w.get("user_id") == user_id and w.get("is_active", True)]
 
-    # Auto-synchronisation des soldes en direct à la consultation
+    # Auto-synchronisation des soldes en direct à la consultation (uniquement en mémoire)
     for w in user_wallets:
         prov = w.get("provider", "").lower()
         token = w.get("access_token") or ""
         acc_num = w.get("account_number") or ""
         if "paymechap" in prov:
             fetched = paymechap_api_service.fetch_live_balance(token, acc_num)
-            if fetched.get("success") or fetched.get("balance", 0.0) > 0:
-                w["balance"] = float(fetched.get("balance", w.get("balance", 0.0)))
+            w["balance"] = float(fetched.get("balance", 0.0))
+            w["currency"] = fetched.get("currency", "XOF")
             w["last_synced_at"] = datetime.utcnow().isoformat()
 
-    _save_persisted_wallets(CONNECTED_USER_WALLETS)
-
-    total_balance = sum(w["balance"] for w in user_wallets)
+    total_balance = sum(w.get("balance", 0.0) for w in user_wallets)
     return {
         "status": "SUCCESS",
         "user_id": user_id,
