@@ -316,14 +316,22 @@ class SikaAIService:
                 "model": self.model
             }
 
-        # 4. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST)
-        elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add"]):
-            if is_english:
-                response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding to your savings brings you 5 days closer to your target!"
-                suggestions = ["Add $1 to savings", "Adjust savings target"]
+        # 4. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST & RECOMMANDATION)
+        elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add", "de côté", "reçu", "combien puis-je"]):
+            if "combien" in msg_lower or "de côté" in msg_lower or "reçu" in msg_lower:
+                if is_english:
+                    response = f"Great news {user_firstname}! Based on your financial context, putting aside 20% to 30% (around 10 000 FCFA to 15 000 FCFA) into your savings safe is recommended. Should I prepare the deposit?"
+                    suggestions = ["Deposit 10 000 FCFA into safe", "Deposit 15 000 FCFA into safe", "Check total balance"]
+                else:
+                    response = f"Excellente nouvelle {user_firstname} ! En tenant compte de tes préférences d'épargne, placer 20% à 30% (soit 10 000 FCFA à 15 000 FCFA) dans ton coffre est l'idéal. Souhaites-tu que je prépare le dépôt ?"
+                    suggestions = ["Déposer 10 000 FCFA dans le coffre", "Déposer 15 000 FCFA dans le coffre", "Vérifier mon solde"]
             else:
-                response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif !"
-                suggestions = ["Ajouter à l'épargne", "Ajuster l'objectif"]
+                if is_english:
+                    response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding to your savings brings you 5 days closer to your target!"
+                    suggestions = ["Add $1 to savings", "Adjust savings target"]
+                else:
+                    response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif !"
+                    suggestions = ["Ajouter à l'épargne", "Ajuster l'objectif"]
 
             return {
                 "response": response,
