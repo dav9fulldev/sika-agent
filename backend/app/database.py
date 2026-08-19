@@ -18,14 +18,11 @@ INSTANCE_CONNECTION_NAME = os.getenv(
     "sika-all-things-agentic:europe-west9:sika-db-instance"
 )
 
-# URL par défaut: PostgreSQL Cloud SQL ou SQLite local
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"postgresql+psycopg2://postgres:SikaSecurePassword2026!@34.155.139.201:5432/sika_db"
-)
+# URL par défaut: PostgreSQL Cloud SQL via variable d'environnement ou SQLite local par défaut
+DEFAULT_SQLITE_URL = "sqlite:////Users/mac/Desktop/SIKA/backend/sika_local.db"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
 
-# Configuration engine pour SQLite et PostgreSQL Cloud SQL
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {"connect_timeout": 3}
 
 try:
     engine = create_engine(
@@ -34,11 +31,13 @@ try:
         echo=False,
         pool_pre_ping=True,
     )
+    # Test immédiat de la connexion SQL
+    with engine.connect() as conn:
+        pass
 except Exception:
-    # Fallback sécurisé sur SQLite si la connexion distante n'est pas joignable sans proxy
-    FALLBACK_URL = "sqlite:////Users/mac/Desktop/SIKA/backend/sika_local.db"
+    # Si Cloud SQL nécessite cloud-sql-proxy ou n'est pas encore joignable, fallback transparent sur SQLite local
     engine = create_engine(
-        FALLBACK_URL,
+        DEFAULT_SQLITE_URL,
         connect_args={"check_same_thread": False},
         echo=False
     )
