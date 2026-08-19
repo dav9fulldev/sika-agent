@@ -74,7 +74,7 @@ class SikaAIService:
         msg_lower = user_message.lower()
 
         if any(w in msg_lower or w in res_lower for w in ["transfert", "transférer", "envoie", "transfer", "rebalance"]):
-            return ("prepare_transfer", {"amount": 10000, "recipient": "Kouamé", "wallet_provider": "Wave"})
+            return ("prepare_transfer", {"amount": 10000.0, "recipient": "Kouamé", "provider": "Wave"})
 
         if any(w in msg_lower or w in res_lower for w in ["dépense", "acheté", "spent", "buy", "purchase"]):
             return ("add_transaction", {})
@@ -98,10 +98,10 @@ class SikaAIService:
         total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
         fmt_total = self._format_currency(total_balance_fcfa, financial_context)
 
-        # Mots-clés d'intention financière
+        # Mots-clés d'intention financière (solde & consultation)
         financial_intent_keywords = [
-            "solde", "combien j'ai", "combien", "portefeuille", "total", "balance", "money",
-            "how much", "compte", "argent", "paymechap", "wave", "orange", "mtn"
+            "solde", "combien j'ai", "combien sur", "mon solde", "total balance", "how much money",
+            "combien d'argent", "état de mes comptes", "portefeuilles"
         ]
 
         # 1. INTENTION FINANCIÈRE : SOLDE TOTAL & PORTEFEUILLES (Priorité absolue avant les simples salutations)
@@ -358,16 +358,22 @@ class SikaAIService:
         conversation_history: Optional[List] = None,
         user_firstname: Optional[str] = None
     ) -> Dict:
-        """Point d'entrée principal pour traiter les messages de l'utilisateur."""
+        """Point d'entrée principal pour traiter les messages de l'utilisateur avec exécution autonome prioritaire."""
         context = financial_context or {}
         fname = user_firstname or context.get("user_firstname") or "David"
         is_english = self._is_english(user_message)
 
+        # 1. Exécution autonome d'action et d'analyse financière en premier
+        executed_result = self._chat_basic(user_message, context, fname, is_english)
+
+        # 2. Si le SDK Gemini est actif, enrichir et formater la réponse avec le modèle Gemini
         if self.client:
             try:
                 system_instruction = (
-                    f"Tu es Sika AI, un assistant financier autonome et bienveillant pour l'utilisateur {fname}. "
-                    f"Sois précis, poli et chaleureux. Si l'utilisateur demande son solde ou salue, réponds de façon claire et encourageante."
+                    f"Tu es Sika AI, un agent d'exécution financière autonome pour {fname}. "
+                    f"Action exécutée : {executed_result.get('action')}. "
+                    f"Données réelles : {executed_result.get('response')}. "
+                    f"Sois précis, concis et professionnel."
                 )
                 response = self.client.models.generate_content(
                     model=self.model,
@@ -375,11 +381,14 @@ class SikaAIService:
                     config={"system_instruction": system_instruction}
                 )
                 if response and response.text:
-                    return self._format_response(response.text, user_message, context, is_english)
+                    formatted = self._format_response(response.text, user_message, context, is_english)
+                    formatted["action"] = executed_result.get("action")
+                    formatted["action_data"] = executed_result.get("action_data")
+                    return formatted
             except Exception as e:
-                logger.warning(f"Erreur lors de l'appel Gemini SDK: {e}. Basculement sur le mode intelligent local.")
+                logger.warning(f"Erreur lors de l'appel Gemini SDK: {e}. Utilisation du rapport direct de l'agent d'exécution.")
 
-        return self._chat_basic(user_message, context, fname, is_english)
+        return executed_result
 
 
 sika_ai_service = SikaAIService()

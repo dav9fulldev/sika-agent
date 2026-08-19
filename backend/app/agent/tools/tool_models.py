@@ -22,6 +22,10 @@ class ToolResult(BaseModel):
     error_message: Optional[str] = None
     requires_confirmation: bool = False
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertit l'objet ToolResult en dictionnaire."""
+        return self.model_dump()
+
 class ToolDefinition(BaseModel):
     """Définition d'un Tool SIKA pour le ToolRegistry et Gemini."""
     name: str
