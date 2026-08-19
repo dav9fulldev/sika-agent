@@ -138,6 +138,7 @@ class SikaADKAgent:
                     "status": "BIOMETRIC_AUTH_REQUIRED",
                     "requires_confirmation": True,
                     "requires_biometric": True,
+                    "requires_security_validation": True,
                     "should_speak": True,
                     "action_data": action,
                     "provider": "GOOGLE_ADK_VERTEX_AI" if self.client else "GOOGLE_ADK_FALLBACK"

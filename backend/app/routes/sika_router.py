@@ -95,6 +95,7 @@ async def sika_chat(data: SikaQueryDTO):
         action_id=result.get("action_id"),
         requires_confirmation=result.get("requires_confirmation", False),
         requires_biometric=result.get("requires_biometric", False),
+        requires_security_validation=result.get("requires_security_validation", result.get("requires_biometric", False)),
         should_speak=result.get("should_speak", True),
         speech_text=result.get("speech_text", result.get("response", "")),
         action_data=result.get("action_data")

@@ -54,6 +54,7 @@ class SikaResponseDTO(BaseModel):
     action_id: Optional[str] = None
     requires_confirmation: Optional[bool] = False
     requires_biometric: Optional[bool] = False
+    requires_security_validation: Optional[bool] = False
     should_speak: Optional[bool] = True
     speech_text: Optional[str] = None
     action_data: Optional[Dict[str, Any]] = None
