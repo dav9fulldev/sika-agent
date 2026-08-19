@@ -1,5 +1,13 @@
 """
 SQLAlchemy Data Models pour la Base de Données SIKA
+
+Architecture SIKA Database :
+1. USERS & AUTHENTICATION (users, connected_wallets)
+2. SIKA DATA & PREFERENCES (user_preferences, savings_goals)
+3. AGENT MEMORY & INSIGHTS (agent_memories)
+
+Note : Les données financières en temps réel (soldes, mouvements) restent hébergées
+au niveau des APIs partenaires (PayMeChap / Wave / Orange Money / MTN MoMo).
 """
 
 # pyrefly: ignore [missing-import]
@@ -10,6 +18,7 @@ from datetime import datetime
 from ..database import Base
 
 class UserModel(Base):
+    """Table centrale des utilisateurs SIKA (Gestion de l'Identité)."""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -21,78 +30,67 @@ class UserModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    wallets = relationship("WalletModel", back_populates="user", cascade="all, delete-orphan")
+    connected_wallets = relationship("ConnectedWalletModel", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferenceModel", back_populates="user", uselist=False, cascade="all, delete-orphan")
     goals = relationship("SavingsGoalModel", back_populates="user", cascade="all, delete-orphan")
-    habits = relationship("UserHabitModel", back_populates="user", cascade="all, delete-orphan")
+    memories = relationship("AgentMemoryModel", back_populates="user", cascade="all, delete-orphan")
 
-class WalletModel(Base):
-    __tablename__ = "wallets"
 
-    id = Column(String(50), primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+class ConnectedWalletModel(Base):
+    """Lien de référence entre l'Utilisateur SIKA et ses comptes partenaires (sans duplication des transactions)."""
+    __tablename__ = "connected_wallets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     provider = Column(String(50), nullable=False) # Wave, Orange Money, MTN MoMo
-    balance = Column(Float, nullable=False, default=0.0)
-    currency = Column(String(10), default="XOF")
-    account_number = Column(String(50), nullable=True)
-    
-    # Méthodes 1 & 3 : APIs Directes OAuth2 et Moteur de Perception SMS/Push
-    auth_method = Column(String(50), default="OAUTH2_WAVE") # OAUTH2_WAVE, ORANGE_DEVELOPER_API, MTN_MOMO_API, PERCEIVE_SMS_PUSH
-    account_identifier = Column(String(100), nullable=True) # Numéro de téléphone ou ID de compte
-    access_token = Column(String(255), nullable=True) # Jeton OAuth2 de session API
-    refresh_token = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True)
-    last_synced_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    external_wallet_id = Column(String(100), nullable=True) # Numéro de compte / ID Partenaire
+    connection_status = Column(String(20), default="connected") # connected, disconnected, pending
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("UserModel", back_populates="wallets")
-    transactions = relationship("TransactionModel", back_populates="wallet", cascade="all, delete-orphan")
+    user = relationship("UserModel", back_populates="connected_wallets")
 
-class TransactionModel(Base):
-    __tablename__ = "transactions"
 
-    id = Column(String(50), primary_key=True, index=True)
-    wallet_id = Column(String(50), ForeignKey("wallets.id"), nullable=False)
-    type = Column(String(20), nullable=False) # payment, transfer, deposit, withdrawal
-    amount = Column(Float, nullable=False)
-    currency = Column(String(10), default="XOF")
-    category = Column(String(50), default="Autre")
-    recipient = Column(String(100), nullable=True)
-    description = Column(String(255), nullable=True)
-    status = Column(String(20), default="completed")
-    timestamp = Column(DateTime, default=datetime.utcnow)
+class UserPreferenceModel(Base):
+    """Préférences et règles budgétaires configurées par l'utilisateur."""
+    __tablename__ = "user_preferences"
 
-    wallet = relationship("WalletModel", back_populates="transactions")
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    preferred_currency = Column(String(10), default="XOF")
+    preferred_language = Column(String(10), default="fr")
+    monthly_budget = Column(Float, nullable=True, default=150000.0)
+    savings_preference = Column(String(50), default="moderate") # conservative, moderate, aggressive
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("UserModel", back_populates="preferences")
+
 
 class SavingsGoalModel(Base):
+    """Objectifs d'épargne définis par l'utilisateur dans l'application SIKA."""
     __tablename__ = "savings_goals"
 
-    id = Column(String(50), primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(100), nullable=False)
     target_amount = Column(Float, nullable=False)
     current_amount = Column(Float, default=0.0)
-    currency = Column(String(10), default="XOF")
     deadline = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("UserModel", back_populates="goals")
 
-class UserHabitModel(Base):
-    __tablename__ = "user_habits"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    category = Column(String(50), nullable=False)
-    average_spent = Column(Float, default=0.0)
-    frequency_per_week = Column(Integer, default=1)
-    preferred_time = Column(String(50), default="12:00-14:00")
-    updated_at = Column(DateTime, default=datetime.utcnow)
+class AgentMemoryModel(Base):
+    """Mémoire progressive et intelligence de l'Agent SIKA (Court-terme, Long-terme, Insights, Habitudes)."""
+    __tablename__ = "agent_memories"
 
-    user = relationship("UserModel", back_populates="habits")
-
-class MemorySnapshotModel(Base):
-    __tablename__ = "memory_snapshots"
-
-    id = Column(String(50), primary_key=True, index=True)
-    user_id = Column(String(50), nullable=False)
-    snapshot_data = Column(Text, nullable=False) # JSON d'état
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    memory_type = Column(String(50), nullable=False, default="long_term") # short_term, long_term, insight, habit
+    key = Column(String(100), nullable=False)
+    value = Column(Text, nullable=False) # Information mémorisée
+    confidence_score = Column(Float, default=1.0)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("UserModel", back_populates="memories")
+
