@@ -290,3 +290,26 @@ def sync_user_wallets(user_id: str = "usr_default"):
         "count": len(synced_wallets),
         "wallets": synced_wallets
     }
+
+
+@router.post("/reset")
+def reset_all_wallets():
+    """Réinitialise complètement les portefeuilles et données enregistrées pour permettre à l'utilisateur de recommencer à zéro."""
+    global CONNECTED_USER_WALLETS, PENDING_OTP_SESSIONS
+    CONNECTED_USER_WALLETS.clear()
+    PENDING_OTP_SESSIONS.clear()
+    
+    if WALLETS_DATA_FILE.exists():
+        try:
+            WALLETS_DATA_FILE.write_text("[]", encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"[RESET WALLETS] Impossible d'effacer {WALLETS_DATA_FILE}: {e}")
+            
+    from ..agents.sika_agent import sika_adk_agent
+    sika_adk_agent.reset_all_sessions()
+    
+    logger.info("[RESET SYSTEM] Le système a été réinitialisé à zéro avec succès !")
+    return {
+        "status": "RESET_SUCCESSFUL",
+        "message": "🧹 Le système a été réinitialisé à zéro. Vous pouvez créer un nouveau compte et connecter vos moyens de paiement."
+    }

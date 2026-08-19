@@ -40,6 +40,11 @@ class SikaADKAgent:
             logger.warning(f"⚠️ Impossible d'initialiser SIKA ADK Agent: {e}")
             self.client = None
 
+    def reset_all_sessions(self):
+        """Réinitialise toutes les sessions conversationnelles multi-tours."""
+        self.user_sessions.clear()
+        logger.info("[SIKA ADK AGENT] Toutes les sessions utilisateur ont été réinitialisées.")
+
     def get_user_session(self, user_id: str = "1") -> Dict[str, Any]:
         """Récupère ou crée la session conversationnelle multi-tours pour un utilisateur donné."""
         if user_id not in self.user_sessions:
