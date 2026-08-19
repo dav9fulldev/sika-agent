@@ -86,11 +86,18 @@ async def sika_chat(data: SikaQueryDTO):
 
     return SikaResponseDTO(
         query=data.query,
-        message=result["response"],
-        intent=result.get("action", "chat"),
+        message=result.get("response", result.get("message", "")),
+        intent=result.get("intent", result.get("action", "chat")),
         sentiment=result.get("sentiment", "positive"),
         suggestions=result.get("suggestions", []),
-        provider=sika_ai.provider.upper()
+        provider=result.get("provider", sika_ai.provider.upper()),
+        status=result.get("status", "PROCESSED"),
+        action_id=result.get("action_id"),
+        requires_confirmation=result.get("requires_confirmation", False),
+        requires_biometric=result.get("requires_biometric", False),
+        should_speak=result.get("should_speak", True),
+        speech_text=result.get("speech_text", result.get("response", "")),
+        action_data=result.get("action_data")
     )
 
 @router.post("/confirm")

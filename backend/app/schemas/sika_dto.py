@@ -49,4 +49,11 @@ class SikaResponseDTO(BaseModel):
     intent: Optional[str] = "chat"
     sentiment: Optional[str] = "positive"
     suggestions: List[str] = []
-    provider: str = "OPENAI"
+    provider: str = "VERTEX_AI"
+    status: Optional[str] = "PROCESSED"
+    action_id: Optional[str] = None
+    requires_confirmation: Optional[bool] = False
+    requires_biometric: Optional[bool] = False
+    should_speak: Optional[bool] = True
+    speech_text: Optional[str] = None
+    action_data: Optional[Dict[str, Any]] = None
