@@ -366,14 +366,14 @@ class SikaAIService:
         # 1. Exécution autonome d'action et d'analyse financière en premier
         executed_result = self._chat_basic(user_message, context, fname, is_english)
 
-        # 2. Si le SDK Gemini est actif, enrichir et formater la réponse avec le modèle Gemini
+        # 2. Si le SDK Gemini est disponible (clé d'API active), invoquer Gemini pour enrichir la réponse
         if self.client:
             try:
                 system_instruction = (
                     f"Tu es Sika AI, un agent d'exécution financière autonome pour {fname}. "
                     f"Action exécutée : {executed_result.get('action')}. "
-                    f"Données réelles : {executed_result.get('response')}. "
-                    f"Sois précis, concis et professionnel."
+                    f"Données d'exécution : {executed_result.get('response')}. "
+                    f"Réponds de manière concise, précise et chaleureuse."
                 )
                 response = self.client.models.generate_content(
                     model=self.model,
@@ -382,8 +382,11 @@ class SikaAIService:
                 )
                 if response and response.text:
                     formatted = self._format_response(response.text, user_message, context, is_english)
-                    formatted["action"] = executed_result.get("action")
-                    formatted["action_data"] = executed_result.get("action_data")
+                    # Si une action financière concrète a été exécutée (ex: dépôt coffre, solde), privilégier le message d'exécution direct
+                    if executed_result.get("action") in ["deposit_to_coffre", "prepare_transfer"]:
+                        formatted["response"] = executed_result["response"]
+                    formatted["action"] = executed_result.get("action") or formatted.get("action")
+                    formatted["action_data"] = executed_result.get("action_data") or formatted.get("action_data")
                     return formatted
             except Exception as e:
                 logger.warning(f"Erreur lors de l'appel Gemini SDK: {e}. Utilisation du rapport direct de l'agent d'exécution.")
