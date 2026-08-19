@@ -25,3 +25,15 @@ print("\n--- TEST SCÉNARIO 4 : CONSEILLER FINANCIER & ANALYSE DÉPENSES ---")
 res4 = sika_adk_agent.process_query("Sika, analyse mes dépenses et dis-moi comment économiser ce mois-ci.", user_firstname="David")
 print("Outil utilisé:", res4.get("tool_used"))
 print("Réponse Vocale SIKA:", res4.get("response"))
+
+print("\n--- TEST MAILLON FINAL : EXÉCUTION RÉELLE APRÈS BIOMÉTRIE ('Oui') ---")
+import asyncio
+from app.agent.orchestrator import sika_orchestrator
+
+async def test_confirm():
+    action_id = res2.get("action_id", "tx_transfer_kouame_20000")
+    exec_res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=1, user_confirmed=True)
+    print("Statut exécution réelle:", exec_res.get("status"))
+    print("Réponse Vocale Finale TTS:", exec_res.get("message"))
+
+asyncio.run(test_confirm())
