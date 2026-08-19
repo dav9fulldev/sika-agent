@@ -14,7 +14,7 @@ logger = logging.getLogger("SikaAuthService")
 
 from fastapi import HTTPException
 from ..database import SessionLocal
-from ..models.db_models import UserModel
+from ..models import UserModel
 import hashlib
 
 def _hash_password(password: str) -> str:

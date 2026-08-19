@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 from ..database import SessionLocal, Base, engine
-from ..models.db_models import (
+from ..models import (
     UserModel,
     ConnectedWalletModel,
     UserPreferenceModel,
