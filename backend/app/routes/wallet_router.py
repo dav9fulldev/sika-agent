@@ -127,12 +127,14 @@ def get_user_coffres():
     """Récupère la liste des Coffres-forts (Objectifs d'Épargne) connectés via PayMeChap."""
     wallets = _load_persisted_wallets()
     pmc_token = None
+    pmc_account = None
     for w in wallets:
         if "paymechap" in w.get("provider", "").lower():
             pmc_token = w.get("access_token")
+            pmc_account = w.get("account_number")
             break
 
-    coffres = paymechap_api_service.fetch_user_coffres(pmc_token)
+    coffres = paymechap_api_service.fetch_user_coffres(pmc_token, account_number=pmc_account)
     return {
         "status": "SUCCESS",
         "count": len(coffres),

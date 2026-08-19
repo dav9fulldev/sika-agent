@@ -227,30 +227,40 @@ class PayMeChapAPIService:
             "last_synced_at": datetime.utcnow().isoformat(),
         }
 
-    def fetch_user_coffres(self, access_token: str) -> List[Dict[str, Any]]:
-        """Récupère la liste des Coffres-forts PayMeChap de l'utilisateur en direct via l'API."""
+    def fetch_user_coffres(self, access_token: str, account_number: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Récupère la liste des Coffres-forts PayMeChap de l'utilisateur via l'API Partenaire (GET /api/v1/partners/wallets/{telephone}/coffres)."""
         tokens_to_try = []
-        if access_token:
-            tokens_to_try.append(access_token)
         partner_tok = self.get_partner_access_token()
-        if partner_tok and partner_tok not in tokens_to_try:
+        if partner_tok:
             tokens_to_try.append(partner_tok)
+        if access_token and access_token not in tokens_to_try:
+            tokens_to_try.append(access_token)
 
-        ep = f"{self.base_url}/api/v1/coffres"
+        endpoints = []
+        if account_number:
+            clean_phone = account_number.replace(" ", "").replace("+225", "")
+            endpoints.append(f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/coffres")
+        endpoints.append(f"{self.base_url}/api/v1/coffres")
+
         for tok in tokens_to_try:
             if not tok or tok.startswith("pmc_token_"):
                 continue
             headers = {"Authorization": f"Bearer {tok}"}
-            try:
-                resp = requests.get(ep, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if isinstance(data, list):
-                        return data
-                    elif isinstance(data, dict):
-                        return data.get("content") or data.get("data") or []
-            except Exception as e:
-                logger.warning(f"[PayMeChap Coffres API] Exception sur {ep}: {e}")
+            for ep in endpoints:
+                try:
+                    resp = requests.get(ep, headers=headers, timeout=8)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        coffre_list = []
+                        if isinstance(data, list):
+                            coffre_list = data
+                        elif isinstance(data, dict):
+                            coffre_list = data.get("content") or data.get("data") or []
+                        if coffre_list:
+                            logger.info(f"[PayMeChap Coffres API] {len(coffre_list)} coffre(s) récupéré(s) depuis {ep}")
+                            return coffre_list
+                except Exception as e:
+                    logger.warning(f"[PayMeChap Coffres API] Exception sur {ep}: {e}")
 
         return []
 
@@ -272,18 +282,25 @@ class PayMeChapAPIService:
             logger.warning(f"[PayMeChap Create Coffre API] Exception: {e}")
         return {"error": "FAILED_TO_CREATE_COFFRE"}
 
-    def deposit_to_coffre(self, access_token: str, coffre_id: int, montant: float) -> Dict[str, Any]:
-        """Effectue un dépôt de fonds vers un Coffre-fort PayMeChap."""
-        tok = access_token or self.get_partner_access_token()
+    def deposit_to_coffre(self, access_token: str, coffre_id: int, montant: float, account_number: Optional[str] = None) -> Dict[str, Any]:
+        """Effectue un dépôt de fonds vers un Coffre-fort via l'API Partenaire (POST /api/v1/partners/wallets/{telephone}/coffres/{coffreId}/depot)."""
+        tok = self.get_partner_access_token() or access_token
         headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
-        ep = f"{self.base_url}/api/v1/coffres/{coffre_id}/depot"
+
+        endpoints = []
+        if account_number:
+            clean_phone = account_number.replace(" ", "").replace("+225", "")
+            endpoints.append(f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/coffres/{coffre_id}/depot")
+        endpoints.append(f"{self.base_url}/api/v1/coffres/{coffre_id}/depot")
+
         payload = {"montant": montant}
-        try:
-            resp = requests.post(ep, json=payload, headers=headers, timeout=8)
-            if resp.status_code in [200, 201]:
-                return resp.json()
-        except Exception as e:
-            logger.warning(f"[PayMeChap Deposit Coffre API] Exception: {e}")
+        for ep in endpoints:
+            try:
+                resp = requests.post(ep, json=payload, headers=headers, timeout=8)
+                if resp.status_code in [200, 201]:
+                    return resp.json()
+            except Exception as e:
+                logger.warning(f"[PayMeChap Deposit Coffre API] Exception sur {ep}: {e}")
         return {"error": "FAILED_TO_DEPOSIT_COFFRE"}
 
     def categorize_transaction(self, tx_type: str, recipient: str, description: str, motif: str, amount: float) -> str:
@@ -311,19 +328,22 @@ class PayMeChapAPIService:
     def fetch_live_transactions(self, access_token: str, account_number: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
         """Collecte l'historique des transactions depuis l'API PayMeChap et applique la catégorisation dynamique."""
         tokens_to_try = []
-        if access_token:
-            tokens_to_try.append(access_token)
         partner_tok = self.get_partner_access_token()
-        if partner_tok and partner_tok not in tokens_to_try:
+        if partner_tok:
             tokens_to_try.append(partner_tok)
+        if access_token and access_token not in tokens_to_try:
+            tokens_to_try.append(access_token)
 
-        endpoints = [
-            f"{self.base_url}/api/v1/transactions/recent",
-            f"{self.base_url}/api/v1/transactions/me?page=0&size={limit}",
-        ]
+        endpoints = []
         if account_number:
             clean_phone = account_number.replace(" ", "").replace("+225", "")
+            endpoints.append(f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/transactions?page=0&size={limit}")
             endpoints.append(f"{self.base_url}/api/v1/partners/transactions/{clean_phone}")
+
+        endpoints.extend([
+            f"{self.base_url}/api/v1/transactions/recent",
+            f"{self.base_url}/api/v1/transactions/me?page=0&size={limit}",
+        ])
 
         for tok in tokens_to_try:
             if not tok or tok.startswith("pmc_token_"):
