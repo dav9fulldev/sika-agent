@@ -14,6 +14,16 @@ class ApiService {
   // OAUTH2 AUTHENTICATION API ENDPOINTS
   // ============================================================================
 
+  String _extractErrorMessage(http.Response response, String fallbackPrefix) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body.containsKey('detail')) {
+        return body['detail'].toString();
+      }
+    } catch (_) {}
+    return '$fallbackPrefix (${response.statusCode})';
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/auth/login'),
@@ -26,7 +36,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception('Erreur de connexion (${response.statusCode}): ${response.body}');
+    throw Exception(_extractErrorMessage(response, 'Erreur de connexion'));
   }
 
   Future<Map<String, dynamic>> register(String name, String email, String password) async {
@@ -42,7 +52,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception('Erreur d\'inscription (${response.statusCode}): ${response.body}');
+    throw Exception(_extractErrorMessage(response, 'Erreur d\'inscription'));
   }
 
   Future<Map<String, dynamic>> googleLogin({String email = "david.yao@gmail.com", String name = "David YAO"}) async {
@@ -57,7 +67,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception('Erreur Google Sign-In (${response.statusCode}): ${response.body}');
+    throw Exception(_extractErrorMessage(response, 'Erreur Google Sign-In'));
   }
 
   Future<Map<String, dynamic>> getMe(String bearerToken) async {

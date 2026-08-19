@@ -157,7 +157,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[AUTH ERROR] Erreur login API: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: "Échec de connexion API SIKA: ${e.toString().replaceAll('Exception: ', '')}",
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return false;
     }
@@ -200,7 +200,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[AUTH ERROR] Erreur register API: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: "Échec d'inscription API SIKA: ${e.toString().replaceAll('Exception: ', '')}",
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return false;
     }
@@ -236,7 +236,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[AUTH ERROR] Erreur Google login API: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: "Échec connexion Google API: ${e.toString().replaceAll('Exception: ', '')}",
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return false;
     }
