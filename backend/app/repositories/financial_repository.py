@@ -28,11 +28,11 @@ class FinancialRepository:
             print(f"[DB INIT] Notice during table creation: {e}")
 
     def _seed_initial_data_if_empty(self):
-        """Initialise la base de données avec l'utilisateur David YAO et ses références de wallets."""
+        """Initialise la base de données uniquement si aucun utilisateur n'existe."""
         db: Session = SessionLocal()
         try:
-            wallets_count = db.query(ConnectedWalletModel).count()
-            if wallets_count == 0:
+            users_count = db.query(UserModel).count()
+            if users_count == 0:
                 user = db.query(UserModel).filter(UserModel.email == "david.yao@email.com").first()
                 if not user:
                     user = UserModel(
