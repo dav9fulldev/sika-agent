@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
 
 class BudgetDTO(BaseModel):
@@ -26,6 +27,16 @@ class FinancialContextDTO(BaseModel):
 class SikaQueryDTO(BaseModel):
     query: str
     context: Optional[Dict[str, Any]] = None
+
+    @field_validator("query")
+    @classmethod
+    def sanitize_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            return v
+        # Anti-XSS and Command Injection Sanitization
+        sanitized = re.sub(r'<[^>]*>', '', v)  # Remove HTML tags
+        sanitized = re.sub(r'script|javascript:|eval\(', '', sanitized, flags=re.IGNORECASE)
+        return sanitized[:1000].strip()
 
 class SikaConfirmTransactionDTO(BaseModel):
     amount: float
