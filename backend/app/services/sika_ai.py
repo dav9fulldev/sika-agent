@@ -189,42 +189,29 @@ class SikaAIService:
             c_obj = float(c_item.get("objectif") or 0.0)
 
             if is_withdraw_action and target_coffre_id is not None:
-                if raw_amount > c_solde:
-                    fmt_solde = self._format_currency(c_solde, financial_context)
-                    fmt_req = self._format_currency(raw_amount, financial_context)
-                    if is_english:
-                        response = f"⚠️ Insufficient coffre balance! You requested **{fmt_req}**, but your **'{c_nom}'** safe currently has **{fmt_solde}**."
-                    else:
-                        response = f"⚠️ Solde de coffre insuffisant ! Vous demandez **{fmt_req}**, mais votre coffre **'{c_nom}'** contient seulement **{fmt_solde}**."
+                # L'API PayMeChap v1 ne fournit pas encore d'endpoint de retrait pour les coffres
+                live_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
+                c_item = live_coffres[0] if live_coffres else {}
+                c_nom = c_item.get("nom") or "Épargne"
+                c_solde = float(c_item.get("solde") or 0.0)
+                c_obj = float(c_item.get("objectif") or 0.0)
+
+                fmt_solde = self._format_currency(c_solde, financial_context)
+                fmt_obj = self._format_currency(c_obj, financial_context)
+                pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
+
+                if is_english:
+                    response = f"Your **'{c_nom}'** safe currently holds **{fmt_solde}** out of **{fmt_obj}** ({pct:.1f}% reached). Coffre withdrawal functionality is not yet available on the PayMeChap API."
+                    suggestions = ["Check total balance", "View savings goal", "View recent expenses"]
                 else:
-                    dep_res = paymechap_api_service.deposit_to_coffre("", coffre_id=target_coffre_id, montant=-raw_amount, account_number=target_account)
-                    c_solde = max(0.0, c_solde - raw_amount)
-
-                    # Rafraîchissement direct de l'état réel du coffre
-                    updated_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
-                    if updated_coffres:
-                        for uc in updated_coffres:
-                            if uc.get("id") == target_coffre_id:
-                                c_solde = float(uc.get("solde") or c_solde)
-                                c_obj = float(uc.get("objectif") or c_obj)
-
-                    fmt_amt = self._format_currency(raw_amount, financial_context)
-                    fmt_solde = self._format_currency(c_solde, financial_context)
-                    fmt_obj = self._format_currency(c_obj, financial_context)
-                    pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
-
-                    if is_english:
-                        response = f"✅ Successfully withdrew **{fmt_amt}** from your **'{c_nom}'** safe and transferred it to your main account! Updated safe balance: **{fmt_solde}** out of **{fmt_obj}** ({pct:.1f}% reached)."
-                        suggestions = ["View my main balance", "View savings goal", "Make a deposit"]
-                    else:
-                        response = f"✅ Retrait de **{fmt_amt}** depuis votre coffre **'{c_nom}'** effectué avec succès et transféré vers votre compte principal ! Nouveau solde du coffre : **{fmt_solde}** sur **{fmt_obj}** ({pct:.1f}% atteint)."
-                        suggestions = ["Voir mon solde principal", "Voir mon objectif d'épargne", "Faire un dépôt"]
+                    response = f"Votre coffre **'{c_nom}'** contient actuellement **{fmt_solde}** sur **{fmt_obj}** ({pct:.1f}% atteint). Le retrait depuis les coffres n'est pas encore disponible sur l'API PayMeChap."
+                    suggestions = ["Vérifier mon solde total", "Voir mon objectif d'épargne", "Voir mes dépenses"]
 
                 return {
                     "response": response,
-                    "action": "withdraw_from_coffre",
+                    "action": "check_savings_goal",
                     "action_data": {"coffre_id": target_coffre_id, "amount": raw_amount, "coffre_name": c_nom},
-                    "sentiment": "positive",
+                    "sentiment": "neutral",
                     "suggestions": suggestions,
                     "provider": "GEMINI",
                     "model": self.model
@@ -232,27 +219,26 @@ class SikaAIService:
 
             elif is_deposit_action and target_coffre_id is not None:
                 dep_res = paymechap_api_service.deposit_to_coffre("", coffre_id=target_coffre_id, montant=raw_amount, account_number=target_account)
-                c_solde = float(dep_res.get("nouveauSoldeCoffre") or c_solde)
                 
-                # Rafraîchissement direct de l'état réel du coffre
+                # Récupération en direct de l'état réel du serveur Render
                 updated_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
-                if updated_coffres:
-                    for uc in updated_coffres:
-                        if uc.get("id") == target_coffre_id:
-                            c_solde = float(uc.get("solde") or c_solde)
-                            c_obj = float(uc.get("objectif") or c_obj)
+                c_item = updated_coffres[0] if updated_coffres else {}
+                c_nom = c_item.get("nom") or "Épargne"
+                c_solde = float(c_item.get("solde") or 0.0)
+                c_obj = float(c_item.get("objectif") or 0.0)
 
                 fmt_dep = self._format_currency(raw_amount, financial_context)
                 fmt_solde = self._format_currency(c_solde, financial_context)
                 fmt_obj = self._format_currency(c_obj, financial_context)
                 pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
 
+                msg = dep_res.get("message") or "OK"
                 if is_english:
-                    response = f"✅ Successfully deposited **{fmt_dep}** into your **'{c_nom}'** safe! Your updated safe balance is **{fmt_solde}** out of **{fmt_obj}** ({pct:.1f}% reached)."
-                    suggestions = ["View my savings goal", "Make another deposit", "Check total balance"]
+                    response = f"PayMeChap API: {msg}. Safe **'{c_nom}'** balance: **{fmt_solde}** / **{fmt_obj}** ({pct:.1f}%)."
+                    suggestions = ["View savings goal", "Check total balance"]
                 else:
-                    response = f"✅ Dépôt de **{fmt_dep}** vers votre coffre **'{c_nom}'** effectué avec succès ! Votre nouveau solde d'épargne est de **{fmt_solde}** sur **{fmt_obj}** ({pct:.1f}% atteint)."
-                    suggestions = ["Voir mon objectif d'épargne", "Faire un autre dépôt", "Vérifier mon solde total"]
+                    response = f"API PayMeChap : {msg}. Solde du coffre **'{c_nom}'** : **{fmt_solde}** / **{fmt_obj}** ({pct:.1f}%)."
+                    suggestions = ["Voir l'objectif d'épargne", "Vérifier mon solde"]
 
                 return {
                     "response": response,
