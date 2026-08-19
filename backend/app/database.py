@@ -18,9 +18,13 @@ INSTANCE_CONNECTION_NAME = os.getenv(
     "sika-all-things-agentic:europe-west9:sika-db-instance"
 )
 
-# URL par défaut: PostgreSQL Cloud SQL via variable d'environnement ou SQLite local par défaut
+# URL par défaut: Cloud SQL Proxy local (127.0.0.1:5433) ou variable DATABASE_URL
+DEFAULT_CLOUD_SQL_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg2://sika_user:SikaSecurePassword2026!@127.0.0.1:5433/sika_db"
+)
 DEFAULT_SQLITE_URL = "sqlite:////Users/mac/Desktop/SIKA/backend/sika_local.db"
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
+DATABASE_URL = DEFAULT_CLOUD_SQL_URL
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {"connect_timeout": 3}
 
