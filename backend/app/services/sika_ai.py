@@ -1,135 +1,394 @@
 import os
+import re
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
+
+from google import genai
 
 logger = logging.getLogger(__name__)
 
 
 class SikaAIService:
-    """Service Sika AI 2.0.
+    """
+    Service IA principal de SIKA.
 
-    Gère le modèle Gemini, le fallback ReAct et la détection d'intention multilingue avec mise à jour dynamique des soldes.
+    Architecture :
+    - Gemini via Vertex AI
+    - Authentification Google Cloud (ADC)
+    - Pas de GEMINI_API_KEY
+    - Fallback vers le moteur métier local si Gemini est indisponible
     """
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        self.provider = "gemini"
-        self.model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    def __init__(self):
+        self.provider = "vertex_ai"
+
+        # Projet Google Cloud
+        self.project = os.getenv(
+            "GOOGLE_CLOUD_PROJECT",
+            "sika-all-things-agentic"
+        )
+
+        # Gemini peut être appelé avec location=global
+        self.location = os.getenv(
+            "GOOGLE_CLOUD_LOCATION",
+            "global"
+        )
+
+        # Modèle Gemini utilisé par SIKA
+        self.model = os.getenv(
+            "GEMINI_MODEL",
+            "gemini-3.5-flash"
+        )
+
+        self.client = None
+
         self._init_gemini_client()
 
     @property
     def use_gemini(self) -> bool:
+        """Retourne True si le client Gemini Vertex AI est disponible."""
         return self.client is not None
 
     def _init_gemini_client(self):
-        """Initialise le client Gemini SDK si la clé d'API est valide."""
+        """
+        Initialise Gemini via Vertex AI.
+
+        Aucune GEMINI_API_KEY n'est utilisée.
+
+        L'authentification repose sur :
+        - Application Default Credentials
+        - gcloud auth application-default login en local
+        - Service Account sur Cloud Run
+        """
+
         try:
-            if self.api_key:
-                from google import genai
-                self.client = genai.Client(api_key=self.api_key)
-                logger.info(f"Gemini Client v2 (genai) initialisé avec modèle {self.model}")
-            else:
-                self.client = None
-                logger.info("Clé GEMINI_API_KEY absente, mode ReAct avec fallback actif.")
+            self.client = genai.Client(
+                vertexai=True,
+                project=self.project,
+                location=self.location,
+            )
+
+            logger.info(
+                "🤖 SIKA connecté à Gemini via Vertex AI | "
+                f"project={self.project} | "
+                f"location={self.location} | "
+                f"model={self.model}"
+            )
+
         except Exception as e:
-            logger.warning(f"Erreur d'initialisation Gemini SDK: {e}. Fallback réactif activé.")
             self.client = None
 
+            logger.warning(
+                "⚠️ Impossible d'initialiser Gemini via Vertex AI : "
+                f"{e}. Le fallback SIKA reste actif."
+            )
+
     def _is_english(self, message: str) -> bool:
-        """Détecte la langue (anglais vs français)."""
+        """Détection simple de la langue anglaise."""
+
         msg_lower = message.lower()
-        french_indicators = ["solde", "dépense", "combien", "épargne", "bonjour", "salut", "transfert", "transférer", "mon", "ma", "mes"]
-        english_indicators = ["balance", "spending", "how much", "savings", "hello", "hi", "transfer", "my", "wallet"]
 
-        fr_count = sum(1 for kw in french_indicators if kw in msg_lower)
-        en_count = sum(1 for kw in english_indicators if kw in msg_lower)
+        french_indicators = [
+            "solde",
+            "dépense",
+            "dépensé",
+            "combien",
+            "épargne",
+            "bonjour",
+            "salut",
+            "transfert",
+            "transférer",
+            "mon",
+            "ma",
+            "mes",
+            "coffre",
+            "budget",
+        ]
 
-        if fr_count > en_count:
-            return False
+        english_indicators = [
+            "balance",
+            "spending",
+            "spent",
+            "how much",
+            "savings",
+            "hello",
+            "hi",
+            "transfer",
+            "wallet",
+            "safe",
+            "budget",
+            "expenses",
+        ]
+
+        fr_count = sum(
+            1 for keyword in french_indicators
+            if keyword in msg_lower
+        )
+
+        en_count = sum(
+            1 for keyword in english_indicators
+            if keyword in msg_lower
+        )
+
         if en_count > fr_count:
             return True
 
         return False
 
-    def _format_currency(self, amount_fcfa: float, context: Dict) -> str:
-        """Formate dynamiquement le montant selon la devise active transmise par le client."""
-        code = (context.get("currency_code") or "XOF").upper()
-        symbol = context.get("currency_symbol") or "FCFA"
+    def _format_currency(
+        self,
+        amount_fcfa: float,
+        context: Dict[str, Any]
+    ) -> str:
+        """
+        Formate un montant selon la devise active.
+
+        Les montants internes de SIKA sont actuellement
+        exprimés en FCFA.
+        """
+
+        code = (
+            context.get("currency_code")
+            or "XOF"
+        ).upper()
+
+        symbol = (
+            context.get("currency_symbol")
+            or "FCFA"
+        )
 
         if code == "USD" or symbol == "$":
-            val = amount_fcfa / 600.0
-            return f"${val:.2f}"
-        elif code == "EUR" or symbol == "€":
-            val = amount_fcfa / 655.957
-            return f"{val:.2f} €"
-        elif code == "GBP" or symbol == "£":
-            val = amount_fcfa / 770.0
-            return f"£{val:.2f}"
-        else:
-            return f"{int(amount_fcfa):,} FCFA".replace(",", " ")
+            value = amount_fcfa / 600.0
+            return f"${value:.2f}"
 
-    def _extract_action(self, response: str, user_message: str) -> tuple:
-        """Détecte si Sika suggère une action."""
+        elif code == "EUR" or symbol == "€":
+            value = amount_fcfa / 655.957
+            return f"{value:.2f} €"
+
+        elif code == "GBP" or symbol == "£":
+            value = amount_fcfa / 770.0
+            return f"£{value:.2f}"
+
+        return f"{int(amount_fcfa):,} FCFA".replace(",", " ")
+
+    def _extract_action(
+        self,
+        response: str,
+        user_message: str
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+        """
+        Détecte une intention d'action financière.
+        """
+
         res_lower = response.lower()
         msg_lower = user_message.lower()
 
-        if any(w in msg_lower or w in res_lower for w in ["transfert", "transférer", "envoie", "transfer", "rebalance"]):
-            return ("prepare_transfer", {"amount": 10000.0, "recipient": "Kouamé", "provider": "Wave"})
+        transfer_keywords = [
+            "transfert",
+            "transférer",
+            "envoie",
+            "envoyer",
+            "transfer",
+            "rebalance",
+        ]
 
-        if any(w in msg_lower or w in res_lower for w in ["dépense", "acheté", "spent", "buy", "purchase"]):
-            return ("add_transaction", {})
+        if any(
+            word in msg_lower or word in res_lower
+            for word in transfer_keywords
+        ):
+            return (
+                "prepare_transfer",
+                {
+                    "amount": 10000.0,
+                    "recipient": "Kouamé",
+                    "provider": "Wave",
+                },
+            )
 
-        return (None, None)
+        expense_keywords = [
+            "dépense",
+            "dépensé",
+            "acheté",
+            "spent",
+            "buy",
+            "purchase",
+        ]
+
+        if any(
+            word in msg_lower or word in res_lower
+            for word in expense_keywords
+        ):
+            return (
+                "add_transaction",
+                {}
+            )
+
+        return None, None
 
     def _chat_basic(
         self,
         user_message: str,
-        financial_context: Dict,
+        financial_context: Dict[str, Any],
         user_firstname: str,
-        is_english: bool
-    ) -> Dict:
-        """Réponses basiques et intelligentes multilingues avec formatage dynamique des VRAIS comptes connectés."""
+        is_english: bool,
+    ) -> Dict[str, Any]:
+        """
+        Moteur métier local SIKA.
+
+        Ce moteur reste fonctionnel même si Vertex AI
+        ou Gemini devient temporairement indisponible.
+        """
+
         msg_lower = user_message.lower()
-        action, action_data = self._extract_action("", user_message)
 
-        # Récupération dynamique des vrais comptes connectés dans le système SIKA
+        action, action_data = self._extract_action(
+            "",
+            user_message
+        )
+
+        # =========================================================
+        # RÉCUPÉRATION DES WALLETS CONNECTÉS
+        # =========================================================
+
         from ..routes.wallet_router import CONNECTED_USER_WALLETS
-        active_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("is_active", True)]
-        total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
-        fmt_total = self._format_currency(total_balance_fcfa, financial_context)
 
-        # Mots-clés d'intention financière (solde & consultation)
-        financial_intent_keywords = [
-            "solde", "combien j'ai", "combien sur", "mon solde", "total balance", "how much money",
-            "combien d'argent", "état de mes comptes", "portefeuilles"
+        active_wallets = [
+            wallet
+            for wallet in CONNECTED_USER_WALLETS
+            if wallet.get("is_active", True)
         ]
 
-        # 1. INTENTION FINANCIÈRE : SOLDE TOTAL & PORTEFEUILLES (Priorité absolue avant les simples salutations)
-        if any(w in msg_lower for w in financial_intent_keywords):
-            if len(active_wallets) == 0:
+        total_balance_fcfa = sum(
+            wallet.get("balance", 0.0)
+            for wallet in active_wallets
+        )
+
+        fmt_total = self._format_currency(
+            total_balance_fcfa,
+            financial_context,
+        )
+
+        # =========================================================
+        # 1. CONSULTATION DU SOLDE
+        # =========================================================
+
+        financial_intent_keywords = [
+            "solde",
+            "combien j'ai",
+            "combien sur",
+            "mon solde",
+            "total balance",
+            "how much money",
+            "combien d'argent",
+            "état de mes comptes",
+            "portefeuilles",
+            "wallet balance",
+        ]
+
+        if any(
+            keyword in msg_lower
+            for keyword in financial_intent_keywords
+        ):
+
+            if not active_wallets:
+
                 if is_english:
-                    response = f"Hi {user_firstname}! You don't have any connected wallets yet. Click on 'Connect my Wallets' to link PayMeChap, Wave, Orange Money, or MTN MoMo!"
+
+                    response = (
+                        f"Hi {user_firstname}! "
+                        "You don't have any connected wallets yet. "
+                        "Connect PayMeChap, Wave, Orange Money "
+                        "or MTN MoMo to let me help you manage them."
+                    )
+
+                    suggestions = [
+                        "Connect a wallet",
+                        "How does SIKA work?",
+                        "Help",
+                    ]
+
                 else:
-                    response = f"Salut {user_firstname} ! Tu n'as encore aucun portefeuille connecté. Clique sur 'Connecter mes comptes' pour raccorder PayMeChap, Wave, Orange Money ou MTN MoMo !"
-                suggestions = ["Connect a wallet", "How does SIKA work?", "Help"]
+
+                    response = (
+                        f"Salut {user_firstname} ! "
+                        "Tu n'as encore aucun portefeuille connecté. "
+                        "Connecte PayMeChap, Wave, Orange Money "
+                        "ou MTN MoMo pour que je puisse t'aider "
+                        "à gérer tes finances."
+                    )
+
+                    suggestions = [
+                        "Connecter un compte",
+                        "Comment fonctionne SIKA ?",
+                        "Aide",
+                    ]
+
             else:
-                # Formatage détaillé de chaque portefeuille connecté
-                wallet_details = []
-                for w in active_wallets:
-                    b_fmt = self._format_currency(w.get("balance", 0.0), financial_context)
-                    p_name = w.get("provider", "Wallet")
-                    acc_num = w.get("account_number", "")
-                    num_str = f" ({acc_num})" if acc_num else ""
-                    wallet_details.append(f"{p_name}{num_str} : {b_fmt}")
 
-                details_str = ", ".join(wallet_details)
+                wallet_details = []
+
+                for wallet in active_wallets:
+
+                    formatted_balance = self._format_currency(
+                        wallet.get("balance", 0.0),
+                        financial_context,
+                    )
+
+                    provider_name = wallet.get(
+                        "provider",
+                        "Wallet"
+                    )
+
+                    account_number = wallet.get(
+                        "account_number",
+                        ""
+                    )
+
+                    account_info = (
+                        f" ({account_number})"
+                        if account_number
+                        else ""
+                    )
+
+                    wallet_details.append(
+                        f"{provider_name}{account_info} : "
+                        f"{formatted_balance}"
+                    )
+
+                details_str = ", ".join(
+                    wallet_details
+                )
 
                 if is_english:
-                    response = f"Hi {user_firstname}! You have a total balance of {fmt_total} across {len(active_wallets)} connected wallet(s): {details_str}."
-                    suggestions = ["View recent expenses", "Make a transfer", "Savings goal"]
+
+                    response = (
+                        f"Hi {user_firstname}! "
+                        f"You have a total balance of "
+                        f"{fmt_total} across "
+                        f"{len(active_wallets)} connected wallet(s): "
+                        f"{details_str}."
+                    )
+
+                    suggestions = [
+                        "View recent expenses",
+                        "Make a transfer",
+                        "Savings goal",
+                    ]
+
                 else:
-                    response = f"Salut {user_firstname} ! Tu as un solde total de **{fmt_total}** réparti ainsi : {details_str}."
-                    suggestions = ["Voir mes dépenses récentes", "Effectuer un transfert", "Objectif d'épargne"]
+
+                    response = (
+                        f"Salut {user_firstname} ! "
+                        f"Tu as un solde total de "
+                        f"**{fmt_total}** réparti ainsi : "
+                        f"{details_str}."
+                    )
+
+                    suggestions = [
+                        "Voir mes dépenses récentes",
+                        "Effectuer un transfert",
+                        "Objectif d'épargne",
+                    ]
 
             return {
                 "response": response,
@@ -137,155 +396,497 @@ class SikaAIService:
                 "action_data": action_data,
                 "sentiment": "positive",
                 "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
+                "provider": "VERTEX_AI",
+                "model": self.model,
             }
 
-        # 2. INTENTION COFFRE & DÉPÔT / RETRAIT ÉPARGNE (SAFE DEPOSIT & WITHDRAWAL)
-        coffre_keywords = ["coffre", "safe", "etude", "déposer", "depot", "dépôt", "deposit", "deposited", "withdraw", "withdrawn", "retrait", "retirer", "épargne", "epargne", "verser", "ajouter au coffre"]
-        if any(w in msg_lower for w in coffre_keywords):
-            from .wallet_integrations.paymechap_api_service import paymechap_api_service
-            import re
+        # =========================================================
+        # 2. COFFRES D'ÉPARGNE
+        # =========================================================
 
-            # Extraction du montant (ex: 40000, 40,000, 40 000, $40,000)
-            numbers = re.findall(r'\d+[\d\s,.]*', user_message)
+        coffre_keywords = [
+            "coffre",
+            "safe",
+            "étude",
+            "etude",
+            "déposer",
+            "depot",
+            "dépôt",
+            "deposit",
+            "deposited",
+            "withdraw",
+            "withdrawn",
+            "retrait",
+            "retirer",
+            "épargne",
+            "epargne",
+            "verser",
+            "ajouter au coffre",
+        ]
+
+        if any(
+            keyword in msg_lower
+            for keyword in coffre_keywords
+        ):
+
+            from .wallet_integrations.paymechap_api_service import (
+                paymechap_api_service
+            )
+
+            numbers = re.findall(
+                r"\d+[\d\s,.]*",
+                user_message,
+            )
+
             raw_amount = 10000.0
+
             if numbers:
+
                 try:
-                    clean_num_str = numbers[0].replace(" ", "").replace(",", "")
-                    if clean_num_str.count('.') > 1:
-                        clean_num_str = clean_num_str.replace('.', '')
-                    parsed_val = float(clean_num_str)
-                    if parsed_val > 0:
-                        raw_amount = parsed_val
+
+                    clean_num_str = (
+                        numbers[0]
+                        .replace(" ", "")
+                        .replace(",", "")
+                    )
+
+                    if clean_num_str.count(".") > 1:
+
+                        clean_num_str = clean_num_str.replace(
+                            ".",
+                            ""
+                        )
+
+                    parsed_value = float(
+                        clean_num_str
+                    )
+
+                    if parsed_value > 0:
+
+                        raw_amount = parsed_value
+
                 except Exception:
-                    pass
 
-            # Si le message indique une volonté de déposer ou de retirer
-            is_deposit_action = any(w in msg_lower for w in ["déposer", "depot", "dépôt", "deposit", "deposited", "verser", "ajouter", "mettre"])
-            is_withdraw_action = any(w in msg_lower for w in ["withdraw", "withdrawn", "retrait", "retirer", "récupérer", "cassage", "casse", "sortir"])
+                    logger.warning(
+                        "Impossible d'extraire le montant "
+                        "du message utilisateur."
+                    )
 
-            # 1. Extraction dynamique du compte connecté actif
-            from ..routes.wallet_router import CONNECTED_USER_WALLETS
-            active_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("is_active", True) and "paymechap" in w.get("provider", "").lower()]
-            target_account = active_wallets[0].get("account_number") if active_wallets else (financial_context.get("account_number") or "")
+            is_deposit_action = any(
+                keyword in msg_lower
+                for keyword in [
+                    "déposer",
+                    "depot",
+                    "dépôt",
+                    "deposit",
+                    "deposited",
+                    "verser",
+                    "ajouter",
+                    "mettre",
+                ]
+            )
 
-            # 2. Récupération dynamique des coffres réels pour ce compte
-            live_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
-            
-            # 3. Sélection dynamique du coffre ciblé (matching par nom ou premier coffre disponible)
-            c_item = {}
+            is_withdraw_action = any(
+                keyword in msg_lower
+                for keyword in [
+                    "withdraw",
+                    "withdrawn",
+                    "retrait",
+                    "retirer",
+                    "récupérer",
+                    "cassage",
+                    "casse",
+                    "sortir",
+                ]
+            )
+
+            active_paymechap_wallets = [
+                wallet
+                for wallet in active_wallets
+                if "paymechap"
+                in wallet.get(
+                    "provider",
+                    ""
+                ).lower()
+            ]
+
+            target_account = (
+                active_paymechap_wallets[0].get(
+                    "account_number"
+                )
+                if active_paymechap_wallets
+                else financial_context.get(
+                    "account_number",
+                    ""
+                )
+            )
+
+            live_coffres = (
+                paymechap_api_service.fetch_user_coffres(
+                    "",
+                    account_number=target_account,
+                )
+            )
+
+            coffre_item: Dict[str, Any] = {}
+
             if live_coffres:
-                for c in live_coffres:
-                    if str(c.get("nom", "")).lower() in msg_lower:
-                        c_item = c
+
+                for coffre in live_coffres:
+
+                    coffre_name = str(
+                        coffre.get("nom", "")
+                    ).lower()
+
+                    if coffre_name in msg_lower:
+
+                        coffre_item = coffre
                         break
-                if not c_item:
-                    c_item = live_coffres[0]
 
-            target_coffre_id = c_item.get("id")
-            c_nom = c_item.get("nom") or "Épargne"
-            c_solde = float(c_item.get("solde") or 0.0)
-            c_obj = float(c_item.get("objectif") or 0.0)
+                if not coffre_item:
 
-            if is_withdraw_action and target_coffre_id is not None:
-                # L'API PayMeChap v1 ne fournit pas encore d'endpoint de retrait pour les coffres
-                live_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
-                c_item = live_coffres[0] if live_coffres else {}
-                c_nom = c_item.get("nom") or "Épargne"
-                c_solde = float(c_item.get("solde") or 0.0)
-                c_obj = float(c_item.get("objectif") or 0.0)
+                    coffre_item = live_coffres[0]
 
-                fmt_solde = self._format_currency(c_solde, financial_context)
-                fmt_obj = self._format_currency(c_obj, financial_context)
-                pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
+            target_coffre_id = coffre_item.get("id")
+
+            coffre_name = (
+                coffre_item.get("nom")
+                or "Épargne"
+            )
+
+            coffre_balance = float(
+                coffre_item.get("solde")
+                or 0.0
+            )
+
+            coffre_target = float(
+                coffre_item.get("objectif")
+                or 0.0
+            )
+
+            # -----------------------------------------------------
+            # RETRAIT
+            # -----------------------------------------------------
+
+            if (
+                is_withdraw_action
+                and target_coffre_id is not None
+            ):
+
+                formatted_balance = self._format_currency(
+                    coffre_balance,
+                    financial_context,
+                )
+
+                formatted_target = self._format_currency(
+                    coffre_target,
+                    financial_context,
+                )
+
+                percentage = (
+                    coffre_balance
+                    / coffre_target
+                    * 100
+                    if coffre_target > 0
+                    else 0.0
+                )
 
                 if is_english:
-                    response = f"Your **'{c_nom}'** safe currently holds **{fmt_solde}** out of **{fmt_obj}** ({pct:.1f}% reached). Coffre withdrawal functionality is not yet available on the PayMeChap API."
-                    suggestions = ["Check total balance", "View savings goal", "View recent expenses"]
+
+                    response = (
+                        f"Your '{coffre_name}' safe currently "
+                        f"holds {formatted_balance} out of "
+                        f"{formatted_target} "
+                        f"({percentage:.1f}% reached). "
+                        "Withdrawal from the safe is not yet "
+                        "available through the PayMeChap API."
+                    )
+
+                    suggestions = [
+                        "Check total balance",
+                        "View savings goal",
+                        "View recent expenses",
+                    ]
+
                 else:
-                    response = f"Votre coffre **'{c_nom}'** contient actuellement **{fmt_solde}** sur **{fmt_obj}** ({pct:.1f}% atteint). Le retrait depuis les coffres n'est pas encore disponible sur l'API PayMeChap."
-                    suggestions = ["Vérifier mon solde total", "Voir mon objectif d'épargne", "Voir mes dépenses"]
+
+                    response = (
+                        f"Votre coffre '{coffre_name}' "
+                        f"contient actuellement "
+                        f"{formatted_balance} sur "
+                        f"{formatted_target} "
+                        f"({percentage:.1f}% atteint). "
+                        "Le retrait depuis les coffres "
+                        "n'est pas encore disponible "
+                        "sur l'API PayMeChap."
+                    )
+
+                    suggestions = [
+                        "Vérifier mon solde total",
+                        "Voir mon objectif d'épargne",
+                        "Voir mes dépenses",
+                    ]
 
                 return {
                     "response": response,
                     "action": "check_savings_goal",
-                    "action_data": {"coffre_id": target_coffre_id, "amount": raw_amount, "coffre_name": c_nom},
+                    "action_data": {
+                        "coffre_id": target_coffre_id,
+                        "amount": raw_amount,
+                        "coffre_name": coffre_name,
+                    },
                     "sentiment": "neutral",
                     "suggestions": suggestions,
-                    "provider": "GEMINI",
-                    "model": self.model
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
                 }
 
-            elif is_deposit_action and target_coffre_id is not None:
-                dep_res = paymechap_api_service.deposit_to_coffre("", coffre_id=target_coffre_id, montant=raw_amount, account_number=target_account)
-                
-                # Récupération en direct de l'état réel du serveur Render
-                updated_coffres = paymechap_api_service.fetch_user_coffres("", account_number=target_account)
-                c_item = updated_coffres[0] if updated_coffres else {}
-                c_nom = c_item.get("nom") or "Épargne"
-                c_solde = float(c_item.get("solde") or 0.0)
-                c_obj = float(c_item.get("objectif") or 0.0)
+            # -----------------------------------------------------
+            # DÉPÔT
+            # -----------------------------------------------------
 
-                fmt_dep = self._format_currency(raw_amount, financial_context)
-                fmt_solde = self._format_currency(c_solde, financial_context)
-                fmt_obj = self._format_currency(c_obj, financial_context)
-                pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
+            if (
+                is_deposit_action
+                and target_coffre_id is not None
+            ):
 
-                msg = dep_res.get("message") or "OK"
+                deposit_result = (
+                    paymechap_api_service.deposit_to_coffre(
+                        "",
+                        coffre_id=target_coffre_id,
+                        montant=raw_amount,
+                        account_number=target_account,
+                    )
+                )
+
+                updated_coffres = (
+                    paymechap_api_service.fetch_user_coffres(
+                        "",
+                        account_number=target_account,
+                    )
+                )
+
+                if updated_coffres:
+
+                    updated_item = updated_coffres[0]
+
+                    coffre_name = (
+                        updated_item.get("nom")
+                        or coffre_name
+                    )
+
+                    coffre_balance = float(
+                        updated_item.get("solde")
+                        or 0.0
+                    )
+
+                    coffre_target = float(
+                        updated_item.get("objectif")
+                        or 0.0
+                    )
+
+                formatted_deposit = self._format_currency(
+                    raw_amount,
+                    financial_context,
+                )
+
+                formatted_balance = self._format_currency(
+                    coffre_balance,
+                    financial_context,
+                )
+
+                formatted_target = self._format_currency(
+                    coffre_target,
+                    financial_context,
+                )
+
+                percentage = (
+                    coffre_balance
+                    / coffre_target
+                    * 100
+                    if coffre_target > 0
+                    else 0.0
+                )
+
+                message = (
+                    deposit_result.get("message")
+                    or "OK"
+                )
+
                 if is_english:
-                    response = f"PayMeChap API: {msg}. Safe **'{c_nom}'** balance: **{fmt_solde}** / **{fmt_obj}** ({pct:.1f}%)."
-                    suggestions = ["View savings goal", "Check total balance"]
+
+                    response = (
+                        f"Deposit of {formatted_deposit} completed. "
+                        f"PayMeChap response: {message}. "
+                        f"Your '{coffre_name}' safe now contains "
+                        f"{formatted_balance} out of "
+                        f"{formatted_target} "
+                        f"({percentage:.1f}%)."
+                    )
+
+                    suggestions = [
+                        "View savings goal",
+                        "Check total balance",
+                    ]
+
                 else:
-                    response = f"API PayMeChap : {msg}. Solde du coffre **'{c_nom}'** : **{fmt_solde}** / **{fmt_obj}** ({pct:.1f}%)."
-                    suggestions = ["Voir l'objectif d'épargne", "Vérifier mon solde"]
+
+                    response = (
+                        f"Dépôt de {formatted_deposit} effectué. "
+                        f"Réponse PayMeChap : {message}. "
+                        f"Votre coffre '{coffre_name}' contient "
+                        f"maintenant {formatted_balance} sur "
+                        f"{formatted_target} "
+                        f"({percentage:.1f}%)."
+                    )
+
+                    suggestions = [
+                        "Voir l'objectif d'épargne",
+                        "Vérifier mon solde",
+                    ]
 
                 return {
                     "response": response,
                     "action": "deposit_to_coffre",
-                    "action_data": {"coffre_id": target_coffre_id, "amount": raw_amount, "coffre_name": c_nom},
+                    "action_data": {
+                        "coffre_id": target_coffre_id,
+                        "amount": raw_amount,
+                        "coffre_name": coffre_name,
+                    },
                     "sentiment": "positive",
                     "suggestions": suggestions,
-                    "provider": "GEMINI",
-                    "model": self.model
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
                 }
+
+            # -----------------------------------------------------
+            # CONSULTATION DU COFFRE
+            # -----------------------------------------------------
+
+            formatted_balance = self._format_currency(
+                coffre_balance,
+                financial_context,
+            )
+
+            formatted_target = self._format_currency(
+                coffre_target,
+                financial_context,
+            )
+
+            percentage = (
+                coffre_balance
+                / coffre_target
+                * 100
+                if coffre_target > 0
+                else 0.0
+            )
+
+            if is_english:
+
+                response = (
+                    f"Your '{coffre_name}' safe currently "
+                    f"contains {formatted_balance} out of "
+                    f"{formatted_target} "
+                    f"({percentage:.1f}% of your target)."
+                )
+
+                suggestions = [
+                    "Deposit 10 000 FCFA into safe",
+                    "Check total balance",
+                    "View recent expenses",
+                ]
+
             else:
-                fmt_solde = self._format_currency(c_solde, financial_context)
-                fmt_obj = self._format_currency(c_obj, financial_context)
-                pct = (c_solde / c_obj * 100) if c_obj > 0 else 0.0
 
-                if is_english:
-                    response = f"Your **'{c_nom}'** safe currently has **{fmt_solde}** saved out of **{fmt_obj}** ({pct:.1f}% target achieved)."
-                    suggestions = ["Deposit 10 000 FCFA into safe", "Withdraw 10 000 FCFA from safe", "View recent expenses"]
-                else:
-                    response = f"Votre coffre d'épargne **'{c_nom}'** contient actuellement **{fmt_solde}** sur un objectif de **{fmt_obj}** ({pct:.1f}% de votre objectif)."
-                    suggestions = ["Déposer 10 000 FCFA dans le coffre", "Retirer 10 000 FCFA du coffre", "Voir mes dépenses"]
+                response = (
+                    f"Votre coffre d'épargne '{coffre_name}' "
+                    f"contient actuellement "
+                    f"{formatted_balance} sur un objectif de "
+                    f"{formatted_target} "
+                    f"({percentage:.1f}% de votre objectif)."
+                )
 
-                return {
-                    "response": response,
-                    "action": "check_savings_goal",
-                    "action_data": {"coffre_id": target_coffre_id, "amount": raw_amount, "coffre_name": c_nom},
-                    "sentiment": "positive",
-                    "suggestions": suggestions,
-                    "provider": "GEMINI",
-                    "model": self.model
-                }
+                suggestions = [
+                    "Déposer 10 000 FCFA dans le coffre",
+                    "Vérifier mon solde",
+                    "Voir mes dépenses",
+                ]
 
-        # 3. SALUTATIONS SIMPLES ET POLITESSES (SEULEMENT SI PAS D'INTENTION FINANCIÈRE OU COFFRE)
+            return {
+                "response": response,
+                "action": "check_savings_goal",
+                "action_data": {
+                    "coffre_id": target_coffre_id,
+                    "amount": raw_amount,
+                    "coffre_name": coffre_name,
+                },
+                "sentiment": "positive",
+                "suggestions": suggestions,
+                "provider": "VERTEX_AI",
+                "model": self.model,
+            }
+
+        # =========================================================
+        # 3. SALUTATIONS
+        # =========================================================
+
         greeting_keywords = [
-            "bonjour", "salut", "coucou", "bonsoir", "comment tu vas", "ça va", "ca va", "comment vas-tu",
-            "tu vas bien", "est-ce que tu vas bien",
-            "hello", "hi", "hey", "how are you", "say hello", "are you okay", "are you fine", "are you good",
-            "you okay", "how are you doing", "what's up", "whats up"
+            "bonjour",
+            "salut",
+            "coucou",
+            "bonsoir",
+            "comment tu vas",
+            "ça va",
+            "ca va",
+            "comment vas-tu",
+            "tu vas bien",
+            "est-ce que tu vas bien",
+            "hello",
+            "hi",
+            "hey",
+            "how are you",
+            "say hello",
+            "are you okay",
+            "are you fine",
+            "are you good",
+            "you okay",
+            "how are you doing",
+            "what's up",
+            "whats up",
         ]
 
-        if any(w in msg_lower for w in greeting_keywords):
+        if any(
+            keyword in msg_lower
+            for keyword in greeting_keywords
+        ):
+
             if is_english:
-                response = f"Hello {user_firstname}! I am doing great and operating normally, thank you for asking! I am ready to assist with your finances today. How can I help you?"
-                suggestions = ["How much money do I have in total?", "Analyze my recent expenses", "How is my savings goal progressing?"]
+
+                response = (
+                    f"Hello {user_firstname}! "
+                    "I am ready to help you manage your finances. "
+                    "What would you like to check today?"
+                )
+
+                suggestions = [
+                    "How much money do I have in total?",
+                    "Analyze my recent expenses",
+                    "How is my savings goal progressing?",
+                ]
+
             else:
-                response = f"Bonjour {user_firstname} ! Je vais très bien et tout fonctionne parfaitement, merci de demander ! Je suis ravi de vous retrouver pour veiller sur vos finances. Que souhaitez-vous vérifier aujourd'hui ?"
-                suggestions = ["Quel est mon solde total ?", "Analyser mes dépenses récentes", "Comment avance mon épargne ?"]
+
+                response = (
+                    f"Bonjour {user_firstname} ! "
+                    "Je suis prêt à t'aider à gérer tes finances. "
+                    "Que souhaites-tu vérifier aujourd'hui ?"
+                )
+
+                suggestions = [
+                    "Quel est mon solde total ?",
+                    "Analyser mes dépenses récentes",
+                    "Comment avance mon épargne ?",
+                ]
 
             return {
                 "response": response,
@@ -293,45 +894,151 @@ class SikaAIService:
                 "action_data": None,
                 "sentiment": "positive",
                 "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
+                "provider": "VERTEX_AI",
+                "model": self.model,
             }
 
-        # 3. TRANSFERT & RÉÉQUILIBRAGE (TRANSFER & AUTO-REBALANCE)
-        elif any(w in msg_lower for w in ["transfert", "envoie", "transférer", "paye", "kouamé", "transfer", "rebalance"]):
+        # =========================================================
+        # 4. TRANSFERT
+        # =========================================================
+
+        if any(
+            keyword in msg_lower
+            for keyword in [
+                "transfert",
+                "envoie",
+                "envoyer",
+                "transférer",
+                "paye",
+                "kouamé",
+                "transfer",
+                "rebalance",
+            ]
+        ):
+
             if is_english:
-                response = f"I am preparing the wallet rebalance transfer. Security validation is required before execution."
-                suggestions = ["I confirm the transfer", "Cancel transfer"]
+
+                response = (
+                    "I am preparing the wallet rebalance transfer. "
+                    "Security confirmation is required "
+                    "before execution."
+                )
+
+                suggestions = [
+                    "I confirm the transfer",
+                    "Cancel transfer",
+                ]
+
             else:
-                response = f"Je prépare le transfert d'équilibrage. Une validation de sécurité est requise avant exécution."
-                suggestions = ["Je confirme le transfert", "Annuler le transfert"]
+
+                response = (
+                    "Je prépare le transfert d'équilibrage. "
+                    "Une validation de sécurité est requise "
+                    "avant son exécution."
+                )
+
+                suggestions = [
+                    "Je confirme le transfert",
+                    "Annuler le transfert",
+                ]
 
             return {
                 "response": response,
                 "action": "prepare_transfer",
-                "action_data": {"amount": 7000, "recipient": "Wave", "wallet_provider": "PayMeChap"},
+                "action_data": {
+                    "amount": 7000,
+                    "recipient": "Wave",
+                    "wallet_provider": "PayMeChap",
+                },
                 "sentiment": "neutral",
                 "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
+                "provider": "VERTEX_AI",
+                "model": self.model,
             }
 
-        # 4. OBJECTIF D'ÉPARGNE (SAVINGS GOAL & BOOST & RECOMMANDATION)
-        elif any(w in msg_lower for w in ["épargne", "objectif", "économiser", "avancement", "save", "savings", "goal", "add", "de côté", "reçu", "combien puis-je"]):
-            if "combien" in msg_lower or "de côté" in msg_lower or "reçu" in msg_lower:
+        # =========================================================
+        # 5. OBJECTIF D'ÉPARGNE
+        # =========================================================
+
+        if any(
+            keyword in msg_lower
+            for keyword in [
+                "épargne",
+                "objectif",
+                "économiser",
+                "avancement",
+                "save",
+                "savings",
+                "goal",
+                "de côté",
+                "reçu",
+            ]
+        ):
+
+            if (
+                "combien" in msg_lower
+                or "de côté" in msg_lower
+                or "reçu" in msg_lower
+            ):
+
                 if is_english:
-                    response = f"Great news {user_firstname}! Based on your financial context, putting aside 20% to 30% (around 10 000 FCFA to 15 000 FCFA) into your savings safe is recommended. Should I prepare the deposit?"
-                    suggestions = ["Deposit 10 000 FCFA into safe", "Deposit 15 000 FCFA into safe", "Check total balance"]
+
+                    response = (
+                        f"Based on your financial context, "
+                        "setting aside between 10 000 FCFA "
+                        "and 15 000 FCFA could be a good option. "
+                        "Would you like me to prepare the deposit?"
+                    )
+
+                    suggestions = [
+                        "Deposit 10 000 FCFA into safe",
+                        "Deposit 15 000 FCFA into safe",
+                        "Check total balance",
+                    ]
+
                 else:
-                    response = f"Excellente nouvelle {user_firstname} ! En tenant compte de tes préférences d'épargne, placer 20% à 30% (soit 10 000 FCFA à 15 000 FCFA) dans ton coffre est l'idéal. Souhaites-tu que je prépare le dépôt ?"
-                    suggestions = ["Déposer 10 000 FCFA dans le coffre", "Déposer 15 000 FCFA dans le coffre", "Vérifier mon solde"]
+
+                    response = (
+                        f"En tenant compte de ton contexte financier "
+                        f"{user_firstname}, mettre de côté entre "
+                        "10 000 FCFA et 15 000 FCFA pourrait être "
+                        "une bonne option. "
+                        "Souhaites-tu que je prépare le dépôt ?"
+                    )
+
+                    suggestions = [
+                        "Déposer 10 000 FCFA dans le coffre",
+                        "Déposer 15 000 FCFA dans le coffre",
+                        "Vérifier mon solde",
+                    ]
+
             else:
+
                 if is_english:
-                    response = f"Great job {user_firstname}! Your savings goal is progressing well (75% completed). Adding to your savings brings you 5 days closer to your target!"
-                    suggestions = ["Add $1 to savings", "Adjust savings target"]
+
+                    response = (
+                        "I can help you analyze the progress "
+                        "of your savings goal and recommend "
+                        "the next action."
+                    )
+
+                    suggestions = [
+                        "Check savings progress",
+                        "Add money to savings",
+                    ]
+
                 else:
-                    response = f"Bravo {user_firstname} ! Ton objectif d'épargne avance très bien (75% atteint). Cet ajout te rapproche de 5 jours de ton objectif !"
-                    suggestions = ["Ajouter à l'épargne", "Ajuster l'objectif"]
+
+                    response = (
+                        "Je peux analyser l'avancement de ton "
+                        "objectif d'épargne et te recommander "
+                        "la prochaine action."
+                    )
+
+                    suggestions = [
+                        "Voir l'avancement",
+                        "Ajouter à l'épargne",
+                    ]
 
             return {
                 "response": response,
@@ -339,18 +1046,54 @@ class SikaAIService:
                 "action_data": action_data,
                 "sentiment": "positive",
                 "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
+                "provider": "VERTEX_AI",
+                "model": self.model,
             }
 
-        # 5. ANALYSE DÉPENSE & DÉPENSES RÉCENTES (EXPENSE ANALYSIS)
-        elif any(w in msg_lower for w in ["dépense", "dépensé", "acheté", "budget", "analyze", "recent", "expenses"]):
+        # =========================================================
+        # 6. ANALYSE DES DÉPENSES
+        # =========================================================
+
+        if any(
+            keyword in msg_lower
+            for keyword in [
+                "dépense",
+                "dépensé",
+                "acheté",
+                "budget",
+                "analyze",
+                "recent",
+                "expenses",
+                "spending",
+            ]
+        ):
+
             if is_english:
-                response = f"Here is your recent spending analysis: your highest category is Food & Dining. You have {fmt_total} remaining for the month."
-                suggestions = ["Set spending limit", "View transaction history"]
+
+                response = (
+                    "I can analyze your recent spending "
+                    f"based on your connected financial data. "
+                    f"Your currently aggregated balance is "
+                    f"{fmt_total}."
+                )
+
+                suggestions = [
+                    "Set spending limit",
+                    "View transaction history",
+                ]
+
             else:
-                response = f"Voici l'analyse de tes dépenses récentes : ta catégorie principale est Restauration. Il te reste {fmt_total} pour finir le mois."
-                suggestions = ["Définir une limite", "Voir l'historique"]
+
+                response = (
+                    "Je peux analyser tes dépenses récentes "
+                    "à partir de tes données financières connectées. "
+                    f"Ton solde agrégé actuel est de {fmt_total}."
+                )
+
+                suggestions = [
+                    "Définir une limite",
+                    "Voir l'historique",
+                ]
 
             return {
                 "response": response,
@@ -358,88 +1101,256 @@ class SikaAIService:
                 "action_data": action_data,
                 "sentiment": "neutral",
                 "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
+                "provider": "VERTEX_AI",
+                "model": self.model,
             }
 
-        # 6. FALLBACK MULTILINGUE
+        # =========================================================
+        # 7. FALLBACK
+        # =========================================================
+
+        if is_english:
+
+            response = (
+                f"Sorry {user_firstname}, "
+                "I didn't fully understand that. "
+                "You can ask me about your balance, "
+                "expenses, savings or transfers."
+            )
+
+            suggestions = [
+                "How much money do I have in total?",
+                "How is my savings goal progressing?",
+                "Analyze my recent expenses",
+            ]
+
         else:
-            if is_english:
-                response = f"Sorry {user_firstname}, I didn't quite catch that. Could you please repeat or select one of the suggested options below?"
-                suggestions = ["How much money do I have in total?", "How is my savings goal progressing?", "Analyze my recent expenses"]
-            else:
-                response = f"Pardon {user_firstname}, je n'ai pas bien compris. Peux-tu répéter ou choisir l'une des options ci-dessous ?"
-                suggestions = ["Quel est mon solde total ?", "Comment avance mon épargne ?", "Analyser mes dépenses"]
 
-            return {
-                "response": response,
-                "action": None,
-                "action_data": None,
-                "sentiment": "neutral",
-                "suggestions": suggestions,
-                "provider": "GEMINI",
-                "model": self.model
-            }
+            response = (
+                f"Pardon {user_firstname}, "
+                "je n'ai pas bien compris. "
+                "Tu peux me demander ton solde, "
+                "analyser tes dépenses, ton épargne "
+                "ou préparer un transfert."
+            )
 
-    def _format_response(self, sika_response: str, user_message: str, financial_context: Dict, is_english: bool) -> Dict:
-        """Formate la réponse générée par Gemini."""
-        action, action_data = self._extract_action(sika_response, user_message)
+            suggestions = [
+                "Quel est mon solde total ?",
+                "Comment avance mon épargne ?",
+                "Analyser mes dépenses",
+            ]
+
+        return {
+            "response": response,
+            "action": None,
+            "action_data": None,
+            "sentiment": "neutral",
+            "suggestions": suggestions,
+            "provider": "VERTEX_AI",
+            "model": self.model,
+        }
+
+    def _format_response(
+        self,
+        sika_response: str,
+        user_message: str,
+        financial_context: Dict[str, Any],
+        is_english: bool,
+    ) -> Dict[str, Any]:
+        """Formate une réponse générée par Gemini."""
+
+        action, action_data = self._extract_action(
+            sika_response,
+            user_message,
+        )
+
         return {
             "response": sika_response,
             "action": action,
             "action_data": action_data,
             "sentiment": "positive",
             "suggestions": [
-                "How much money do I have in total?" if is_english else "Quel est mon solde total ?",
-                "How is my savings goal progressing?" if is_english else "Comment avance mon épargne ?",
-                "Analyze recent expenses" if is_english else "Analyser mes dépenses"
+                (
+                    "How much money do I have in total?"
+                    if is_english
+                    else "Quel est mon solde total ?"
+                ),
+                (
+                    "How is my savings goal progressing?"
+                    if is_english
+                    else "Comment avance mon épargne ?"
+                ),
+                (
+                    "Analyze recent expenses"
+                    if is_english
+                    else "Analyser mes dépenses"
+                ),
             ],
-            "provider": "GEMINI",
-            "model": self.model
+            "provider": "VERTEX_AI",
+            "model": self.model,
         }
 
     async def chat(
         self,
         user_message: str,
-        financial_context: Optional[Dict] = None,
-        conversation_history: Optional[List] = None,
-        user_firstname: Optional[str] = None
-    ) -> Dict:
-        """Point d'entrée principal pour traiter les messages de l'utilisateur avec exécution autonome prioritaire."""
+        financial_context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Any]] = None,
+        user_firstname: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Point d'entrée principal SIKA.
+
+        Étapes :
+
+        1. Analyse locale de l'intention.
+        2. Préparation ou exécution des actions financières.
+        3. Appel Gemini via Vertex AI pour enrichir
+           la réponse conversationnelle.
+        4. Fallback local en cas d'erreur.
+        """
+
         context = financial_context or {}
-        fname = user_firstname or context.get("user_firstname") or "David"
-        is_english = self._is_english(user_message)
 
-        # 1. Exécution autonome d'action et d'analyse financière en premier
-        executed_result = self._chat_basic(user_message, context, fname, is_english)
+        firstname = (
+            user_firstname
+            or context.get("user_firstname")
+            or "David"
+        )
 
-        # 2. Si le SDK Gemini est disponible (clé d'API active), invoquer Gemini pour enrichir la réponse
+        is_english = self._is_english(
+            user_message
+        )
+
+        # =========================================================
+        # ÉTAPE 1 : MOTEUR MÉTIER SIKA
+        # =========================================================
+
+        executed_result = self._chat_basic(
+            user_message=user_message,
+            financial_context=context,
+            user_firstname=firstname,
+            is_english=is_english,
+        )
+
+        # =========================================================
+        # ÉTAPE 2 : GEMINI VIA VERTEX AI
+        # =========================================================
+
         if self.client:
+
             try:
-                system_instruction = (
-                    f"Tu es Sika AI, un agent d'exécution financière autonome pour {fname}. "
-                    f"Action exécutée : {executed_result.get('action')}. "
-                    f"Données d'exécution : {executed_result.get('response')}. "
-                    f"Réponds de manière concise, précise et chaleureuse."
+
+                language_instruction = (
+                    "Réponds en anglais."
+                    if is_english
+                    else "Réponds en français."
                 )
-                response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=user_message,
-                    config={"system_instruction": system_instruction}
+
+                system_instruction = f"""
+Tu es SIKA, un agent financier intelligent.
+
+Utilisateur : {firstname}
+
+{language_instruction}
+
+Tu aides l'utilisateur à comprendre ses finances,
+ses portefeuilles connectés, ses dépenses,
+son épargne et ses transferts.
+
+Le moteur métier SIKA a déjà analysé la demande.
+
+Action détectée :
+{executed_result.get("action")}
+
+Résultat métier :
+{executed_result.get("response")}
+
+Règles importantes :
+
+- Ne jamais inventer de solde.
+- Ne jamais inventer de transaction.
+- Ne jamais prétendre qu'une opération financière
+  a été exécutée si le moteur métier ne l'indique pas.
+- Utilise le résultat métier fourni comme source
+  de vérité.
+- Réponds de manière concise, naturelle et chaleureuse.
+- Si une confirmation de sécurité est nécessaire,
+  indique clairement qu'elle est requise.
+"""
+
+                response = (
+                    self.client.models.generate_content(
+                        model=self.model,
+                        contents=user_message,
+                        config={
+                            "system_instruction":
+                                system_instruction
+                        },
+                    )
                 )
+
                 if response and response.text:
-                    formatted = self._format_response(response.text, user_message, context, is_english)
-                    # Si une action financière concrète a été exécutée (ex: dépôt coffre, solde), privilégier le message d'exécution direct
-                    if executed_result.get("action") in ["deposit_to_coffre", "prepare_transfer"]:
-                        formatted["response"] = executed_result["response"]
-                    formatted["action"] = executed_result.get("action") or formatted.get("action")
-                    formatted["action_data"] = executed_result.get("action_data") or formatted.get("action_data")
+
+                    formatted = self._format_response(
+                        sika_response=response.text,
+                        user_message=user_message,
+                        financial_context=context,
+                        is_english=is_english,
+                    )
+
+                    # =================================================
+                    # L'ACTION MÉTIER RESTE PRIORITAIRE
+                    # =================================================
+
+                    if executed_result.get("action") in [
+                        "deposit_to_coffre",
+                        "prepare_transfer",
+                        "get_total_balance",
+                    ]:
+
+                        formatted["response"] = (
+                            executed_result["response"]
+                        )
+
+                    formatted["action"] = (
+                        executed_result.get("action")
+                        or formatted.get("action")
+                    )
+
+                    formatted["action_data"] = (
+                        executed_result.get("action_data")
+                        or formatted.get("action_data")
+                    )
+
+                    formatted["sentiment"] = (
+                        executed_result.get("sentiment")
+                        or formatted.get("sentiment")
+                    )
+
+                    formatted["suggestions"] = (
+                        executed_result.get("suggestions")
+                        or formatted.get("suggestions")
+                    )
+
                     return formatted
-            except Exception as e:
-                logger.warning(f"Erreur lors de l'appel Gemini SDK: {e}. Utilisation du rapport direct de l'agent d'exécution.")
+
+            except Exception as error:
+
+                logger.warning(
+                    "⚠️ Erreur Gemini via Vertex AI : "
+                    f"{error}. "
+                    "Retour au moteur métier SIKA."
+                )
+
+        # =========================================================
+        # ÉTAPE 3 : FALLBACK
+        # =========================================================
 
         return executed_result
 
 
+# Instance globale utilisée dans l'application
 sika_ai_service = SikaAIService()
+
+# Compatibilité avec les anciens imports
 SikaAI = SikaAIService
