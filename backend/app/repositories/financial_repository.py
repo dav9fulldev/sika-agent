@@ -31,21 +31,21 @@ class FinancialRepository:
         """Initialise la base de données avec l'utilisateur David YAO et ses 3 portefeuilles s'ils sont vides."""
         db: Session = SessionLocal()
         try:
-            user = db.query(UserModel).filter(UserModel.id == "usr_default").first()
+            user = db.query(UserModel).filter(UserModel.email == "david.yao@email.com").first()
             if not user:
                 user = UserModel(
-                    id="usr_default",
-                    name="David YAO",
+                    full_name="David YAO",
                     email="david.yao@email.com",
-                    is_premium=True,
-                    preferred_currency="XOF",
+                    auth_provider="email",
                 )
                 db.add(user)
+                db.commit()
+                db.refresh(user)
 
                 # 3 Portefeuilles réels (Wave, Orange Money, MTN MoMo)
-                w1 = WalletModel(id="w_wave", user_id="usr_default", provider="Wave", balance=15000.0, currency="XOF")
-                w2 = WalletModel(id="w_om", user_id="usr_default", provider="Orange Money", balance=22000.0, currency="XOF")
-                w3 = WalletModel(id="w_mtn", user_id="usr_default", provider="MTN MoMo", balance=8000.0, currency="XOF")
+                w1 = WalletModel(id="w_wave", user_id=user.id, provider="Wave", balance=15000.0, currency="XOF")
+                w2 = WalletModel(id="w_om", user_id=user.id, provider="Orange Money", balance=22000.0, currency="XOF")
+                w3 = WalletModel(id="w_mtn", user_id=user.id, provider="MTN MoMo", balance=8000.0, currency="XOF")
                 db.add_all([w1, w2, w3])
 
                 # Dépenses initiales
@@ -55,7 +55,7 @@ class FinancialRepository:
                 db.add_all([t1, t2, t3])
 
                 # Objectif d'épargne
-                goal = SavingsGoalModel(id="goal_1", user_id="usr_default", title="Épargne de précaution", target_amount=80000.0, current_amount=48000.0)
+                goal = SavingsGoalModel(id="goal_1", user_id=user.id, title="Épargne de précaution", target_amount=80000.0, current_amount=48000.0)
                 db.add(goal)
 
                 db.commit()
@@ -70,7 +70,9 @@ class FinancialRepository:
         """Récupère les portefeuilles réels de la base de données SQL."""
         db: Session = SessionLocal()
         try:
-            wallets = db.query(WalletModel).filter(WalletModel.user_id == user_id).all()
+            wallets = db.query(WalletModel).filter(WalletModel.user_id == user_id).all() if user_id and str(user_id).isdigit() else db.query(WalletModel).all()
+            if not wallets:
+                wallets = db.query(WalletModel).all()
             return [
                 {
                     "id": w.id,

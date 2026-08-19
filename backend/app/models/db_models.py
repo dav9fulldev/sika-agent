@@ -12,14 +12,14 @@ from ..database import Base
 class UserModel(Base):
     __tablename__ = "users"
 
-    id = Column(String(50), primary_key=True, index=True, default="usr_default")
-    name = Column(String(100), nullable=False, default="David YAO")
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     email = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=True)
-    is_premium = Column(Boolean, default=True)
-    preferred_currency = Column(String(10), default="XOF")
-    preferred_language = Column(String(10), default="fr")
+    password_hash = Column(String(255), nullable=True)
+    full_name = Column(String(100), nullable=False, default="David YAO")
+    google_id = Column(String(100), nullable=True)
+    auth_provider = Column(String(20), nullable=False, default="email") # 'email' ou 'google'
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     wallets = relationship("WalletModel", back_populates="user", cascade="all, delete-orphan")
     goals = relationship("SavingsGoalModel", back_populates="user", cascade="all, delete-orphan")
@@ -29,7 +29,7 @@ class WalletModel(Base):
     __tablename__ = "wallets"
 
     id = Column(String(50), primary_key=True, index=True)
-    user_id = Column(String(50), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     provider = Column(String(50), nullable=False) # Wave, Orange Money, MTN MoMo
     balance = Column(Float, nullable=False, default=0.0)
     currency = Column(String(10), default="XOF")
@@ -67,7 +67,7 @@ class SavingsGoalModel(Base):
     __tablename__ = "savings_goals"
 
     id = Column(String(50), primary_key=True, index=True)
-    user_id = Column(String(50), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     title = Column(String(100), nullable=False)
     target_amount = Column(Float, nullable=False)
     current_amount = Column(Float, default=0.0)
@@ -80,7 +80,7 @@ class UserHabitModel(Base):
     __tablename__ = "user_habits"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String(50), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     category = Column(String(50), nullable=False)
     average_spent = Column(Float, default=0.0)
     frequency_per_week = Column(Integer, default=1)

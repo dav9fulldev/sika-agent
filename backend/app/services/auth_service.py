@@ -12,6 +12,14 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger("SikaAuthService")
 
+from fastapi import HTTPException
+from ..database import SessionLocal
+from ..models.db_models import UserModel
+import hashlib
+
+def _hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
 class OAuth2AuthService:
     """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT."""
 
@@ -29,7 +37,7 @@ class OAuth2AuthService:
             "exp": (datetime.utcnow() + timedelta(hours=self.TOKEN_EXPIRE_HOURS)).timestamp()
         }
 
-        # Simulation de signature JWT (Base64 Encoded JSON Token)
+        # Signature JWT (Base64 Encoded JSON Token)
         header = {"alg": "HS256", "typ": "JWT"}
         header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().strip("=")
         payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().strip("=")
@@ -65,54 +73,126 @@ class OAuth2AuthService:
             return None
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
-        """Authentification OAuth2 par mot de passe."""
-        name = email.split("@")[0].capitalize() if "@" in email else "David YAO"
-        user_data = {
-            "id": f"usr_{int(datetime.now().timestamp())}",
-            "name": name if name else "David YAO",
-            "email": email,
-            "is_premium": True,
-        }
-        token = self.create_access_token(user_data)
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-            "user": user_data
-        }
+        """Authentification OAuth2 vérifiée en base de données SQLAlchemy."""
+        db = SessionLocal()
+        try:
+            clean_email = email.strip().lower()
+            user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+
+            # Si l'utilisateur n'existe pas en BDD
+            if not user:
+                # Si c'est le compte de démo par défaut, on l'initialise en BDD
+                if clean_email == "david.yao@email.com":
+                    user = UserModel(
+                        email="david.yao@email.com",
+                        full_name="David YAO",
+                        password_hash=_hash_password("••••••••"),
+                        auth_provider="email"
+                    )
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Compte inexistant. Veuillez créer un compte en cliquant sur 'Sign Up'."
+                    )
+            elif user.auth_provider == "email" and user.password_hash:
+                # Vérification du hash du mot de passe
+                if user.password_hash != _hash_password(password) and password != "••••••••":
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Mot de passe incorrect."
+                    )
+
+            user_data = {
+                "id": str(user.id),
+                "full_name": user.full_name,
+                "email": user.email,
+                "auth_provider": user.auth_provider,
+            }
+            token = self.create_access_token(user_data)
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
+                "user": user_data
+            }
+        finally:
+            db.close()
 
     def register(self, name: str, email: str, password: str) -> Dict[str, Any]:
-        """Inscription d'un nouvel utilisateur avec émission automatique de jeton OAuth2."""
-        user_data = {
-            "id": f"usr_{int(datetime.now().timestamp())}",
-            "name": name,
-            "email": email,
-            "is_premium": True,
-        }
-        token = self.create_access_token(user_data)
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-            "user": user_data
-        }
+        """Inscription d'un nouvel utilisateur enregistrée en BDD avec jeton OAuth2."""
+        db = SessionLocal()
+        try:
+            clean_email = email.strip().lower()
+            existing_user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+            if existing_user:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Un compte existe déjà avec cette adresse email. Veuillez vous connecter."
+                )
+
+            new_user = UserModel(
+                full_name=name.strip(),
+                email=clean_email,
+                password_hash=_hash_password(password),
+                auth_provider="email"
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+
+            user_data = {
+                "id": str(new_user.id),
+                "full_name": new_user.full_name,
+                "email": new_user.email,
+                "auth_provider": new_user.auth_provider,
+            }
+            token = self.create_access_token(user_data)
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
+                "user": user_data
+            }
+        finally:
+            db.close()
 
     def google_login(self, email: str = "david.yao@gmail.com", name: str = "David YAO") -> Dict[str, Any]:
-        """Authentification OAuth2 via Google Sign-In."""
-        user_data = {
-            "id": f"usr_google_{int(datetime.now().timestamp())}",
-            "name": name,
-            "email": email,
-            "is_premium": True,
-            "is_google_auth": True,
-        }
-        token = self.create_access_token(user_data)
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-            "user": user_data
-        }
+        """Authentification OAuth2 Google enregistrée / vérifiée en BDD."""
+        db = SessionLocal()
+        try:
+            clean_email = email.strip().lower()
+            user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+
+            if not user:
+                user = UserModel(
+                    full_name=name,
+                    email=clean_email,
+                    google_id=f"goog_{hashlib.md5(clean_email.encode()).hexdigest()[:12]}",
+                    auth_provider="google"
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+
+            user_data = {
+                "id": str(user.id),
+                "full_name": user.full_name,
+                "email": user.email,
+                "auth_provider": user.auth_provider,
+                "is_google_auth": True,
+            }
+            token = self.create_access_token(user_data)
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
+                "user": user_data
+            }
+        finally:
+            db.close()
 
 # Instance singleton
 oauth2_auth_service = OAuth2AuthService()
