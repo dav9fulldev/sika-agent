@@ -61,6 +61,7 @@ CONNECTED_USER_WALLETS: List[Dict[str, Any]] = _load_persisted_wallets()
 def get_my_wallets(user_id: str = "usr_default"):
     """Retourne la liste complète des portefeuilles connectés de l'utilisateur avec mise à jour en direct."""
     global CONNECTED_USER_WALLETS
+    CONNECTED_USER_WALLETS = _load_persisted_wallets()
     user_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("user_id") == user_id and w.get("is_active", True)]
 
     # Auto-synchronisation des soldes en direct à la consultation
@@ -70,7 +71,8 @@ def get_my_wallets(user_id: str = "usr_default"):
         acc_num = w.get("account_number") or ""
         if "paymechap" in prov:
             fetched = paymechap_api_service.fetch_live_balance(token, acc_num)
-            w["balance"] = float(fetched.get("balance", w.get("balance", 0.0)))
+            if fetched.get("success") or fetched.get("balance", 0.0) > 0:
+                w["balance"] = float(fetched.get("balance", w.get("balance", 0.0)))
             w["last_synced_at"] = datetime.utcnow().isoformat()
 
     _save_persisted_wallets(CONNECTED_USER_WALLETS)
@@ -94,20 +96,25 @@ def get_all_wallets_transaction_history(
     user_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("user_id") == user_id and w.get("is_active", True)]
     movements: List[Dict[str, Any]] = []
 
+    try:
+        limit_val = int(limit)
+    except Exception:
+        limit_val = 30
+
     for wallet in user_wallets:
         prov = wallet.get("provider", "").lower()
         token = wallet.get("access_token") or "token"
         if "wave" in prov:
-            movements.extend(wave_api_service.fetch_live_transactions(token, limit=limit))
+            movements.extend(wave_api_service.fetch_live_transactions(token, limit=limit_val))
         elif "orange" in prov:
-            movements.extend(orange_money_api_service.fetch_live_transactions(token, limit=limit))
+            movements.extend(orange_money_api_service.fetch_live_transactions(token, limit=limit_val))
         elif "mtn" in prov:
-            movements.extend(mtn_momo_api_service.fetch_live_transactions(token, limit=limit))
+            movements.extend(mtn_momo_api_service.fetch_live_transactions(token, limit=limit_val))
         elif "paymechap" in prov:
-            movements.extend(paymechap_api_service.fetch_live_transactions(token, account_number=wallet.get("account_number"), limit=limit))
+            movements.extend(paymechap_api_service.fetch_live_transactions(token, account_number=wallet.get("account_number"), limit=limit_val))
 
     movements.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-    movements = movements[:limit]
+    movements = movements[:limit_val]
 
     total_spent = sum(t["amount"] for t in movements if t.get("type") in ["payment", "transfer", "withdrawal"])
     total_received = sum(t["amount"] for t in movements if t.get("type") == "deposit")
