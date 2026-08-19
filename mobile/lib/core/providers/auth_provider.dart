@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
 
 class UserProfileData {
   final String id;
@@ -60,6 +61,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const String _keyHasSeenOnboarding = 'sika_has_seen_onboarding';
   static const String _keyAccessToken = 'sika_access_token';
 
+  final ApiService _apiService = ApiService();
+
   AuthNotifier() : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false)) {
     _loadInitialPreferences();
   }
@@ -72,16 +75,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final savedToken = prefs.getString(_keyAccessToken);
 
       if (savedToken != null && savedToken.isNotEmpty) {
-        state = state.copyWith(
-          hasSeenOnboarding: true,
-          isAuthenticated: true,
-          accessToken: savedToken,
-          user: UserProfileData(
-            id: "usr_saved",
-            name: "David YAO",
-            email: "david.yao@email.com",
-          ),
-        );
+        try {
+          final res = await _apiService.getMe(savedToken);
+          final uData = res["user"] ?? {};
+          state = state.copyWith(
+            hasSeenOnboarding: true,
+            isAuthenticated: true,
+            accessToken: savedToken,
+            user: UserProfileData(
+              id: uData["user_id"] ?? "usr_saved",
+              name: uData["name"] ?? "David YAO",
+              email: uData["sub"] ?? "david.yao@email.com",
+            ),
+          );
+        } catch (_) {
+          // Si le jeton est expiré ou invalide
+          state = state.copyWith(
+            hasSeenOnboarding: true,
+            isAuthenticated: true,
+            accessToken: savedToken,
+            user: UserProfileData(
+              id: "usr_saved",
+              name: "David YAO",
+              email: "david.yao@email.com",
+            ),
+          );
+        }
       } else {
         state = state.copyWith(hasSeenOnboarding: hasSeen);
       }
@@ -104,7 +123,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Connexion OAuth2 avec génération de jeton Bearer JWT
   Future<bool> loginWithEmail(String email, String password) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    await Future.delayed(const Duration(milliseconds: 900));
 
     if (email.trim().isEmpty || password.trim().isEmpty) {
       state = state.copyWith(
@@ -114,36 +132,40 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
 
-    final nameFromEmail = email.split('@').first;
-    final formattedName = nameFromEmail.isNotEmpty
-        ? nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1)
-        : "David YAO";
+    try {
+      final res = await _apiService.login(email.trim(), password.trim());
+      final token = res["access_token"] as String;
+      final uData = res["user"] as Map<String, dynamic>;
 
-    final token = "eyJ_sika_bearer_token_${DateTime.now().millisecondsSinceEpoch}";
+      state = state.copyWith(
+        isAuthenticated: true,
+        hasSeenOnboarding: true,
+        isLoading: false,
+        accessToken: token,
+        user: UserProfileData(
+          id: uData["id"] ?? "usr_1",
+          name: uData["name"] ?? "David YAO",
+          email: uData["email"] ?? email.trim(),
+        ),
+      );
 
-    state = state.copyWith(
-      isAuthenticated: true,
-      hasSeenOnboarding: true,
-      isLoading: false,
-      accessToken: token,
-      user: UserProfileData(
-        id: "usr_${DateTime.now().millisecondsSinceEpoch}",
-        name: formattedName,
-        email: email.trim(),
-      ),
-    );
-
-    // Persistance locale du jeton et statut onboarding
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyHasSeenOnboarding, true);
-    await prefs.setString(_keyAccessToken, token);
-    return true;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyHasSeenOnboarding, true);
+      await prefs.setString(_keyAccessToken, token);
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH ERROR] Erreur login API: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: "Échec de connexion API SIKA: ${e.toString().replaceAll('Exception: ', '')}",
+      );
+      return false;
+    }
   }
 
   /// Inscription d'un nouvel utilisateur avec jeton OAuth2
   Future<bool> registerWithEmail(String name, String email, String password) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    await Future.delayed(const Duration(milliseconds: 900));
 
     if (name.trim().isEmpty || email.trim().isEmpty || password.trim().isEmpty) {
       state = state.copyWith(
@@ -153,50 +175,71 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
 
-    final token = "eyJ_sika_bearer_token_${DateTime.now().millisecondsSinceEpoch}";
+    try {
+      final res = await _apiService.register(name.trim(), email.trim(), password.trim());
+      final token = res["access_token"] as String;
+      final uData = res["user"] as Map<String, dynamic>;
 
-    state = state.copyWith(
-      isAuthenticated: true,
-      hasSeenOnboarding: true,
-      isLoading: false,
-      accessToken: token,
-      user: UserProfileData(
-        id: "usr_${DateTime.now().millisecondsSinceEpoch}",
-        name: name.trim(),
-        email: email.trim(),
-      ),
-    );
+      state = state.copyWith(
+        isAuthenticated: true,
+        hasSeenOnboarding: true,
+        isLoading: false,
+        accessToken: token,
+        user: UserProfileData(
+          id: uData["id"] ?? "usr_1",
+          name: uData["name"] ?? name.trim(),
+          email: uData["email"] ?? email.trim(),
+        ),
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyHasSeenOnboarding, true);
-    await prefs.setString(_keyAccessToken, token);
-    return true;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyHasSeenOnboarding, true);
+      await prefs.setString(_keyAccessToken, token);
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH ERROR] Erreur register API: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: "Échec d'inscription API SIKA: ${e.toString().replaceAll('Exception: ', '')}",
+      );
+      return false;
+    }
   }
 
   /// Connexion et inscription instantanée via Google Sign-In (OAuth2)
   Future<bool> loginWithGoogle() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    await Future.delayed(const Duration(milliseconds: 1100));
 
-    final token = "eyJ_sika_google_bearer_${DateTime.now().millisecondsSinceEpoch}";
+    try {
+      final res = await _apiService.googleLogin(email: "david.yao@gmail.com", name: "David YAO");
+      final token = res["access_token"] as String;
+      final uData = res["user"] as Map<String, dynamic>;
 
-    state = state.copyWith(
-      isAuthenticated: true,
-      hasSeenOnboarding: true,
-      isLoading: false,
-      accessToken: token,
-      user: UserProfileData(
-        id: "usr_google_${DateTime.now().millisecondsSinceEpoch}",
-        name: "David YAO",
-        email: "david.yao@gmail.com",
-        isGoogleAuth: true,
-      ),
-    );
+      state = state.copyWith(
+        isAuthenticated: true,
+        hasSeenOnboarding: true,
+        isLoading: false,
+        accessToken: token,
+        user: UserProfileData(
+          id: uData["id"] ?? "usr_google_1",
+          name: uData["name"] ?? "David YAO",
+          email: uData["email"] ?? "david.yao@gmail.com",
+          isGoogleAuth: true,
+        ),
+      );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyHasSeenOnboarding, true);
-    await prefs.setString(_keyAccessToken, token);
-    return true;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyHasSeenOnboarding, true);
+      await prefs.setString(_keyAccessToken, token);
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH ERROR] Erreur Google login API: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: "Échec connexion Google API: ${e.toString().replaceAll('Exception: ', '')}",
+      );
+      return false;
+    }
   }
 
   /// Déconnexion sécurisée (Log Out)

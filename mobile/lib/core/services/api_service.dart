@@ -8,7 +8,71 @@ class ApiService {
 
   ApiService({this.baseUrl = ApiConstants.baseUrl});
 
-  bool get hasToken => true;
+  bool get hasToken => token != null && token!.isNotEmpty;
+
+  // ============================================================================
+  // OAUTH2 AUTHENTICATION API ENDPOINTS
+  // ============================================================================
+
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/sika/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Erreur de connexion (${response.statusCode}): ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/sika/auth/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Erreur d\'inscription (${response.statusCode}): ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> googleLogin({String email = "david.yao@gmail.com", String name = "David YAO"}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/sika/auth/google'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'name': name,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Erreur Google Sign-In (${response.statusCode}): ${response.body}');
+  }
+
+  Future<Map<String, dynamic>> getMe(String bearerToken) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/v1/sika/auth/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $bearerToken',
+      },
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Jeton OAuth2 invalide (${response.statusCode})');
+  }
 
   Future<Map<String, dynamic>> sikaChat(
     String query, {
