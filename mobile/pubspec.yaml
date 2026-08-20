@@ -23,6 +23,7 @@ dependencies:
   # Voice & Audio AI
   speech_to_text: ^7.4.0
   flutter_tts: ^3.8.5
+  audioplayers: ^6.0.0
 
   # Icons & UI
   cupertino_icons: ^1.0.6

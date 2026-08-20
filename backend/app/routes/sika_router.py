@@ -115,16 +115,62 @@ def sika_confirm_transaction(data: SikaConfirmTransactionDTO):
         }
     }
 
+from ..services.gcp_tts_service import gcp_tts_service
+
+
+@router.post("/tts")
+def sika_text_to_speech(data: Dict[str, Any]):
+    """Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS)."""
+    text = data.get("text") or data.get("speech_text") or ""
+    voice_name = data.get("voice_name", "fr-FR-Neural2-C")
+    speaking_rate = float(data.get("speaking_rate", 1.05))
+
+    if not text:
+        raise HTTPException(status_code=400, detail="Le champ 'text' est obligatoire.")
+
+    res = gcp_tts_service.synthesize_speech(
+        text=text,
+        voice_name=voice_name,
+        speaking_rate=speaking_rate
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=res.get("error", "Échec GCP TTS"))
+
+    return res
+
+
+@router.get("/tts/voices")
+def sika_list_tts_voices():
+    """Liste les voix françaises de haute qualité disponibles sur Google Cloud Text-to-Speech."""
+    return gcp_tts_service.list_french_voices()
+
+
 @router.post("/agent/process")
 async def sika_agent_process(data: Dict[str, Any]):
     """Endpoint principal de traitement de la boucle Agent Taskmaster."""
     user_id = data.get("user_id", 1)
     query = data.get("query", "")
-    return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
+    res = await sika_orchestrator.process_user_request(user_id=user_id, query=query)
+
+    # Synthèse vocale GCP TTS optionnelle si demandée
+    if data.get("generate_audio") and res.get("speech_text"):
+        tts_res = gcp_tts_service.synthesize_speech(res["speech_text"])
+        if tts_res.get("success"):
+            res["audio_base64"] = tts_res["audio_base64"]
+
+    return res
+
 
 @router.post("/agent/confirm")
 async def sika_agent_confirm(data: Dict[str, Any]):
     """Endpoint de validation humaine pour l'agent SIKA."""
     action_id = data.get("action_id", "")
     user_id = data.get("user_id", 1)
-    return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
+    res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
+
+    if data.get("generate_audio") and res.get("speech_text"):
+        tts_res = gcp_tts_service.synthesize_speech(res["speech_text"])
+        if tts_res.get("success"):
+            res["audio_base64"] = tts_res["audio_base64"]
+
+    return res

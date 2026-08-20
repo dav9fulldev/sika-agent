@@ -256,4 +256,20 @@ class ApiService {
     }
     throw Exception('Failed to create transaction: ${response.statusCode}');
   }
+
+  Future<Map<String, dynamic>> fetchGcpTtsAudio(String text, {String voiceName = 'fr-FR-Neural2-C'}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/sika/tts'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'text': text,
+        'voice_name': voiceName,
+        'speaking_rate': 1.05,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to generate GCP TTS audio: ${response.statusCode}');
+  }
 }
