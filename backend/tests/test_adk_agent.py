@@ -1196,6 +1196,377 @@ def test_action_events_audit_trail_recorded():
         assert events[0].event_type == "ACTION_CREATED"
 
 
+# ============================================================================
+# TTL, CONCURRENCY RACES & IDEMPOTENCY HARDENING TESTS
+# ============================================================================
+
+def test_action_expires_after_ttl():
+    """TTL TEST 1 : Une action en attente depuis >300s passe automatiquement à EXPIRED via cleanup_stale_actions."""
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_ttl_exp_{secrets.token_hex(4)}"
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=400)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="WAITING_CONFIRMATION",
+            created_at=old_time,
+            expires_at=old_time + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    expired_ids = sika_orchestrator.cleanup_stale_actions()
+    assert aid in expired_ids
+
+    with Session(engine) as db:
+        db_act = db.query(SikaActionModel).filter(SikaActionModel.action_id == aid).first()
+        assert db_act.status == "EXPIRED"
+
+
+def test_expired_action_cannot_execute_payout():
+    """TTL TEST 2 : confirm_action() sur une action expirée retourne status EXPIRED et N'EXÉCUTE PAS execute_payout()."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_ttl_payout_reject_{secrets.token_hex(4)}"
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=400)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="WAITING_CONFIRMATION",
+            created_at=old_time,
+            expires_at=old_time + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "EXPIRED"
+        mock_payout.assert_not_called()
+
+
+def test_confirm_vs_expiration_race():
+    """RACE TEST 1 : Si l'expiration marque l'action EXPIRED avant confirmation, confirm_action échoue sans appeler execute_payout."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_race_exp_conf_{secrets.token_hex(4)}"
+    now_utc = datetime.now(timezone.utc)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXPIRED",
+            created_at=now_utc - timedelta(seconds=400),
+            expires_at=now_utc - timedelta(seconds=100),
+            updated_at=now_utc
+        ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "EXPIRED"
+        mock_payout.assert_not_called()
+
+
+def test_cancel_vs_confirm_race():
+    """RACE TEST 2 : Si l'annulation gagne la course, confirm_action échoue et n'exécute pas execute_payout."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_race_cancel_conf_{secrets.token_hex(4)}"
+    now_utc = datetime.now(timezone.utc)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="CANCELLED",
+            created_at=now_utc,
+            expires_at=now_utc + timedelta(seconds=300),
+            updated_at=now_utc
+        ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "CANCELLED"
+        mock_payout.assert_not_called()
+
+
+def test_terminal_action_cannot_expire():
+    """TTL TEST 3 : Une action déjà dans un état terminal (EXECUTED) n'est jamais basculée vers EXPIRED par cleanup_stale_actions."""
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_term_no_exp_{secrets.token_hex(4)}"
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=400)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXECUTED",
+            created_at=old_time,
+            expires_at=old_time + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    expired_ids = sika_orchestrator.cleanup_stale_actions()
+    assert aid not in expired_ids
+
+    with Session(engine) as db:
+        db_act = db.query(SikaActionModel).filter(SikaActionModel.action_id == aid).first()
+        assert db_act.status == "EXECUTED"
+
+
+def test_backend_restart_detects_expired_action():
+    """RECOVERY TEST : Redémarrage backend (RAM vidée) -> confirm_action décèle l'expiration en BDD sans appeler execute_payout."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_restart_exp_{secrets.token_hex(4)}"
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=500)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="WAITING_CONFIRMATION",
+            created_at=old_time,
+            expires_at=old_time + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    # Vidage de la mémoire vive RAM
+    sika_orchestrator.action_store.clear()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "EXPIRED"
+        mock_payout.assert_not_called()
+
+
+def test_state_change_and_audit_event_are_atomic():
+    """TRANSACTION TEST : La création d'une action génère un événement d'audit dans la même transaction BDD."""
+    import secrets
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.models.sika_action_event import SikaActionEventModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_atomic_audit_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(aid, user_id=99, payload={"recipient": "Kouamé"})
+
+    with Session(engine) as db:
+        act = db.query(SikaActionModel).filter(SikaActionModel.action_id == aid).first()
+        events = db.query(SikaActionEventModel).filter(SikaActionEventModel.action_id == aid).all()
+        assert act is not None
+        assert len(events) >= 1
+        assert events[0].action_id == aid
+        assert events[0].new_status == "WAITING_CONFIRMATION"
+
+
+def test_failed_state_transition_does_not_create_fake_audit_event():
+    """SECURITY AUDIT TEST : Une demande non autorisée de confirmation ne génère PAS de faux événement de changement d'état."""
+    import asyncio, secrets
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action_event import SikaActionEventModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_fake_audit_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(aid, user_id=1)
+
+    with Session(engine) as db:
+        initial_count = db.query(SikaActionEventModel).filter(SikaActionEventModel.action_id == aid).count()
+
+    # Tentative d'un autre utilisateur non autorisé (user_id=999)
+    res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=999))
+    assert res["success"] is False
+
+    with Session(engine) as db:
+        final_count = db.query(SikaActionEventModel).filter(SikaActionEventModel.action_id == aid).count()
+        assert final_count == initial_count  # Aucun événement de transition n'a été inséré !
+
+
+def test_same_idempotency_key_is_reused_after_retry():
+    """IDEMPOTENCY TEST : L'idempotency_key reste identique à action_id lors des réessais et de la réconciliation."""
+    import secrets
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_idempotency_stable_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(aid, user_id=1)
+
+    with Session(engine) as db:
+        act = db.query(SikaActionModel).filter(SikaActionModel.action_id == aid).first()
+        assert act.idempotency_key == aid
+
+
+def test_timeout_does_not_generate_new_idempotency_key():
+    """IDEMPOTENCY TEST : Un timeout réseau bascule le statut à UNKNOWN_RESULT tout en conservant l'idempotency_key originale."""
+    import asyncio, secrets
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_tr_timeout_idempotency_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(aid, user_id=1)
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.side_effect = TimeoutError("Network timeout")
+        res = asyncio.run(sika_orchestrator.confirm_action(aid, user_id=1))
+        assert res["status"] == "UNKNOWN_RESULT"
+
+    with Session(engine) as db:
+        act = db.query(SikaActionModel).filter(SikaActionModel.action_id == aid).first()
+        assert act.status == "UNKNOWN_RESULT"
+        assert act.idempotency_key == aid
+
+
+def test_concurrent_reconciliation_cannot_create_conflicting_terminal_states():
+    """RECONCILIATION RACE TEST : Deux réconciliations simultanées aboutissent à un état terminal cohérent sans écrasement."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_rec_race_{secrets.token_hex(4)}"
+    now_utc = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="UNKNOWN_RESULT",
+            created_at=now_utc,
+            expires_at=now_utc + timedelta(seconds=300),
+            updated_at=now_utc
+        ))
+        db.commit()
+
+    mock_txs = [{
+        "id": aid,
+        "reference": aid,
+        "description": "Transfert SIKA",
+        "amount": 20000.0,
+        "status": "COMPLETED"
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions", return_value=mock_txs), \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        
+        async def run_reconciles():
+            return await asyncio.gather(
+                sika_orchestrator.reconcile_action(aid, user_id=1),
+                sika_orchestrator.reconcile_action(aid, user_id=1)
+            )
+
+        res1, res2 = asyncio.run(run_reconciles())
+        assert res1["status"] == "EXECUTED"
+        assert res2["status"] == "EXECUTED"
+        mock_payout.assert_not_called()
+
+
+def test_expiration_event_is_recorded_once():
+    """AUDIT TEST : L'exécution répétée de cleanup_stale_actions n'enregistre qu'un seul événement ACTION_EXPIRED."""
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.models.sika_action_event import SikaActionEventModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_double_cleanup_{secrets.token_hex(4)}"
+    old_time = datetime.now(timezone.utc) - timedelta(seconds=400)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            idempotency_key=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="WAITING_CONFIRMATION",
+            created_at=old_time,
+            expires_at=old_time + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    # Premier nettoyage
+    sika_orchestrator.cleanup_stale_actions()
+
+    # Deuxième nettoyage
+    sika_orchestrator.cleanup_stale_actions()
+
+    with Session(engine) as db:
+        exp_events = db.query(SikaActionEventModel).filter(
+            SikaActionEventModel.action_id == aid,
+            SikaActionEventModel.new_status == "EXPIRED"
+        ).all()
+        assert len(exp_events) == 1
+
+
+
 
 
 

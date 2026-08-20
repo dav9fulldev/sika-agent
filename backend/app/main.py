@@ -14,6 +14,13 @@ Point d'entrée principal de l'API SIKA AI Standalone.
 
 # Initialisation des tables SQL au démarrage
 Base.metadata.create_all(bind=engine)
+try:
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE sika_actions ADD COLUMN idempotency_key VARCHAR(100)"))
+        conn.commit()
+except Exception:
+    pass
 
 app = FastAPI(
     title="SIKA AI API",

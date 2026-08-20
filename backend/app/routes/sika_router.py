@@ -176,4 +176,17 @@ async def sika_reconcile_action(action_id: str, data: Optional[Dict[str, Any]] =
     return await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
 
 
+@router.post("/actions/cleanup-stale")
+def sika_cleanup_stale_actions(authorization: Optional[str] = Header(None)):
+    """Endpoint de nettoyage périodique / arrière-plan des actions expirées."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    expired_ids = sika_orchestrator.cleanup_stale_actions()
+    return {
+        "success": True,
+        "expired_count": len(expired_ids),
+        "expired_action_ids": expired_ids
+    }
+
+
+
 

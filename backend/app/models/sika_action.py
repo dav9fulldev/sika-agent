@@ -19,6 +19,12 @@ class SikaActionModel(Base):
         index=True
     )
 
+    idempotency_key = Column(
+        String(100),
+        nullable=True,
+        index=True
+    )
+
     user_id = Column(
         Integer,
         nullable=False,

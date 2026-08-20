@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .state_machine import AgentState
 from .memory_bridge import memory_bridge
 from .tool_registry import tool_registry
@@ -14,6 +14,15 @@ from datetime import datetime, timedelta, timezone
 import json
 
 logger = logging.getLogger("SikaAgentOrchestrator")
+
+
+def _ensure_utc(dt: Any) -> Any:
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def _log_action_event(db, action_id: str, user_id: int, previous_status: str, new_status: str, event_type: str = "STATE_CHANGE", reason: str = None, metadata: dict = None):
@@ -88,6 +97,7 @@ class SikaAgentOrchestrator:
                 else:
                     db.add(SikaActionModel(
                         action_id=action_id,
+                        idempotency_key=action_id,
                         user_id=user_id,
                         action_type=action_type,
                         status="WAITING_CONFIRMATION",
@@ -102,57 +112,84 @@ class SikaAgentOrchestrator:
 
         return entry
 
+    def cleanup_stale_actions(self, now: Optional[datetime] = None) -> List[str]:
+        """Bascule automatiquement et de manière atomique toutes les actions en attente expirées vers l'état EXPIRED."""
+        now_utc = _ensure_utc(now or datetime.now(timezone.utc))
+        expired_ids = []
+        try:
+            from sqlalchemy.orm import Session
+            from ..database import engine
+            from ..models.sika_action import SikaActionModel
+            with Session(engine) as db:
+                candidates = db.query(SikaActionModel).filter(
+                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
+                ).all()
+
+                stale_actions = [act for act in candidates if act.expires_at and now_utc > _ensure_utc(act.expires_at)]
+
+                for act in stale_actions:
+                    prev_st = act.status
+                    act.status = "EXPIRED"
+                    act.updated_at = now_utc
+                    expired_ids.append(act.action_id)
+                    _log_action_event(db, act.action_id, act.user_id, prev_st, "EXPIRED", "ACTION_EXPIRED", "BACKGROUND_TTL_CLEANUP")
+
+                    if act.action_id in self.action_store:
+                        self.action_store[act.action_id]["status"] = "EXPIRED"
+
+                if expired_ids:
+                    db.commit()
+                    logger.info(f"[TTL CLEANUP] {len(expired_ids)} action(s) expiré(es) nettoyée(s) : {expired_ids}")
+        except Exception as e:
+            logger.warning(f"[TTL CLEANUP WARN] Erreur lors du nettoyage des actions expirées: {e}")
+        return expired_ids
+
     def cancel_action(self, action_id: str, user_id: int = 1, reason: str = "USER_CANCELLED") -> Dict[str, Any]:
         """Marque une action comme annulée de manière atomique (uniquement si WAITING_CONFIRMATION ou PREPARED)."""
         try:
             from sqlalchemy.orm import Session
             from ..database import engine
             from ..models.sika_action import SikaActionModel
+
             with Session(engine) as db:
                 db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
-                if not db_action:
-                    return {"success": False, "status": "NOT_FOUND", "message": "Action introuvable."}
-
-                if str(db_action.user_id) != str(user_id):
-                    logger.warning(f"[SECURITY REJECT] User {user_id} ne peut pas annuler l'action {action_id} de user {db_action.user_id}")
-                    return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Vous n'êtes pas autorisé à annuler cette transaction."}
-
-                if db_action.status not in ["WAITING_CONFIRMATION", "PREPARED"]:
-                    logger.warning(f"[CANCEL REJECT] Impossible d'annuler l'action {action_id} qui est déjà au statut '{db_action.status}'")
+                if db_action and str(db_action.user_id) != str(user_id):
                     return {
                         "success": False,
-                        "status": db_action.status,
-                        "message": f"Impossible d'annuler une action déjà au statut {db_action.status}."
+                        "status": "UNAUTHORIZED_USER",
+                        "action_id": action_id,
+                        "message": "Cette action financière n'appartient pas à cet utilisateur."
                     }
 
-                prev_st = db_action.status
                 affected = db.query(SikaActionModel).filter(
                     SikaActionModel.action_id == action_id,
                     SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
-                ).update({
-                    "status": "CANCELLED",
-                    "cancelled_reason": reason,
-                    "updated_at": datetime.now(timezone.utc)
-                }, synchronize_session=False)
+                ).update({"status": "CANCELLED", "cancelled_reason": reason, "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
 
                 if affected > 0:
-                    _log_action_event(db, action_id, user_id, prev_st, "CANCELLED", "ACTION_CANCELLED", reason)
+                    _log_action_event(db, action_id, user_id, "WAITING_CONFIRMATION", "CANCELLED", "ACTION_CANCELLED", reason)
                 db.commit()
 
-                if affected == 0:
-                    return {"success": False, "status": "CANNOT_CANCEL", "message": "Transaction déjà en cours ou terminée."}
+                if affected == 0 and db_action:
+                    return {
+                        "success": False,
+                        "status": db_action.status,
+                        "action_id": action_id,
+                        "message": f"Impossible d'annuler cette action car elle est déjà au statut {db_action.status}."
+                    }
         except Exception as e:
-            logger.warning(f"[DB WARN] Impossible d'annuler l'action dans la DB: {e}")
+            logger.warning(f"[DB WARN] Impossible d'annuler l'action en DB: {e}")
 
         if action_id in self.action_store:
-            if str(self.action_store[action_id].get("user_id")) != str(user_id):
-                return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Vous n'êtes pas autorisé à annuler cette transaction."}
             self.action_store[action_id]["status"] = "CANCELLED"
             self.action_store[action_id]["cancelled_reason"] = reason
 
-        return {"success": True, "status": "CANCELLED", "action_id": action_id}
-
-
+        return {
+            "success": True,
+            "status": "CANCELLED",
+            "action_id": action_id,
+            "message": "Demande de virement annulée avec succès."
+        }
 
     def list_available_tools(self) -> List[Dict[str, Any]]:
         """Retourne la liste des tools disponibles dans le registre."""
@@ -163,10 +200,9 @@ class SikaAgentOrchestrator:
         logger.info(f"[SIKA AGENT] Exécution du tool '{tool_name}' (Arguments: {arguments})")
         return self.registry.execute(tool_name, arguments, user_confirmed=user_confirmed)
 
-    async def process_user_request(self, user_id: int, query: str, session_id: str = "default") -> Dict[str, Any]:
-        """Exécute la boucle agentique Taskmaster basée sur Google Gemini."""
-        logger.info(f"[SIKA AGENT] Requête reçue de user_id={user_id}: '{query}'")
-        self.state = AgentState.UNDERSTANDING
+    async def process_user_query(self, query: str, user_id: int = 1) -> Dict[str, Any]:
+        """Traite la requête utilisateur via Google Gemini (SikaAI) et exécute les tools financiers appropriés."""
+        logger.info(f"[SIKA ORCHESTRATOR] Traitement de la requête utilisateur: '{query}' (user_id={user_id})")
 
         # 1. Récupération du contexte financier via MemoryBridge
         context = memory_bridge.get_financial_context(user_id)
@@ -225,6 +261,7 @@ class SikaAgentOrchestrator:
 
         # 1. VÉRIFICATION D'APPARTENANCE ET D'ÉTAT PERSISTÉ EN BASE DE DONNÉES
         db_action = None
+        now_utc = _ensure_utc(datetime.now(timezone.utc))
         try:
             with Session(engine) as db:
                 db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
@@ -241,7 +278,7 @@ class SikaAgentOrchestrator:
                             "should_speak": True
                         }
 
-                    # États terminaux (Transition strictement interdite)
+                    # États terminaux (Transition strictly interdite)
                     if db_action.status == "EXECUTED":
                         return {
                             "success": False,
@@ -290,8 +327,8 @@ class SikaAgentOrchestrator:
 
                     # Gestion d'une action EXECUTING bloquée (Crash recovery / Timeout > 60s)
                     if db_action.status == "EXECUTING":
-                        now = datetime.utcnow()
-                        if (now - db_action.updated_at) > timedelta(seconds=60):
+                        updated_at_utc = _ensure_utc(db_action.updated_at)
+                        if updated_at_utc and (now_utc - updated_at_utc) > timedelta(seconds=60):
                             logger.warning(f"[CRASH RECOVERY] Action {action_id} bloquée en EXECUTING depuis > 60s. Bascule vers REQUIRES_RECONCILIATION.")
                             db_action.status = "REQUIRES_RECONCILIATION"
                             db_action.cancelled_reason = "STUCK_EXECUTING_TIMEOUT"
@@ -313,8 +350,11 @@ class SikaAgentOrchestrator:
                             "should_speak": True
                         }
 
-                    if db_action.status == "EXPIRED" or (datetime.utcnow() > db_action.expires_at):
+                    if db_action.status == "EXPIRED" or (db_action.expires_at and now_utc > _ensure_utc(db_action.expires_at)):
+                        prev_st = db_action.status
                         db_action.status = "EXPIRED"
+                        db_action.updated_at = now_utc
+                        _log_action_event(db, action_id, user_id, prev_st, "EXPIRED", "ACTION_EXPIRED", "TTL_EXPIRED_UPON_CONFIRM")
                         db.commit()
                         return {
                             "success": False,
@@ -347,15 +387,34 @@ class SikaAgentOrchestrator:
             if cur_st == "CANCELLED":
                 return {"success": False, "status": "CANCELLED", "message": "Cette demande de transaction a été annulée.", "speech_text": "Cette demande de transaction a été annulée.", "should_speak": True}
 
-        # 2. VERROUILLAGE ATOMIQUE SQL (WAITING_CONFIRMATION / PREPARED -> EXECUTING)
+        # 2. VERROUILLAGE ATOMIQUE SQL (WAITING_CONFIRMATION / PREPARED -> EXECUTING) AVEC FILTRE TTL
+        # L'inclusion de expires_at >= now_utc dans la clause WHERE empêche toute race condition
+        # entre l'expiration et la confirmation : si l'action expire exactement au même moment,
+        # affected == 0 et aucun payout n'est déclenché.
         try:
+            from sqlalchemy import or_
             with Session(engine) as db:
                 affected = db.query(SikaActionModel).filter(
                     SikaActionModel.action_id == action_id,
-                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
-                ).update({"status": "EXECUTING", "updated_at": datetime.utcnow()}, synchronize_session=False)
+                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"]),
+                    or_(SikaActionModel.expires_at.is_(None), SikaActionModel.expires_at >= now_utc)
+                ).update({"status": "EXECUTING", "updated_at": now_utc}, synchronize_session=False)
+
+                if affected > 0:
+                    _log_action_event(db, action_id, user_id, "WAITING_CONFIRMATION", "EXECUTING", "ACTION_EXECUTING", "USER_CONFIRMED")
                 db.commit()
+
                 if affected == 0:
+                    check_act = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                    if check_act and (check_act.status == "EXPIRED" or (check_act.expires_at and now_utc > _ensure_utc(check_act.expires_at))):
+                        return {
+                            "success": False,
+                            "status": "EXPIRED",
+                            "action_id": action_id,
+                            "message": "Cette demande de transaction a expiré. Veuillez recommencer la commande.",
+                            "speech_text": "Cette demande de transaction a expiré. Veuillez recommencer.",
+                            "should_speak": True
+                        }
                     logger.warning(f"[ATOMIC LOCK REJECT] Action {action_id} déjà verrouillée ou changée d'état.")
                     return {
                         "success": False,
@@ -392,9 +451,10 @@ class SikaAgentOrchestrator:
                 with Session(engine) as db:
                     db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
                         "status": "UNKNOWN_RESULT",
-                        "cancelled_reason": str(net_exc),
-                        "updated_at": datetime.utcnow()
+                        "cancelled_reason": str(net_exc)[:255],
+                        "updated_at": datetime.now(timezone.utc)
                     })
+                    _log_action_event(db, action_id, user_id, "EXECUTING", "UNKNOWN_RESULT", "ACTION_UNKNOWN_RESULT", "NETWORK_ERROR")
                     db.commit()
             except Exception:
                 pass
@@ -412,7 +472,8 @@ class SikaAgentOrchestrator:
             fail_msg = payout_res.get("message") or "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué."
             try:
                 with Session(engine) as db:
-                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "FAILED", "updated_at": datetime.utcnow()})
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "FAILED", "updated_at": datetime.now(timezone.utc)})
+                    _log_action_event(db, action_id, user_id, "EXECUTING", "FAILED", "ACTION_FAILED", "PAYMECHAP_REJECTED")
                     db.commit()
             except Exception:
                 pass
@@ -454,8 +515,9 @@ class SikaAgentOrchestrator:
                 db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
                     "status": "EXECUTED",
                     "result_json": json.dumps(res_dict),
-                    "updated_at": datetime.utcnow()
+                    "updated_at": datetime.now(timezone.utc)
                 })
+                _log_action_event(db, action_id, user_id, "EXECUTING", "EXECUTED", "ACTION_EXECUTED", "PAYMECHAP_SUCCESS")
                 db.commit()
         except Exception:
             pass
@@ -558,8 +620,9 @@ class SikaAgentOrchestrator:
                             SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
                         ).update({
                             "status": "EXECUTED",
-                            "updated_at": datetime.utcnow()
+                            "updated_at": datetime.now(timezone.utc)
                         }, synchronize_session=False)
+                        _log_action_event(db, action_id, user_id, "UNKNOWN_RESULT", "EXECUTED", "ACTION_RECONCILED", "PAYMECHAP_CONFIRMED")
                         db.commit()
                 except Exception as e:
                     logger.warning(f"[DB WARN] Erreur mise à jour réconciliation EXECUTED: {e}")
@@ -586,8 +649,9 @@ class SikaAgentOrchestrator:
                             SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
                         ).update({
                             "status": "FAILED",
-                            "updated_at": datetime.utcnow()
+                            "updated_at": datetime.now(timezone.utc)
                         }, synchronize_session=False)
+                        _log_action_event(db, action_id, user_id, "UNKNOWN_RESULT", "FAILED", "ACTION_RECONCILED", "PAYMECHAP_FAILED")
                         db.commit()
                 except Exception as e:
                     logger.warning(f"[DB WARN] Erreur mise à jour réconciliation FAILED: {e}")
@@ -615,7 +679,7 @@ class SikaAgentOrchestrator:
                     ).update({
                         "status": "REQUIRES_RECONCILIATION",
                         "cancelled_reason": "NO_MATCHING_TRANSACTION_FOUND",
-                        "updated_at": datetime.utcnow()
+                        "updated_at": datetime.now(timezone.utc)
                     }, synchronize_session=False)
                     db.commit()
             except Exception:

@@ -467,12 +467,21 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[PAYMECHAP EXECUTION] Executing real payout confirmation via POST /api/v1/sika/agent/confirm for action_id: $actionId');
 
       final confirmRes = await _apiService.sikaAgentConfirm(actionId);
+      final String status = (confirmRes['status'] as String?) ?? '';
 
       final String sikaText = (confirmRes['speech_text'] as String?) ??
           (confirmRes['message'] as String?) ??
-          (isEnglish
-              ? 'Operation confirmed and completed successfully on PayMeChap!'
-              : 'Opération confirmée et exécutée avec succès sur PayMeChap !');
+          (status == 'EXPIRED'
+              ? (isEnglish ? 'This transaction request has expired. Please try again.' : 'Cette demande de transaction a expiré. Veuillez recommencer l\'opération.')
+              : status == 'REQUIRES_RECONCILIATION'
+                  ? (isEnglish ? 'The transaction status must be verified before any new attempt.' : 'Le statut de cette opération doit être vérifié avant toute nouvelle tentative.')
+                  : (isEnglish
+                      ? 'Operation confirmed and completed successfully on PayMeChap!'
+                      : 'Opération confirmée et exécutée avec succès sur PayMeChap !'));
+
+      final SikaState pendingState = (status == 'EXPIRED' || status == 'REQUIRES_RECONCILIATION' || status == 'FAILED')
+          ? SikaState.error
+          : SikaState.completed;
 
       final sikaMessage = SikaMessage(text: sikaText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
@@ -480,7 +489,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       state = state.copyWith(
         state: SikaState.speaking,
         messages: finalMessages,
-        pendingNextState: SikaState.completed,
+        pendingNextState: pendingState,
         pendingActionId: null,
       );
 
