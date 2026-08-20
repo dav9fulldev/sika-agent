@@ -315,6 +315,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
       await fetchWallets();
       await fetchMovements();
+      await fetchCoffres();
       return true;
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error verifying OTP: $e');
@@ -331,6 +332,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
       state = state.copyWith(isLoading: false, lastPerceptionMessage: msg);
       await fetchWallets();
       await fetchMovements();
+      await fetchCoffres();
       return true;
     } catch (e) {
       debugPrint('[WALLET PERCEPTION] Error perceiving SMS: $e');
@@ -366,6 +368,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
       await _apiService.syncWallets();
       await fetchWallets();
       await fetchMovements();
+      await fetchCoffres();
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error syncing wallets: $e');
       state = state.copyWith(isLoading: false);

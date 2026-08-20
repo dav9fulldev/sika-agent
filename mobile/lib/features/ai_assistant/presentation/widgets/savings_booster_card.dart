@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
+import '../../../wallet/providers/wallet_provider.dart';
 import '../../providers/sika_provider.dart';
 
 /// SavingsBoosterCard — Module Cœur SIKA: Booster d'Épargne Autonome
@@ -21,6 +22,11 @@ class SavingsBoosterCard extends ConsumerWidget {
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
     final sikaNotifier = ref.read(sikaProvider.notifier);
+
+    final walletState = ref.watch(walletProvider);
+    final firstCoffre = walletState.coffres.isNotEmpty ? walletState.coffres.first : null;
+    final double targetAmount = firstCoffre != null && firstCoffre.objectif > 0 ? firstCoffre.objectif : 500000.0;
+    final String coffreName = firstCoffre?.nom ?? langNotifier.tr('Épargne', 'Savings');
 
     return Container(
       width: double.infinity,
@@ -67,8 +73,8 @@ class SavingsBoosterCard extends ConsumerWidget {
 
           Text(
             langNotifier.tr(
-              'En mettant de côté ${currNotifier.format(500)} aujourd\'hui, vous atteindrez votre objectif de ${currNotifier.format(80000)} avec 5 jours d\'avance !',
-              'By putting aside ${currNotifier.format(500)} today, you will reach your ${currNotifier.format(80000)} target 5 days earlier!',
+              'En mettant de côté ${currNotifier.format(500)} aujourd\'hui, vous atteindrez votre coffre "$coffreName" (${currNotifier.format(targetAmount)}) avec 5 jours d\'avance !',
+              'By putting aside ${currNotifier.format(500)} today, you will reach your "$coffreName" target (${currNotifier.format(targetAmount)}) 5 days earlier!',
             ),
             style: const TextStyle(
               color: Color(0xFF94A3B8),

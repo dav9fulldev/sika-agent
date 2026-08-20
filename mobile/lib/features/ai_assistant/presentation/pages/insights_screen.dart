@@ -16,6 +16,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   String _selectedPeriodKey = 'Ce mois';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(walletProvider.notifier).fetchCoffres();
+      ref.read(walletProvider.notifier).fetchMovements();
+      ref.read(walletProvider.notifier).fetchWallets();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
@@ -119,8 +129,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(walletProvider.notifier).syncAllWallets();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -367,8 +382,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildCategoryRow(String name, String percentage, Color dotColor) {
     return Row(
