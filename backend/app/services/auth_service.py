@@ -56,9 +56,9 @@ class OAuth2AuthService:
         exp_time = now + (expires_delta if expires_delta is not None else timedelta(hours=self.TOKEN_EXPIRE_HOURS))
         jti_val = user_data.get("jti") or str(uuid.uuid4())
         payload = {
-            "sub": user_data.get("email", "david.yao@email.com"),
+            "sub": user_data.get("email", "anonymous@sika.app"),
             "user_id": int(u_id) if str(u_id).isdigit() else 1,
-            "name": user_data.get("name", "David YAO"),
+            "name": user_data.get("name", "User"),
             "is_premium": user_data.get("is_premium", True),
             "jti": jti_val,
             "iat": now,

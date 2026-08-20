@@ -5,6 +5,13 @@ Supports PostgreSQL (Cloud SQL) and SQLite (Development Fallback).
 
 import os
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis le fichier .env
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(env_path)
+
 # pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
 
