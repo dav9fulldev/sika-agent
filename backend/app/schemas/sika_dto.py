@@ -57,5 +57,4 @@ class SikaResponseDTO(BaseModel):
     requires_security_validation: Optional[bool] = False
     should_speak: Optional[bool] = True
     speech_text: Optional[str] = None
-    audio_base64: Optional[str] = None
     action_data: Optional[Dict[str, Any]] = None

@@ -336,8 +336,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
         messages: finalMessages,
       );
 
-      final String? audioB64 = response['audio_base64'] as String?;
-      await _speak(sikaText, ttsLocale: activeTtsLocale, audioBase64: audioB64);
+      await _speak(sikaText, ttsLocale: activeTtsLocale);
     } catch (e) {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
@@ -364,26 +363,24 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  Future<void> _speak(String text, {required String ttsLocale, String? audioBase64}) async {
+  Future<void> _speak(String text, {required String ttsLocale}) async {
     try {
-      debugPrint('[SIKA TTS] Preparing speech output ($ttsLocale)');
-      String? b64 = audioBase64;
+      debugPrint('[SIKA TTS] Preparing speech output ($ttsLocale): "$text"');
+      String? b64;
 
-      // 1. Si aucun audio base64 n'est fourni, tenter la génération GCP TTS via le backend SIKA
-      if (b64 == null || b64.isEmpty) {
-        try {
-          final ttsRes = await _apiService.fetchGcpTtsAudio(text);
-          if (ttsRes['success'] == true && ttsRes['audio_base64'] != null) {
-            b64 = ttsRes['audio_base64'] as String;
-          }
-        } catch (e) {
-          debugPrint('[GCP TTS] Impossible d\'obtenir l\'audio du backend: $e. Basculement sur flutter_tts.');
+      // 1. MOTEUR PRINCIPAL : Appel de l'endpoint dédié POST /api/v1/sika/tts
+      try {
+        final ttsRes = await _apiService.fetchGcpTtsAudio(text);
+        if (ttsRes['success'] == true && ttsRes['audio_base64'] != null) {
+          b64 = ttsRes['audio_base64'] as String;
         }
+      } catch (e) {
+        debugPrint('[GCP TTS API] Indisponible ($e). Basculement automatique sur flutter_tts.');
       }
 
-      // 2. MOTEUR PRINCIPAL : Lecture de l'audio MP3 haute-fidélité Google Cloud Text-to-Speech
+      // 2. LECTURE AUDIO GCP TTS MP3
       if (b64 != null && b64.isNotEmpty) {
-        debugPrint('[GCP TTS] 🔊 Lecture de l\'audio MP3 Google Cloud Text-to-Speech (Taille: ${b64.length} caractères)');
+        debugPrint('[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets)');
         final bytes = base64Decode(b64);
         await _audioPlayer.stop();
         await _audioPlayer.play(BytesSource(bytes));
@@ -393,10 +390,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
             state = state.copyWith(state: SikaState.idle);
           }
         });
-        return; // UN SEUL MOTEUR AUDIO EXÉCUTÉ - AUCUN DOUBLON
+        return; // UN SEUL MOTEUR AUDIO EXÉCUTÉ - SANS AUCUN DOUBLON
       }
 
-      // 3. STRATÉGIE DE FALLBACK : Utilisation de flutter_tts si GCP TTS est indisponible
+      // 3. FALLBACK : flutter_tts
       debugPrint('[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale du téléphone');
       await _flutterTts.setLanguage(ttsLocale);
       await _flutterTts.speak(text);

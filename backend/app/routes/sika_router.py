@@ -150,15 +150,7 @@ async def sika_agent_process(data: Dict[str, Any]):
     """Endpoint principal de traitement de la boucle Agent Taskmaster."""
     user_id = data.get("user_id", 1)
     query = data.get("query", "")
-    res = await sika_orchestrator.process_user_request(user_id=user_id, query=query)
-
-    # Synthèse vocale GCP TTS optionnelle si demandée
-    if data.get("generate_audio") and res.get("speech_text"):
-        tts_res = gcp_tts_service.synthesize_speech(res["speech_text"])
-        if tts_res.get("success"):
-            res["audio_base64"] = tts_res["audio_base64"]
-
-    return res
+    return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
 
 
 @router.post("/agent/confirm")
@@ -166,11 +158,4 @@ async def sika_agent_confirm(data: Dict[str, Any]):
     """Endpoint de validation humaine pour l'agent SIKA."""
     action_id = data.get("action_id", "")
     user_id = data.get("user_id", 1)
-    res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
-
-    if data.get("generate_audio") and res.get("speech_text"):
-        tts_res = gcp_tts_service.synthesize_speech(res["speech_text"])
-        if tts_res.get("success"):
-            res["audio_base64"] = tts_res["audio_base64"]
-
-    return res
+    return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
