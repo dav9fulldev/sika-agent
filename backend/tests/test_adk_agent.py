@@ -439,9 +439,10 @@ def test_client_supplied_fake_user_id_overridden_by_auth():
     token = oauth2_auth_service.create_access_token({"id": 100, "email": "valid.user@sika.ci"})
     auth_header = f"Bearer {token}"
 
-    # Le client envoie un fake body user_id: 999
-    authenticated_id = oauth2_auth_service.get_authenticated_user_id(authorization_header=auth_header, client_body_user_id=999)
+    # Le client tente d'envoyer un fake user_id: 999, mais le serveur extrait l'identité depuis le JWT (100)
+    authenticated_id = oauth2_auth_service.require_authenticated_user_id(authorization_header=auth_header)
     assert authenticated_id == 100
+
 
 
 def test_confirm_request_cannot_modify_amount():
@@ -507,7 +508,6 @@ def test_confirm_request_cannot_modify_recipient():
 
 def test_biometric_pin_failure_does_not_call_confirm():
     """SECURITY TEST 13 : Un échec ou une annulation d'authentification biométrique/PIN n'invoque pas confirm_action."""
-    # Simulation du comportement mobile : lorsque authenticate() échoue/est annulé, confirm_action n'est pas appelé
     biometric_success = False
     confirm_called = False
 
@@ -515,6 +515,239 @@ def test_biometric_pin_failure_does_not_call_confirm():
         confirm_called = True
 
     assert confirm_called is False
+
+
+# ============================================================================
+# TESTS D'AUTHENTIFICATION ET DE RENFORCEMENT JWT (STRICT 401 & NO FALLBACK)
+# ============================================================================
+
+def test_sensitive_endpoint_without_token_returns_401():
+    """TEST 1 : Route sensible sans jeton -> Leve HTTPException(401)."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    try:
+        asyncio.run(sika_agent_confirm({"action_id": "act_123"}, authorization=None))
+        assert False, "Devrait lever HTTPException 401"
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert "Authentication required" in e.detail
+
+
+def test_confirm_without_token_does_not_execute_payout():
+    """TEST 2 : Appel de confirm sans jeton n'invoque pas execute_payout."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        try:
+            asyncio.run(sika_agent_confirm({"action_id": "act_123"}, authorization=None))
+        except HTTPException:
+            pass
+        mock_payout.assert_not_called()
+
+
+def test_cancel_without_token_returns_401():
+    """TEST 3 : Annulation sans jeton -> 401."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_cancel
+    try:
+        asyncio.run(sika_agent_cancel({"action_id": "act_123"}, authorization=None))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_reconcile_without_token_returns_401():
+    """TEST 4 : Réconciliation sans jeton -> 401."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_reconcile_action
+    try:
+        asyncio.run(sika_reconcile_action("act_123", authorization=None))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_invalid_jwt_returns_401():
+    """TEST 5 : Jeton JWT corrompu ou falsifié -> 401."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    try:
+        asyncio.run(sika_agent_confirm({"action_id": "act_123"}, authorization="Bearer invalid.fake.token"))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_expired_jwt_returns_401():
+    """TEST 6 : Jeton JWT expiré -> 401."""
+    import asyncio, base64, json
+    from datetime import datetime, timedelta
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    from app.services.auth_service import oauth2_auth_service
+
+    payload = {
+        "sub": "test@sika.ci",
+        "user_id": 55,
+        "exp": (datetime.utcnow() - timedelta(minutes=10)).timestamp()
+    }
+    header_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().strip("=")
+    sig = base64.urlsafe_b64encode(f"{header_b64}.{payload_b64}.{oauth2_auth_service.SECRET_KEY}".encode()).decode().strip("=")
+    expired_token = f"{header_b64}.{payload_b64}.{sig}"
+
+    try:
+        asyncio.run(sika_agent_confirm({"action_id": "act_123"}, authorization=f"Bearer {expired_token}"))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_malformed_authorization_header_returns_401():
+    """TEST 7 : Header Authorization malformé sans 'Bearer ' -> 401."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    try:
+        asyncio.run(sika_agent_confirm({"action_id": "act_123"}, authorization="Basic dXNlcjpwYXNz"))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_valid_jwt_extracts_authenticated_user():
+    """TEST 8 : Jeton JWT valide extrait correctement l'ID utilisateur authentifié."""
+    from app.services.auth_service import oauth2_auth_service
+    token = oauth2_auth_service.create_access_token({"id": 77, "email": "valid77@sika.ci"})
+    uid = oauth2_auth_service.require_authenticated_user_id(f"Bearer {token}")
+    assert uid == 77
+
+
+def test_client_body_user_id_is_ignored_for_authenticated_requests():
+    """TEST 9 : user_id dans le body JSON est ignoré sur les endpoints exigeant un JWT."""
+    import asyncio
+    from app.routes.sika_router import sika_agent_confirm
+    from app.agent.orchestrator import sika_orchestrator
+    from app.services.auth_service import oauth2_auth_service
+
+    token = oauth2_auth_service.create_access_token({"id": 77, "email": "valid77@sika.ci"})
+    action_id = "act_tr_ignore_body_user"
+    sika_orchestrator.register_action(action_id, user_id=77, payload={"recipient": "Kouamé Jean", "amount": 20000.0})
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "status": "SUCCES"}
+        res = asyncio.run(sika_agent_confirm({"action_id": action_id, "user_id": 9999}, authorization=f"Bearer {token}"))
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+
+
+def test_expired_jwt_cannot_execute_pending_action():
+    """TEST 10 : Un jeton expiré ne peut pas exécuter une action en attente."""
+    import asyncio, base64, json
+    from datetime import datetime, timedelta
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    from app.agent.orchestrator import sika_orchestrator
+    from app.services.auth_service import oauth2_auth_service
+
+    action_id = "act_tr_pending_expired_jwt"
+    sika_orchestrator.register_action(action_id, user_id=55)
+
+    expired_payload = {"sub": "test@sika.ci", "user_id": 55, "exp": (datetime.utcnow() - timedelta(minutes=5)).timestamp()}
+    header_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().strip("=")
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(expired_payload).encode()).decode().strip("=")
+    sig = base64.urlsafe_b64encode(f"{header_b64}.{payload_b64}.{oauth2_auth_service.SECRET_KEY}".encode()).decode().strip("=")
+    expired_token = f"{header_b64}.{payload_b64}.{sig}"
+
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        try:
+            asyncio.run(sika_agent_confirm({"action_id": action_id}, authorization=f"Bearer {expired_token}"))
+        except HTTPException as e:
+            assert e.status_code == 401
+        mock_payout.assert_not_called()
+
+
+def test_user_b_token_cannot_execute_user_a_action():
+    """TEST 11 : Le jeton de l'utilisateur B ne peut pas exécuter l'action de l'utilisateur A."""
+    import asyncio
+    from app.routes.sika_router import sika_agent_confirm
+    from app.agent.orchestrator import sika_orchestrator
+    from app.services.auth_service import oauth2_auth_service
+
+    action_id = "act_tr_user_A_private_test"
+    sika_orchestrator.register_action(action_id, user_id=100) # Appartient à User 100
+
+    token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_agent_confirm({"action_id": action_id}, authorization=f"Bearer {token_B}"))
+        assert res["success"] is False
+        assert res["status"] == "UNAUTHORIZED_USER"
+        mock_payout.assert_not_called()
+
+
+def test_user_b_token_cannot_cancel_user_a_action():
+    """TEST 12 : Le jeton de l'utilisateur B ne peut pas annuler l'action de l'utilisateur A."""
+    import asyncio
+    from app.routes.sika_router import sika_agent_cancel
+    from app.agent.orchestrator import sika_orchestrator
+    from app.services.auth_service import oauth2_auth_service
+
+    action_id = "act_tr_user_A_cancel_test"
+    sika_orchestrator.register_action(action_id, user_id=100)
+
+    token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
+    res = asyncio.run(sika_agent_cancel({"action_id": action_id}, authorization=f"Bearer {token_B}"))
+    assert res["success"] is False
+    assert res["status"] == "UNAUTHORIZED_USER"
+
+
+def test_user_b_token_cannot_reconcile_user_a_action():
+    """TEST 13 : Le jeton de l'utilisateur B ne peut pas réconcilier l'action de l'utilisateur A."""
+    import asyncio
+    from app.routes.sika_router import sika_reconcile_action
+    from app.agent.orchestrator import sika_orchestrator
+    from app.services.auth_service import oauth2_auth_service
+
+    action_id = "act_tr_user_A_reconcile_test"
+    sika_orchestrator.register_action(action_id, user_id=100)
+
+    token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
+    res = asyncio.run(sika_reconcile_action(action_id, authorization=f"Bearer {token_B}"))
+    assert res["success"] is False
+    assert res["status"] == "UNAUTHORIZED_USER"
+
+
+def test_missing_token_cannot_access_private_paymechap_data():
+    """TEST 14 : Un accès aux endpoints sensibles sans jeton est rejeté."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_process
+    try:
+        asyncio.run(sika_agent_process({"query": "Quel est mon solde ?"}, authorization=None))
+        assert False
+    except HTTPException as e:
+        assert e.status_code == 401
+
+
+def test_auth_failure_never_calls_execute_payout():
+    """TEST 15 : Toute défaillance d'authentification garantit qu'aucun virement n'est déclenché."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        try:
+            asyncio.run(sika_agent_confirm({"action_id": "act_any"}, authorization="Bearer invalid"))
+        except HTTPException:
+            pass
+        mock_payout.assert_not_called()
+
 
 
 

@@ -146,37 +146,34 @@ def sika_list_tts_voices():
 
 
 @router.post("/agent/process")
-async def sika_agent_process(data: Dict[str, Any]):
-    """Endpoint principal de traitement de la boucle Agent Taskmaster."""
-    user_id = data.get("user_id", 1)
+async def sika_agent_process(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """Endpoint principal de traitement de la boucle Agent Taskmaster (Exige JWT)."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     query = data.get("query", "")
     return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
 
 
 @router.post("/agent/confirm")
 async def sika_agent_confirm(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
-    """Endpoint de validation humaine pour l'agent SIKA. Extract identity from Bearer token."""
+    """Endpoint de validation humaine pour l'agent SIKA (Exige JWT)."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     action_id = data.get("action_id", "")
-    body_user_id = data.get("user_id", 1)
-    user_id = oauth2_auth_service.get_authenticated_user_id(authorization, client_body_user_id=body_user_id)
     return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
 
 
 @router.post("/agent/cancel")
 async def sika_agent_cancel(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
-    """Endpoint d'annulation d'action pour l'agent SIKA."""
+    """Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT)."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     action_id = data.get("action_id", "")
-    body_user_id = data.get("user_id", 1)
-    user_id = oauth2_auth_service.get_authenticated_user_id(authorization, client_body_user_id=body_user_id)
     return sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.get("reason", "USER_CANCELLED"))
 
 
 @router.post("/actions/{action_id}/reconcile")
 async def sika_reconcile_action(action_id: str, data: Optional[Dict[str, Any]] = None, authorization: Optional[str] = Header(None)):
-    """Endpoint de réconciliation d'une transaction au statut incertain UNKNOWN_RESULT auprès de PayMeChap."""
-    body = data or {}
-    body_user_id = body.get("user_id", 1)
-    user_id = oauth2_auth_service.get_authenticated_user_id(authorization, client_body_user_id=body_user_id)
+    """Endpoint de réconciliation d'une transaction au statut incertain UNKNOWN_RESULT auprès de PayMeChap (Exige JWT)."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     return await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
+
 
 

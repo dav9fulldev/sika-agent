@@ -257,10 +257,15 @@ class ApiService {
     throw Exception('Failed to create transaction: ${response.statusCode}');
   }
 
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    if (hasToken) 'Authorization': 'Bearer $token',
+  };
+
   Future<Map<String, dynamic>> sikaAgentConfirm(String actionId, {int userId = 1}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/agent/confirm'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'action_id': actionId,
         'user_id': userId,
@@ -275,7 +280,7 @@ class ApiService {
   Future<Map<String, dynamic>> sikaReconcileAction(String actionId, {int userId = 1}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/actions/$actionId/reconcile'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'user_id': userId,
       }),
@@ -285,6 +290,7 @@ class ApiService {
     }
     throw Exception('Failed to reconcile agent action: ${response.statusCode}');
   }
+
 
 
   Future<Map<String, dynamic>> fetchGcpTtsAudio(String text, {String voiceName = 'fr-FR-Neural2-C'}) async {
