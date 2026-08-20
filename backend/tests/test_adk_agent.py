@@ -300,6 +300,7 @@ def test_reconciliation_finds_successful_transaction():
 
     mock_txs = [{
         "id": "tx_pmc_found_123",
+        "reference": action_id,
         "description": "Transfert vers Kouamé Jean",
         "amount": 20000.0,
         "status": "COMPLETED"
@@ -333,6 +334,7 @@ def test_reconciliation_finds_failed_transaction():
 
     mock_txs = [{
         "id": "tx_pmc_failed_456",
+        "reference": action_id,
         "description": "Transfert vers Kouamé Jean",
         "amount": 20000.0,
         "status": "FAILED"
@@ -1110,6 +1112,89 @@ def test_terminal_states_cannot_be_overridden():
             assert res_conf["success"] is False
             assert res_conf["status"] in ["ALREADY_EXECUTED", "CANCELLED", "FAILED", "EXPIRED"]
             mock_payout.assert_not_called()
+
+
+def test_reconciliation_ignores_unrelated_20k_transfer():
+    """RECONCILIATION TEST : Réconciliation sans action_id dans PayMeChap ignore les faux positifs 20k/Kouamé."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_strict_rec_{secrets.token_hex(4)}"
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=action_id,
+            user_id=1,
+            action_type="TRANSFER",
+            status="UNKNOWN_RESULT",
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=datetime.utcnow()
+        ))
+        db.commit()
+
+    # Transaction sans le action_id spécifique
+    unrelated_txs = [{
+        "id": "tx_unrelated_123",
+        "reference": "PARTNER-SIKA-999",
+        "description": "Transfert vers Kouamé Jean",
+        "amount": 20000.0,
+        "status": "COMPLETED"
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions", return_value=unrelated_txs):
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id=action_id, user_id=1))
+        assert res["status"] == "UNKNOWN_RESULT"
+        assert res["reconciled"] is False
+
+
+def test_cancel_action_fails_if_already_executing_or_executed():
+    """SECURITY TEST : cancel_action() échoue si l'action est déjà au statut EXECUTING ou EXECUTED."""
+    import secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_tr_cancel_executing_{secrets.token_hex(4)}"
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=aid,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXECUTING",
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=datetime.utcnow()
+        ))
+        db.commit()
+
+    res = sika_orchestrator.cancel_action(aid, user_id=1)
+    assert res["success"] is False
+    assert res["status"] == "EXECUTING"
+
+
+def test_action_events_audit_trail_recorded():
+    """AUDIT TRAIL TEST : Verifie qu'un événement immuable est enregistré dans sika_action_events lors de la création d'une action."""
+    import secrets
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action_event import SikaActionEventModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    aid = f"act_tr_audit_trail_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(aid, user_id=1, payload={"amount": 15000})
+
+    with Session(engine) as db:
+        events = db.query(SikaActionEventModel).filter(SikaActionEventModel.action_id == aid).all()
+        assert len(events) >= 1
+        assert events[0].new_status == "WAITING_CONFIRMATION"
+        assert events[0].event_type == "ACTION_CREATED"
+
 
 
 

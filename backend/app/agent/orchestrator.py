@@ -10,11 +10,30 @@ from ..services.sika_ai import SikaAI
 
 import time
 
-import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 logger = logging.getLogger("SikaAgentOrchestrator")
+
+
+def _log_action_event(db, action_id: str, user_id: int, previous_status: str, new_status: str, event_type: str = "STATE_CHANGE", reason: str = None, metadata: dict = None):
+    """Enregistre un événement immuable dans la table sika_action_events pour l'audit trail."""
+    try:
+        from ..models.sika_action_event import SikaActionEventModel
+        event = SikaActionEventModel(
+            action_id=action_id,
+            user_id=int(user_id) if str(user_id).isdigit() else 1,
+            previous_status=previous_status,
+            new_status=new_status,
+            event_type=event_type,
+            reason=reason,
+            metadata_json=json.dumps(metadata) if metadata else None,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(event)
+    except Exception as e:
+        logger.warning(f"[AUDIT TRAIL WARN] Erreur lors de l'enregistrement de l'événement d'audit: {e}")
+
 
 class SikaAgentOrchestrator:
     """Orchestrateur principal de l'agent SIKA avec raisonnement Google Gemini et persistance SQL."""
@@ -26,9 +45,9 @@ class SikaAgentOrchestrator:
         self.action_store: Dict[str, Dict[str, Any]] = {}
 
     def register_action(self, action_id: str, user_id: int = 1, ttl_seconds: int = 300, action_type: str = "TRANSFER", payload: dict = None) -> Dict[str, Any]:
-        """Enregistre une action financière en attente dans la base de données et en mémoire."""
-        created_at = datetime.utcnow()
-        expires_at = created_at + timedelta(seconds=ttl_seconds)
+        """Enregistre une action financière en attente dans la base de données et en mémoire avec traçabilité d'audit."""
+        now_utc = datetime.now(timezone.utc)
+        expires_at = now_utc + timedelta(seconds=ttl_seconds)
 
         # 1. Mise à jour de la mémoire de processus
         for aid, meta in list(self.action_store.items()):
@@ -56,24 +75,27 @@ class SikaAgentOrchestrator:
                 db.query(SikaActionModel).filter(
                     SikaActionModel.user_id == user_id,
                     SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
-                ).update({"status": "CANCELLED", "cancelled_reason": "REPLACED_BY_NEW_ACTION", "updated_at": datetime.utcnow()}, synchronize_session=False)
+                ).update({"status": "CANCELLED", "cancelled_reason": "REPLACED_BY_NEW_ACTION", "updated_at": now_utc}, synchronize_session=False)
 
                 existing = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
                 if existing:
+                    prev_st = existing.status
                     existing.status = "WAITING_CONFIRMATION"
                     existing.user_id = user_id
                     existing.expires_at = expires_at
-                    existing.updated_at = created_at
+                    existing.updated_at = now_utc
+                    _log_action_event(db, action_id, user_id, prev_st, "WAITING_CONFIRMATION", "ACTION_REGISTERED", "REPLACED_EXISTING", payload)
                 else:
                     db.add(SikaActionModel(
                         action_id=action_id,
                         user_id=user_id,
                         action_type=action_type,
                         status="WAITING_CONFIRMATION",
-                        created_at=created_at,
+                        created_at=now_utc,
                         expires_at=expires_at,
-                        updated_at=created_at
+                        updated_at=now_utc
                     ))
+                    _log_action_event(db, action_id, user_id, None, "WAITING_CONFIRMATION", "ACTION_CREATED", "INITIAL_REGISTRATION", payload)
                 db.commit()
         except Exception as e:
             logger.warning(f"[DB WARN] Impossible d'enregistrer l'action dans la DB: {e}")
@@ -81,23 +103,44 @@ class SikaAgentOrchestrator:
         return entry
 
     def cancel_action(self, action_id: str, user_id: int = 1, reason: str = "USER_CANCELLED") -> Dict[str, Any]:
-        """Marque une action comme annulée dans la mémoire et la base de données après vérification du propriétaire."""
+        """Marque une action comme annulée de manière atomique (uniquement si WAITING_CONFIRMATION ou PREPARED)."""
         try:
             from sqlalchemy.orm import Session
             from ..database import engine
             from ..models.sika_action import SikaActionModel
             with Session(engine) as db:
                 db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
-                if db_action and str(db_action.user_id) != str(user_id):
+                if not db_action:
+                    return {"success": False, "status": "NOT_FOUND", "message": "Action introuvable."}
+
+                if str(db_action.user_id) != str(user_id):
                     logger.warning(f"[SECURITY REJECT] User {user_id} ne peut pas annuler l'action {action_id} de user {db_action.user_id}")
                     return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Vous n'êtes pas autorisé à annuler cette transaction."}
 
-                db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                if db_action.status not in ["WAITING_CONFIRMATION", "PREPARED"]:
+                    logger.warning(f"[CANCEL REJECT] Impossible d'annuler l'action {action_id} qui est déjà au statut '{db_action.status}'")
+                    return {
+                        "success": False,
+                        "status": db_action.status,
+                        "message": f"Impossible d'annuler une action déjà au statut {db_action.status}."
+                    }
+
+                prev_st = db_action.status
+                affected = db.query(SikaActionModel).filter(
+                    SikaActionModel.action_id == action_id,
+                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
+                ).update({
                     "status": "CANCELLED",
                     "cancelled_reason": reason,
-                    "updated_at": datetime.utcnow()
-                })
+                    "updated_at": datetime.now(timezone.utc)
+                }, synchronize_session=False)
+
+                if affected > 0:
+                    _log_action_event(db, action_id, user_id, prev_st, "CANCELLED", "ACTION_CANCELLED", reason)
                 db.commit()
+
+                if affected == 0:
+                    return {"success": False, "status": "CANNOT_CANCEL", "message": "Transaction déjà en cours ou terminée."}
         except Exception as e:
             logger.warning(f"[DB WARN] Impossible d'annuler l'action dans la DB: {e}")
 
@@ -108,6 +151,7 @@ class SikaAgentOrchestrator:
             self.action_store[action_id]["cancelled_reason"] = reason
 
         return {"success": True, "status": "CANCELLED", "action_id": action_id}
+
 
 
     def list_available_tools(self) -> List[Dict[str, Any]]:
@@ -496,9 +540,9 @@ class SikaAgentOrchestrator:
         matching_tx = None
         for tx in live_txs:
             tx_id_str = str(tx.get("id", ""))
-            tx_desc = str(tx.get("description", "")).lower()
+            tx_desc = str(tx.get("description", ""))
             tx_ref = str(tx.get("reference", ""))
-            if action_id in tx_id_str or action_id in tx_ref or "kouamé" in tx_desc or "kouame" in tx_desc or float(tx.get("amount", 0)) == 20000.0:
+            if action_id in tx_id_str or action_id in tx_ref or action_id in tx_desc:
                 matching_tx = tx
                 break
 

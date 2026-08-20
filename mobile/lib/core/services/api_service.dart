@@ -92,7 +92,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl${ApiConstants.sikaChat}'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'query': query,
         'context': {
@@ -112,7 +112,7 @@ class ApiService {
   Future<Map<String, dynamic>> fetchMyWallets() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/v1/wallets/me'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -123,7 +123,7 @@ class ApiService {
   Future<Map<String, dynamic>> fetchWalletTransactionHistory({int limit = 30}) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/v1/wallets/transactions/history?limit=$limit'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -134,7 +134,7 @@ class ApiService {
   Future<Map<String, dynamic>> fetchUserCoffres() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/v1/wallets/coffres'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);

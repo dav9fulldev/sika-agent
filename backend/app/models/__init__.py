@@ -12,6 +12,7 @@ from .savings_goal import SavingsGoalModel
 from .agent_memory import AgentMemoryModel
 from .sika_action import SikaActionModel
 from .sika_session import SikaSessionModel
+from .sika_action_event import SikaActionEventModel
 
 __all__ = [
     "UserModel",
@@ -21,5 +22,7 @@ __all__ = [
     "AgentMemoryModel",
     "SikaActionModel",
     "SikaSessionModel",
+    "SikaActionEventModel",
 ]
+
 
