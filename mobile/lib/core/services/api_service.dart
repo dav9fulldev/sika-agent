@@ -207,7 +207,14 @@ class ApiService {
       return jsonDecode(response.body);
     }
     _handleStatusCode(response.statusCode);
-    throw Exception('Failed to initiate wallet connection: ${response.statusCode}');
+    String errorMsg = 'Échec de la demande de connexion (${response.statusCode})';
+    try {
+      final errObj = jsonDecode(response.body);
+      if (errObj is Map && errObj['detail'] != null) {
+        errorMsg = errObj['detail'].toString();
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
   }
 
   Future<Map<String, dynamic>> verifyWalletOtp({
@@ -230,7 +237,14 @@ class ApiService {
       return jsonDecode(response.body);
     }
     _handleStatusCode(response.statusCode);
-    throw Exception('Failed to verify OTP: ${response.statusCode}');
+    String errorMsg = 'Échec de la validation OTP (${response.statusCode})';
+    try {
+      final errObj = jsonDecode(response.body);
+      if (errObj is Map && errObj['detail'] != null) {
+        errorMsg = errObj['detail'].toString();
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
   }
 
   Future<Map<String, dynamic>> syncWallets() async {
@@ -242,7 +256,14 @@ class ApiService {
       return jsonDecode(response.body);
     }
     _handleStatusCode(response.statusCode);
-    throw Exception('Failed to sync wallets: ${response.statusCode}');
+    String errorMsg = 'Échec de la synchronisation (${response.statusCode})';
+    try {
+      final errObj = jsonDecode(response.body);
+      if (errObj is Map && errObj['detail'] != null) {
+        errorMsg = errObj['detail'].toString();
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
   }
 
   // ============================================================================

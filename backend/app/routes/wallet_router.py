@@ -189,6 +189,12 @@ def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str
     prov_lower = provider.lower()
     if "paymechap" in prov_lower:
         otp_res = paymechap_api_service.initiate_otp_challenge(account_number)
+        if otp_res.get("success") is False:
+            err_msg = otp_res.get("message") or f"Ce numéro ({account_number}) n'est pas enregistré sur PayMeChap."
+            status_c = otp_res.get("status_code", 400)
+            if status_c == 404:
+                status_c = 400
+            raise HTTPException(status_code=status_c, detail=err_msg)
         session_id = otp_res.get("session_id", f"sess_pmc_{int(datetime.utcnow().timestamp())}")
     else:
         session_id = f"sess_{prov_lower.replace(' ', '')}_{int(datetime.utcnow().timestamp())}"
@@ -262,11 +268,12 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
 
     if "paymechap" in prov_lower:
         verify_res = paymechap_api_service.verify_otp_code(account_number, otp_code)
-        if not verify_res.get("success") and not verify_res.get("accessToken"):
+        if not verify_res.get("success"):
             if attempts >= 3:
                 PENDING_OTP_SESSIONS.pop(session_id, None)
                 raise HTTPException(status_code=429, detail="Code OTP incorrect. Nombre maximal de tentatives atteint (3). Session invalidée.")
-            raise HTTPException(status_code=400, detail=f"Code OTP incorrect ({attempts}/3 tentatives).")
+            err_msg = verify_res.get("message") or f"Code OTP incorrect ({attempts}/3 tentatives)."
+            raise HTTPException(status_code=400, detail=err_msg)
 
         access_token = verify_res.get("accessToken")
         fetched = paymechap_api_service.fetch_live_balance(access_token, account_number)

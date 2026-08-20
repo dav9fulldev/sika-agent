@@ -76,6 +76,18 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           _sessionId = sessId;
           _currentStep = 2;
         });
+      } else {
+        final err = ref.read(walletProvider).errorMessage ?? 'Numéro introuvable ou erreur de connexion.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.rose,
+            duration: const Duration(seconds: 4),
+            content: Text(
+              err.replaceAll('Exception: ', ''),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        );
       }
     }
   }
@@ -100,6 +112,18 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           SnackBar(
             backgroundColor: AppColors.emerald,
             content: Text('✅ Code OTP validé ! Compte $_selectedProvider raccordé à SIKA.'),
+          ),
+        );
+      } else {
+        final err = ref.read(walletProvider).errorMessage ?? 'Code OTP incorrect ou expiré.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.rose,
+            duration: const Duration(seconds: 4),
+            content: Text(
+              err.replaceAll('Exception: ', ''),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
           ),
         );
       }

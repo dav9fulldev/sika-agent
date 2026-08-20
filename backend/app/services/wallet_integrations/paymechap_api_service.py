@@ -72,27 +72,37 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone},
                 headers={"Content-Type": "application/json"},
-                timeout=8,
+                timeout=10,
             )
             if resp.status_code in [200, 201]:
+                data = resp.json() if resp.text else {}
                 return {
                     "success": True,
                     "provider": "PayMeChap",
                     "telephone": clean_phone,
                     "session_id": f"pmc_sess_{int(datetime.utcnow().timestamp())}",
-                    "message": f"📧 Code OTP PayMeChap envoyé par Email (Revo) au {phone_number} !",
+                    "message": data.get("message") or f"📧 Code OTP PayMeChap envoyé par Email (Revo) au {phone_number} !",
                 }
-            logger.warning(f"[PayMeChap OTP] Réponse {resp.status_code}: {resp.text}")
+            else:
+                err_data = {}
+                try:
+                    err_data = resp.json()
+                except Exception:
+                    pass
+                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or f"Ce numéro ({clean_phone}) n'est pas enregistré sur PayMeChap (HTTP {resp.status_code})."
+                logger.warning(f"[PayMeChap OTP] Échec {resp.status_code}: {err_msg}")
+                return {
+                    "success": False,
+                    "status_code": resp.status_code,
+                    "message": err_msg
+                }
         except Exception as e:
             logger.warning(f"[PayMeChap OTP] Exception réseau: {e}")
-
-        return {
-            "success": True,
-            "provider": "PayMeChap",
-            "telephone": clean_phone,
-            "session_id": f"pmc_sess_{int(datetime.utcnow().timestamp())}",
-            "message": f"📧 Code OTP PayMeChap envoyé par Email (Revo) au {phone_number} !",
-        }
+            return {
+                "success": False,
+                "status_code": 503,
+                "message": f"Erreur de connexion avec le serveur PayMeChap ({e})."
+            }
 
     def verify_otp_code(self, phone_number: str, otp_code: str) -> Dict[str, Any]:
         """Vérifie le code OTP (POST /api/v1/auth/verify-otp)."""
@@ -105,24 +115,36 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone, "otp": otp_code},
                 headers={"Content-Type": "application/json"},
-                timeout=8,
+                timeout=10,
             )
             if resp.status_code in [200, 201]:
-                data = resp.json()
+                data = resp.json() if resp.text else {}
                 return {
                     "success": True,
-                    "accessToken": data.get("accessToken"),
+                    "accessToken": data.get("accessToken") or data.get("token") or f"pmc_token_{clean_phone}",
                     "refreshToken": data.get("refreshToken"),
-                    "message": "✅ Code OTP vérifié avec succès sur PayMeChap API !",
+                    "message": data.get("message") or "✅ Code OTP vérifié avec succès sur PayMeChap API !",
+                }
+            else:
+                err_data = {}
+                try:
+                    err_data = resp.json()
+                except Exception:
+                    pass
+                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or "Code OTP incorrect ou expiré sur PayMeChap."
+                logger.warning(f"[PayMeChap Verify OTP] Échec {resp.status_code}: {err_msg}")
+                return {
+                    "success": False,
+                    "status_code": resp.status_code,
+                    "message": err_msg
                 }
         except Exception as e:
             logger.warning(f"[PayMeChap Verify OTP] Exception: {e}")
-
-        return {
-            "success": True,
-            "accessToken": f"pmc_token_{clean_phone}",
-            "message": "✅ Code OTP vérifié avec succès !"
-        }
+            return {
+                "success": False,
+                "status_code": 503,
+                "message": f"Erreur de connexion PayMeChap ({e})."
+            }
 
     def verify_transaction_pin(self, phone_number: str, pin_code: str) -> Dict[str, Any]:
         """Vérifie le code PIN de transaction auprès de l'API PayMeChap (POST /api/v1/partners/wallets/{telephone}/verify-pin)."""
