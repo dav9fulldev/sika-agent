@@ -18,6 +18,8 @@ from app.agent.tools.transaction_tools import prepare_transfer
 
 client = TestClient(app)
 
+from app.models.connected_wallet import ConnectedWalletModel
+
 @pytest.fixture(autouse=True)
 def clean_security_environment():
     """Initialise et nettoie la base de données et les caches de sécurité avant chaque test."""
@@ -30,12 +32,14 @@ def clean_security_environment():
 
     with Session(engine) as db:
         db.query(SikaActionModel).delete()
+        db.query(ConnectedWalletModel).delete()
         db.commit()
 
     yield
 
     with Session(engine) as db:
         db.query(SikaActionModel).delete()
+        db.query(ConnectedWalletModel).delete()
         db.commit()
     wallet_router.CONNECTED_USER_WALLETS.clear()
     wallet_router.PENDING_OTP_SESSIONS.clear()
@@ -44,7 +48,14 @@ def clean_security_environment():
     security_rate_limiter.clear()
 
 
+from app.models.user import UserModel
+
 def create_token(user_id: int = 101, email: str = "user@sika.app") -> str:
+    with Session(engine) as db:
+        existing = db.query(UserModel).filter(UserModel.id == user_id).first()
+        if not existing:
+            db.add(UserModel(id=user_id, email=f"user{user_id}@sika.app", full_name=f"User {user_id}", auth_provider="email"))
+            db.commit()
     return oauth2_auth_service.create_access_token(
         user_data={"id": user_id, "email": email, "name": f"User {user_id}"}
     )
@@ -377,7 +388,9 @@ def test_duplicate_perception_event_is_idempotent():
 
 def test_sensitive_fields_not_exposed_in_api_responses():
     """Vérifie qu'aucun hash de mot de passe ni clé privée n'est exposé dans les réponses."""
-    res = client.post("/api/v1/sika/auth/login", json={"email": "david.yao@email.com", "password": "••••••••"})
+    # Créer un compte pour le test
+    client.post("/api/v1/sika/auth/register", json={"name": "Test User", "email": "test.sensitive@sika.app", "password": "SecurePassword123!"})
+    res = client.post("/api/v1/sika/auth/login", json={"email": "test.sensitive@sika.app", "password": "SecurePassword123!"})
     assert res.status_code == 200
     user_data = res.json()["user"]
     assert "password" not in user_data

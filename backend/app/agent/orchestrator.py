@@ -7,6 +7,7 @@ from .tool_registry import tool_registry
 from .tools.tool_models import ToolResult
 from . import tools
 from ..services.sika_ai import SikaAI
+from ..routes.wallet_router import CONNECTED_USER_WALLETS
 
 import time
 

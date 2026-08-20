@@ -274,9 +274,9 @@ class ProfileScreen extends ConsumerWidget {
 
     final authState = ref.watch(authProvider);
     final user = authState.user;
-    final userName = user?.name ?? 'David YAO';
-    final userEmail = user?.email ?? 'david.yao@email.com';
-    final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'D';
+    final userName = user?.name ?? 'Utilisateur';
+    final userEmail = user?.email ?? '';
+    final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     final walletState = ref.watch(walletProvider);
     final connectedCount = walletState.wallets.length;
