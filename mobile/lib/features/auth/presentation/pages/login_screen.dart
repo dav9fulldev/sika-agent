@@ -48,7 +48,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
         (route) => false,
       );
+    } else if (mounted) {
+      final authState = ref.read(authProvider);
+      if (authState.errorMessage != null && authState.errorMessage!.contains('SHA-1')) {
+        _showManualGoogleEmailDialog(authNotifier);
+      }
     }
+  }
+
+  void _showManualGoogleEmailDialog(AuthNotifier authNotifier) {
+    final TextEditingController emailCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF0B1329),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+              child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 10),
+            const Text('Connexion Google', style: TextStyle(color: Colors.white, fontSize: 17)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Mode Développeur / Émulateur :\nSaisissez votre propre adresse Google pour vous connecter directement :',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailCtrl,
+              style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'votre.email@gmail.com',
+                hintStyle: const TextStyle(color: Color(0xFF64748B)),
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx),
+            child: const Text('Annuler', style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final em = emailCtrl.text.trim();
+              if (em.isNotEmpty) {
+                Navigator.pop(dlgCtx);
+                final s = await authNotifier.loginWithGoogle(customEmail: em);
+                if (s && mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
+                    (route) => false,
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+            child: const Text('Se connecter', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

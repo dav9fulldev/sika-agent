@@ -193,29 +193,40 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Connexion et inscription instantanée via le SDK officiel Google Sign-In (OAuth2 / OIDC)
-  Future<bool> loginWithGoogle() async {
+  Future<bool> loginWithGoogle({String? customEmail, String? customName}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      debugPrint('[GOOGLE AUTH] Lancement du flux natif Google Sign-In...');
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      String? email;
+      String? name;
+      String? photoUrl;
+      String? idToken;
 
-      if (account == null) {
-        // L'utilisateur a fermé ou annulé la boîte de dialogue Google
-        debugPrint('[GOOGLE AUTH] Authentification annulée par l\'utilisateur.');
-        state = state.copyWith(isLoading: false);
-        return false;
+      if (customEmail != null && customEmail.trim().isNotEmpty) {
+        // Mode développement / Fallback direct
+        email = customEmail.trim().toLowerCase();
+        name = customName?.trim() ?? email.split('@').first;
+      } else {
+        debugPrint('[GOOGLE AUTH] Lancement du flux natif Google Sign-In...');
+        final GoogleSignInAccount? account = await _googleSignIn.signIn();
+
+        if (account == null) {
+          debugPrint('[GOOGLE AUTH] Authentification annulée par l\'utilisateur.');
+          state = state.copyWith(isLoading: false);
+          return false;
+        }
+
+        final GoogleSignInAuthentication auth = await account.authentication;
+        idToken = auth.idToken;
+        email = account.email;
+        name = account.displayName ?? email.split('@').first;
+        photoUrl = account.photoUrl;
       }
 
-      final GoogleSignInAuthentication auth = await account.authentication;
-      final email = account.email;
-      final name = account.displayName ?? email.split('@').first;
-      final photoUrl = account.photoUrl;
-
-      debugPrint('[GOOGLE AUTH] Compte Google sélectionné: $email ($name)');
+      debugPrint('[GOOGLE AUTH] Compte Google: $email ($name)');
 
       final res = await _apiService.googleLogin(
-        idToken: auth.idToken,
+        idToken: idToken,
         email: email,
         name: name,
         photoUrl: photoUrl,
@@ -244,10 +255,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await prefs.setString(_keyAccessToken, token);
       return true;
     } catch (e) {
-      debugPrint('[AUTH ERROR] Erreur Google Sign-In natif: $e');
+      debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
+        msg = "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez 'Sign Up' ci-dessous ou saisissez votre email.";
+      }
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       );
       return false;
     }
