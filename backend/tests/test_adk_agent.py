@@ -109,3 +109,37 @@ def test_scenario_10_multi_user_isolation():
     assert session_a["state"] == "WAITING_VOICE_CONFIRMATION"
     assert session_b["state"] == "EXECUTED"
     assert res_b["tool_used"] == "get_total_balance"
+
+
+def test_paymechap_real_execution_via_confirm_action():
+    """Vérifie l'exécution réelle via PayMeChap lors de la confirmation d'action par l'orchestrateur."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {
+            "success": True,
+            "status": "SUCCES",
+            "transaction_id": "tx_paymechap_real_123",
+            "message": "Virement effectué"
+        }
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id="tx_transfer_kouame_20000", user_id=1))
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+        assert "Kouamé Jean" in res["speech_text"]
+        assert res["should_speak"] is True
+        mock_payout.assert_called_once()
+
+
+def test_new_request_while_action_pending():
+    """Vérifie qu'une nouvelle requête annule la transaction en attente précédente."""
+    agent = SikaADKAgent()
+    agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id="u_pending")
+    session = agent.get_user_session("u_pending")
+    assert session["state"] == "WAITING_VOICE_CONFIRMATION"
+
+    # L'utilisateur change d'avis et pose une nouvelle question
+    res_new = agent.process_query("Quel est mon solde ?", user_id="u_pending")
+    assert res_new["tool_used"] == "get_total_balance"
+    assert session["state"] == "EXECUTED"
+

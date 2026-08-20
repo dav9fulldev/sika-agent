@@ -9,7 +9,19 @@ import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/services/api_service.dart';
 
-enum SikaState { idle, listening, processing, speaking, error }
+enum SikaState {
+  idle,
+  listening,
+  processing,
+  speaking,
+  waitingVoiceConfirmation,
+  ambiguityAsked,
+  securityValidation,
+  executingAction,
+  completed,
+  cancelled,
+  error,
+}
 
 class SikaMessage {
   final String text;
@@ -31,6 +43,8 @@ class SikaData {
   final String? currentText;
   final String? errorMessage;
   final bool isInitialized;
+  final SikaState? pendingNextState;
+  final String? pendingActionId;
 
   SikaData({
     required this.state,
@@ -38,6 +52,8 @@ class SikaData {
     this.currentText,
     this.errorMessage,
     this.isInitialized = false,
+    this.pendingNextState,
+    this.pendingActionId,
   });
 
   SikaData copyWith({
@@ -46,6 +62,8 @@ class SikaData {
     String? currentText,
     String? errorMessage,
     bool? isInitialized,
+    SikaState? pendingNextState,
+    String? pendingActionId,
   }) {
     return SikaData(
       state: state ?? this.state,
@@ -53,6 +71,8 @@ class SikaData {
       currentText: currentText ?? this.currentText,
       errorMessage: errorMessage ?? this.errorMessage,
       isInitialized: isInitialized ?? this.isInitialized,
+      pendingNextState: pendingNextState ?? this.pendingNextState,
+      pendingActionId: pendingActionId ?? this.pendingActionId,
     );
   }
 }
@@ -63,8 +83,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   final SpeechToText _speechToText = SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _speechEnabled = false;
+  int _activeSpeechRequestId = 0;
 
   SikaNotifier(this._apiService, this._ref)
       : super(SikaData(
@@ -122,9 +144,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
     await _flutterTts.setPitch(1.0);
 
     _flutterTts.setCompletionHandler(() {
-      debugPrint('[SIKA TTS] TTS playback completed');
+      debugPrint('[SIKA TTS] Fallback flutter_tts playback completed');
       if (state.state == SikaState.speaking) {
-        state = state.copyWith(state: SikaState.idle);
+        _onSpeechPlaybackFinished(_activeSpeechRequestId);
       }
     });
 
@@ -271,32 +293,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       currentText: null,
     );
 
-    // 2. INTERCEPTION CONFIRMATION SÉCURISÉE
-    final queryLower = cleanQuery.toLowerCase();
-    if (queryLower.contains('confirme') ||
-        queryLower.contains('valide') ||
-        queryLower.contains('confirm') ||
-        queryLower.contains('yes') ||
-        queryLower.contains('approve') ||
-        queryLower.contains('authorize')) {
-
-      final confirmText = isEnglish
-          ? 'Alright $userFirstName, the transfer rebalance from Orange Money to Wave is now confirmed and completed!'
-          : 'D\'accord $userFirstName, le transfert d\'équilibrage depuis Orange Money vers Wave est maintenant confirmé et exécuté !';
-
-      final sikaMessage = SikaMessage(text: confirmText, isUser: false);
-      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
-
-      state = state.copyWith(
-        state: SikaState.speaking,
-        messages: finalMessages,
-      );
-
-      await _speak(confirmText, ttsLocale: activeTtsLocale);
-      return;
-    }
-
-    // 3. ENVOI AU BACKEND SIKA AVEC PRÉNOM ET DEVISE ACTIVE
+    // 2. ENVOI AU BACKEND SIKA AVEC ORCHESTRATION ET CONTEXTE MULTI-TOURS
     try {
       debugPrint('[SIKA API] Querying backend agent ($userFirstName, $currencyCode, $activeTtsLocale): "$cleanQuery"');
       final response = await _apiService.sikaChat(
@@ -306,18 +303,34 @@ class SikaNotifier extends StateNotifier<SikaData> {
         currencySymbol: currencySymbol,
       );
 
-      final String sikaText = (response['message'] as String?) ??
+      final String sikaText = (response['speech_text'] as String?) ??
+          (response['message'] as String?) ??
           (response['response'] as String?) ??
           (isEnglish
               ? 'Sorry $userFirstName, I didn\'t quite catch that. Could you please repeat?'
               : 'Pardon $userFirstName, je n\'ai pas bien compris. Peux-tu répéter ?');
 
       final action = response['intent'] ?? response['action'];
+      final status = response['status'] as String? ?? 'PROCESSED';
+      final actionId = response['action_id'] as String?;
+      final bool requiresSecurity = response['requires_security_validation'] == true || response['requires_biometric'] == true;
+
+      SikaState pendingNextState = SikaState.idle;
+      if (requiresSecurity && actionId != null) {
+        pendingNextState = SikaState.securityValidation;
+      } else if (status == 'WAITING_VOICE_CONFIRMATION') {
+        pendingNextState = SikaState.waitingVoiceConfirmation;
+      } else if (status == 'AMBIGUITY_ASKED') {
+        pendingNextState = SikaState.ambiguityAsked;
+      } else if (status == 'CANCELLED') {
+        pendingNextState = SikaState.cancelled;
+      } else if (status == 'EXECUTED') {
+        pendingNextState = SikaState.completed;
+      }
 
       Map<String, dynamic>? suggestedTx;
       bool canAddTx = false;
-      if (action == 'add_transaction' &&
-          response['action_data'] != null) {
+      if (action == 'add_transaction' && response['action_data'] != null) {
         suggestedTx = Map<String, dynamic>.from(response['action_data']);
         canAddTx = true;
       }
@@ -334,6 +347,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       state = state.copyWith(
         state: SikaState.speaking,
         messages: finalMessages,
+        pendingNextState: pendingNextState,
+        pendingActionId: actionId,
       );
 
       await _speak(sikaText, ttsLocale: activeTtsLocale);
@@ -351,6 +366,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         state: SikaState.speaking,
         messages: finalMessages,
         errorMessage: e.toString(),
+        pendingNextState: SikaState.error,
+        pendingActionId: null,
       );
 
       await _speak(fallbackText, ttsLocale: activeTtsLocale);
@@ -360,9 +377,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
   Future<void> sendTextMessage(String text, {String? ttsLocale}) async {
     await processUserQuery(text, ttsLocale: ttsLocale);
   }
-
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  int _activeSpeechRequestId = 0;
 
   Future<void> _speak(String text, {required String ttsLocale}) async {
     final currentRequestId = ++_activeSpeechRequestId;
@@ -401,7 +415,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
         _audioPlayer.onPlayerComplete.first.then((_) {
           if (currentRequestId == _activeSpeechRequestId && state.state == SikaState.speaking) {
-            state = state.copyWith(state: SikaState.idle);
+            _onSpeechPlaybackFinished(currentRequestId);
           }
         });
         return; // UN SEUL MOTEUR AUDIO EXÉCUTÉ - SANS AUCUN DOUBLON
@@ -417,6 +431,78 @@ class SikaNotifier extends StateNotifier<SikaData> {
       if (currentRequestId == _activeSpeechRequestId) {
         state = state.copyWith(state: SikaState.idle);
       }
+    }
+  }
+
+  void _onSpeechPlaybackFinished(int reqId) {
+    if (reqId != _activeSpeechRequestId) return;
+    debugPrint('[HANDS-FREE] Speech playback finished (ReqID: $reqId, PendingState: ${state.pendingNextState})');
+
+    final nextState = state.pendingNextState;
+    final actionId = state.pendingActionId;
+
+    if (nextState == SikaState.waitingVoiceConfirmation || nextState == SikaState.ambiguityAsked) {
+      debugPrint('[HANDS-FREE] 🎙️ Auto-resuming STT listening for user voice response (State: $nextState)');
+      state = state.copyWith(state: nextState);
+      startListening();
+    } else if (nextState == SikaState.securityValidation && actionId != null) {
+      debugPrint('[SECURITY] 🔐 Launching security validation for action_id: $actionId');
+      state = state.copyWith(state: SikaState.securityValidation);
+      executeSecurityValidationAndConfirm(actionId);
+    } else {
+      state = state.copyWith(
+        state: nextState ?? SikaState.idle,
+        pendingNextState: null,
+        pendingActionId: null,
+      );
+    }
+  }
+
+  Future<void> executeSecurityValidationAndConfirm(String actionId) async {
+    final currentLang = _ref.read(languageProvider);
+    final isEnglish = currentLang.code == 'en';
+
+    try {
+      state = state.copyWith(state: SikaState.executingAction);
+      debugPrint('[PAYMECHAP EXECUTION] Executing real payout confirmation via POST /api/v1/sika/agent/confirm for action_id: $actionId');
+
+      final confirmRes = await _apiService.sikaAgentConfirm(actionId);
+
+      final String sikaText = (confirmRes['speech_text'] as String?) ??
+          (confirmRes['message'] as String?) ??
+          (isEnglish
+              ? 'Operation confirmed and completed successfully on PayMeChap!'
+              : 'Opération confirmée et exécutée avec succès sur PayMeChap !');
+
+      final sikaMessage = SikaMessage(text: sikaText, isUser: false);
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
+
+      state = state.copyWith(
+        state: SikaState.speaking,
+        messages: finalMessages,
+        pendingNextState: SikaState.completed,
+        pendingActionId: null,
+      );
+
+      await _speak(sikaText, ttsLocale: currentLang.ttsLanguage);
+    } catch (e) {
+      debugPrint('[SECURITY EXECUTION ERROR] $e');
+      final errorMsg = isEnglish
+          ? 'Failed to execute transaction on PayMeChap: $e'
+          : 'Échec d\'exécution de la transaction sur PayMeChap : $e';
+
+      final sikaMessage = SikaMessage(text: errorMsg, isUser: false);
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
+
+      state = state.copyWith(
+        state: SikaState.error,
+        messages: finalMessages,
+        errorMessage: e.toString(),
+        pendingNextState: SikaState.error,
+        pendingActionId: null,
+      );
+
+      await _speak(errorMsg, ttsLocale: currentLang.ttsLanguage);
     }
   }
 
@@ -449,24 +535,23 @@ class SikaNotifier extends StateNotifier<SikaData> {
       'are you okay', 'are you fine', 'are you good', 'you okay', 'doing', 'okay', 'ok'
     ];
 
-    int frCount = 0;
-    for (final kw in frenchIndicators) {
-      if (lower.contains(kw)) frCount++;
+    int frenchCount = 0;
+    int englishCount = 0;
+
+    for (final word in frenchIndicators) {
+      if (lower.contains(word)) frenchCount++;
+    }
+    for (final word in englishIndicators) {
+      if (lower.contains(word)) englishCount++;
     }
 
-    int enCount = 0;
-    for (final kw in englishIndicators) {
-      if (lower.contains(kw)) enCount++;
-    }
+    if (englishCount > frenchCount) return true;
+    if (frenchCount > englishCount) return false;
 
-    if (frCount > enCount) return false;
-    if (enCount > frCount) return true;
-
-    return _ref.read(languageProvider) == AppLanguage.english;
+    return _ref.read(languageProvider).code == 'en';
   }
 }
 
-// Provider global de Riverpod
 final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
   final apiService = ApiService();
   return SikaNotifier(apiService, ref);

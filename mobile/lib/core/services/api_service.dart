@@ -257,6 +257,21 @@ class ApiService {
     throw Exception('Failed to create transaction: ${response.statusCode}');
   }
 
+  Future<Map<String, dynamic>> sikaAgentConfirm(String actionId, {int userId = 1}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/sika/agent/confirm'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action_id': actionId,
+        'user_id': userId,
+      }),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception('Failed to confirm agent action: ${response.statusCode}');
+  }
+
   Future<Map<String, dynamic>> fetchGcpTtsAudio(String text, {String voiceName = 'fr-FR-Neural2-C'}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/tts'),

@@ -15,13 +15,22 @@ class AgentOrbWidget extends StatelessWidget {
   Color _getOrbColor() {
     switch (state) {
       case SikaState.listening:
+      case SikaState.waitingVoiceConfirmation:
+      case SikaState.ambiguityAsked:
         return const Color(0xFF10B981); // Emerald / Teal glowing
       case SikaState.processing:
+      case SikaState.executingAction:
         return const Color(0xFF6366F1); // Indigo / Thinking
       case SikaState.speaking:
         return const Color(0xFF38BDF8); // Cyan
+      case SikaState.securityValidation:
+        return const Color(0xFFF59E0B); // Amber / Lock
       case SikaState.error:
         return const Color(0xFFEF4444); // Red error
+      case SikaState.completed:
+        return const Color(0xFF10B981); // Emerald Success
+      case SikaState.cancelled:
+        return const Color(0xFF64748B); // Slate
       case SikaState.idle:
         return const Color(0xFF3B82F6); // Soft Blue
     }
@@ -31,10 +40,22 @@ class AgentOrbWidget extends StatelessWidget {
     switch (state) {
       case SikaState.listening:
         return 'Listening...';
+      case SikaState.waitingVoiceConfirmation:
+        return 'Waiting for voice confirmation ("Oui" / "Non")...';
+      case SikaState.ambiguityAsked:
+        return 'Which contact do you choose?';
+      case SikaState.securityValidation:
+        return 'Authentication & PIN validation required...';
+      case SikaState.executingAction:
+        return 'Executing transaction on PayMeChap...';
       case SikaState.processing:
         return 'Analyzing your financial context...';
       case SikaState.speaking:
         return 'SIKA is responding...';
+      case SikaState.completed:
+        return 'Transaction completed successfully!';
+      case SikaState.cancelled:
+        return 'Operation cancelled.';
       case SikaState.error:
         return 'Connection issue';
       case SikaState.idle:
