@@ -80,17 +80,18 @@ class SikaAgentOrchestrator:
 
         return entry
 
-    def cancel_action(self, action_id: str, reason: str = "USER_CANCELLED"):
-        """Marque une action comme annulée dans la mémoire et la base de données."""
-        if action_id in self.action_store:
-            self.action_store[action_id]["status"] = "CANCELLED"
-            self.action_store[action_id]["cancelled_reason"] = reason
-
+    def cancel_action(self, action_id: str, user_id: int = 1, reason: str = "USER_CANCELLED") -> Dict[str, Any]:
+        """Marque une action comme annulée dans la mémoire et la base de données après vérification du propriétaire."""
         try:
             from sqlalchemy.orm import Session
             from ..database import engine
             from ..models.sika_action import SikaActionModel
             with Session(engine) as db:
+                db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                if db_action and str(db_action.user_id) != str(user_id):
+                    logger.warning(f"[SECURITY REJECT] User {user_id} ne peut pas annuler l'action {action_id} de user {db_action.user_id}")
+                    return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Vous n'êtes pas autorisé à annuler cette transaction."}
+
                 db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
                     "status": "CANCELLED",
                     "cancelled_reason": reason,
@@ -99,6 +100,15 @@ class SikaAgentOrchestrator:
                 db.commit()
         except Exception as e:
             logger.warning(f"[DB WARN] Impossible d'annuler l'action dans la DB: {e}")
+
+        if action_id in self.action_store:
+            if str(self.action_store[action_id].get("user_id")) != str(user_id):
+                return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Vous n'êtes pas autorisé à annuler cette transaction."}
+            self.action_store[action_id]["status"] = "CANCELLED"
+            self.action_store[action_id]["cancelled_reason"] = reason
+
+        return {"success": True, "status": "CANCELLED", "action_id": action_id}
+
 
     def list_available_tools(self) -> List[Dict[str, Any]]:
         """Retourne la liste des tools disponibles dans le registre."""
@@ -283,13 +293,14 @@ class SikaAgentOrchestrator:
 
         # 3. EXECUTION SUR L'API PAYMECHAP
         try:
-            if "transfer" in action_id:
+            if "transfer" in action_id or "act_tr" in action_id:
                 payout_res = paymechap_api_service.execute_payout(
                     access_token="",
                     recipient_phone="0701020304",
                     amount=20000.0,
                     motif="Transfert SIKA vers Kouamé Jean"
                 )
+
             elif "dep_coffre" in action_id or "deposit" in action_id:
                 payout_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=1, montant=10000.0)
             else:
@@ -341,10 +352,11 @@ class SikaAgentOrchestrator:
             if w.get("is_active", True):
                 w["balance"] = real_bal
 
-        if "transfer" in action_id:
+        if "transfer" in action_id or "act_tr" in action_id:
             msg = f"Le transfert de 20 000 francs CFA vers Kouamé Jean a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
         else:
             msg = "Opération confirmée et exécutée avec succès via PayMeChap."
+
 
         res_dict = {
             "success": True,

@@ -72,6 +72,27 @@ class OAuth2AuthService:
             logger.error(f"[AUTH OAUTH2] Erreur de validation du jeton: {e}")
             return None
 
+    def get_authenticated_user_id(self, authorization_header: Optional[str] = None, client_body_user_id: Any = 1) -> int:
+        """Extrait l'ID de l'utilisateur authentifié depuis le jeton Bearer JWT.
+        Si un jeton valide est présent, l'ID du jeton prend le dessus sur le client_body_user_id.
+        """
+        if authorization_header and authorization_header.startswith("Bearer "):
+            token = authorization_header.split(" ")[1]
+            payload = self.verify_token(token)
+            if payload:
+                u_id = payload.get("user_id")
+                if u_id is not None:
+                    if isinstance(u_id, int):
+                        return u_id
+                    if isinstance(u_id, str) and u_id.isdigit():
+                        return int(u_id)
+        if isinstance(client_body_user_id, int):
+            return client_body_user_id
+        if isinstance(client_body_user_id, str) and client_body_user_id.isdigit():
+            return int(client_body_user_id)
+        return 1
+
+
     def login(self, email: str, password: str) -> Dict[str, Any]:
         """Authentification OAuth2 vérifiée en base de données SQLAlchemy."""
         db = SessionLocal()

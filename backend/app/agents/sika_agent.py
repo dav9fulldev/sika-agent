@@ -263,7 +263,8 @@ class SikaADKAgent:
         if any(w in msg_lower for w in ["envoie", "transfert", "transférer", "send", "transfer"]):
             tool_used = "prepare_transfer"
             requires_confirmation = True
-            action_id = "tx_transfer_kouame_20000"
+            import secrets
+            action_id = f"act_tr_{secrets.token_hex(8)}"
             tool_data = {
                 "recipient": "Kouamé Jean",
                 "phone_number": "07 01 02 03 04",
@@ -272,7 +273,7 @@ class SikaADKAgent:
                 "currency": "XOF"
             }
             from ..agent.orchestrator import sika_orchestrator
-            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1)
+            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1, action_type="TRANSFER", payload=tool_data)
 
             session["state"] = "WAITING_VOICE_CONFIRMATION"
             session["active_action"] = {
@@ -291,11 +292,12 @@ class SikaADKAgent:
         elif any(w in msg_lower for w in ["mettre de côté", "mettre 10", "épargner 10", "puis-je épargner", "puis-je mettre", "dans mon coffre"]):
             tool_used = "get_savings_status"
             requires_confirmation = True
-            action_id = "dep_coffre_10000"
+            import secrets
+            action_id = f"act_dp_{secrets.token_hex(8)}"
             tool_data = get_savings_status()
 
             from ..agent.orchestrator import sika_orchestrator
-            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1)
+            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1, action_type="SAVINGS_DEPOSIT", payload={"coffre_name": "Épargne", "amount": 10000.0})
 
             session["state"] = "WAITING_VOICE_CONFIRMATION"
             session["active_action"] = {

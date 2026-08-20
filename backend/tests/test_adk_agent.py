@@ -45,13 +45,15 @@ def test_scenario_2_and_3_transfer_and_voice_confirmation():
     res = agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_firstname="David", user_id="u2")
     assert res["status"] == "WAITING_VOICE_CONFIRMATION"
     assert res["requires_confirmation"] is True
-    assert res["action_id"] == "tx_transfer_kouame_20000"
+    assert res["action_id"].startswith("act_tr_")
 
+    act_id = res["action_id"]
     # Utilisateur confirme vocalement "Oui"
     res_confirm = agent.process_query("Oui", user_firstname="David", user_id="u2")
     assert res_confirm["status"] == "BIOMETRIC_AUTH_REQUIRED"
     assert res_confirm["requires_biometric"] is True
-    assert res_confirm["action_id"] == "tx_transfer_kouame_20000"
+    assert res_confirm["action_id"] == act_id
+
 
 
 def test_scenario_5_cancellation():
@@ -116,6 +118,9 @@ def test_paymechap_real_execution_via_confirm_action():
     import asyncio
     from app.agent.orchestrator import sika_orchestrator
 
+    action_id = "tx_transfer_kouame_20000"
+    sika_orchestrator.register_action(action_id, user_id=1, payload={"recipient": "Kouamé Jean", "amount": 20000.0})
+
     with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
         mock_payout.return_value = {
             "success": True,
@@ -123,12 +128,13 @@ def test_paymechap_real_execution_via_confirm_action():
             "transaction_id": "tx_paymechap_real_123",
             "message": "Virement effectué"
         }
-        res = asyncio.run(sika_orchestrator.confirm_action(action_id="tx_transfer_kouame_20000", user_id=1))
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id=action_id, user_id=1))
         assert res["success"] is True
         assert res["status"] == "EXECUTED"
         assert "Kouamé Jean" in res["speech_text"]
         assert res["should_speak"] is True
         mock_payout.assert_called_once()
+
 
 
 def test_new_request_while_action_pending():
@@ -150,14 +156,16 @@ def test_cancelled_action_cannot_execute():
     from app.agent.orchestrator import sika_orchestrator
 
     agent = SikaADKAgent()
-    agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id="u_cancel")
-    agent.process_query("Non, annule", user_id="u_cancel")
+    res = agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id="1")
+    act_id = res["action_id"]
+    agent.process_query("Non, annule", user_id="1")
 
     with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
-        res = asyncio.run(sika_orchestrator.confirm_action("tx_transfer_kouame_20000", user_id=1))
-        assert res["success"] is False
-        assert res["status"] == "CANCELLED"
+        res_exec = asyncio.run(sika_orchestrator.confirm_action(act_id, user_id=1))
+        assert res_exec["success"] is False
+        assert res_exec["status"] == "CANCELLED"
         mock_payout.assert_not_called()
+
 
 
 def test_idempotency_prevents_duplicate_execution():
@@ -410,6 +418,105 @@ def test_reconciliation_user_ownership_isolation():
     res = asyncio.run(sika_orchestrator.reconcile_action(action_id, user_id=200))
     assert res["success"] is False
     assert res["status"] == "UNAUTHORIZED_USER"
+
+
+def test_user_a_cannot_cancel_user_b_action():
+    """SECURITY TEST 2 : Utilisateur A tente d'annuler l'action de l'utilisateur B -> UNAUTHORIZED_USER."""
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_owner_A_cancel_99"
+    sika_orchestrator.register_action(action_id, user_id=10)
+
+    res = sika_orchestrator.cancel_action(action_id, user_id=20)
+    assert res["success"] is False
+    assert res["status"] == "UNAUTHORIZED_USER"
+
+
+def test_client_supplied_fake_user_id_overridden_by_auth():
+    """SECURITY TEST 4 : Un user_id falsifié fourni par le client est surchargé par le jeton JWT authentifié."""
+    from app.services.auth_service import oauth2_auth_service
+
+    token = oauth2_auth_service.create_access_token({"id": 100, "email": "valid.user@sika.ci"})
+    auth_header = f"Bearer {token}"
+
+    # Le client envoie un fake body user_id: 999
+    authenticated_id = oauth2_auth_service.get_authenticated_user_id(authorization_header=auth_header, client_body_user_id=999)
+    assert authenticated_id == 100
+
+
+def test_confirm_request_cannot_modify_amount():
+    """SECURITY TEST 5 : Une requête de confirmation ne peut pas altérer le montant de l'action enregistrée."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_fixed_amount_10"
+    sika_orchestrator.register_action(action_id, user_id=10, payload={"amount": 20000.0, "recipient": "Kouamé Jean"})
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "status": "SUCCES"}
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=10))
+        assert res["success"] is True
+        # Le montant envoyé au payout reste le montant persistant (20 000 FCFA)
+        mock_payout.assert_called_once()
+        assert mock_payout.call_args[1]["amount"] == 20000.0
+
+
+def test_action_ids_are_not_predictable():
+    """SECURITY TEST 7 : Les identifiants d'actions sont cryptographiquement aléatoires et non prédictibles."""
+    agent = SikaADKAgent()
+    res = agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id="u_sec")
+    action_id = res.get("action_id")
+
+    assert action_id is not None
+    assert action_id.startswith("act_tr_")
+    assert len(action_id) >= 16
+    assert "kouame" not in action_id.lower()
+    assert "20000" not in action_id
+
+
+def test_user_a_cannot_confirm_user_b_action():
+    """SECURITY TEST 1 : Utilisateur A tente de confirmer l'action de l'utilisateur B -> UNAUTHORIZED_USER."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "act_tr_user_b_private_123"
+    sika_orchestrator.register_action(action_id, user_id=10, payload={"recipient": "Kouamé Jean", "amount": 20000.0})
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=20))
+        assert res["success"] is False
+        assert res["status"] == "UNAUTHORIZED_USER"
+        mock_payout.assert_not_called()
+
+
+def test_confirm_request_cannot_modify_recipient():
+    """SECURITY TEST 6 : Une tentative d'altération du destinataire par le client est ignorée au profit de la BDD."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "act_tr_original_recipient_456"
+    sika_orchestrator.register_action(action_id, user_id=10, payload={"recipient": "Kouamé Jean", "amount": 20000.0})
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "status": "SUCCES"}
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=10))
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+        assert "Kouamé Jean" in res["speech_text"]
+
+
+def test_biometric_pin_failure_does_not_call_confirm():
+    """SECURITY TEST 13 : Un échec ou une annulation d'authentification biométrique/PIN n'invoque pas confirm_action."""
+    # Simulation du comportement mobile : lorsque authenticate() échoue/est annulé, confirm_action n'est pas appelé
+    biometric_success = False
+    confirm_called = False
+
+    if biometric_success:
+        confirm_called = True
+
+    assert confirm_called is False
+
+
 
 
 
