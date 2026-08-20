@@ -33,7 +33,7 @@ void main() {
       expect(apiService.hasToken, isTrue);
     });
 
-    test('401 unauthorized callback triggers auto-logout', () {
+    test('401 unauthorized callback triggers auto-logout', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -47,9 +47,32 @@ void main() {
 
       // Déclencher le callback 401
       apiService.onUnauthorized?.call();
+      await Future.delayed(const Duration(milliseconds: 50));
 
       expect(container.read(authProvider).isAuthenticated, isFalse);
       expect(container.read(authProvider).accessToken, isNull);
+    });
+
+    test('AuthNotifier.logout clears local session and resets state', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final authNotifier = container.read(authProvider.notifier);
+      authNotifier.state = AuthState(
+        isAuthenticated: true,
+        accessToken: 'test_active_jwt_token',
+        user: UserProfileData(id: '1', name: 'David YAO', email: 'david@sika.app'),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('sika_access_token', 'test_active_jwt_token');
+
+      await authNotifier.logout();
+
+      expect(container.read(authProvider).isAuthenticated, isFalse);
+      expect(container.read(authProvider).accessToken, isNull);
+      expect(container.read(authProvider).user, isNull);
+      expect(prefs.getString('sika_access_token'), isNull);
     });
 
     test('WalletNotifier.clearData resets all wallet balances and movements', () {

@@ -7,6 +7,7 @@ from ..services.sika_nlp import SikaNLP
 from ..services.user_learning_service import user_learning_service
 from ..services.backup_service import backup_service
 from ..services.auth_service import oauth2_auth_service
+from ..services.security_rate_limiter import security_rate_limiter
 from ..agent.orchestrator import sika_orchestrator
 
 router = APIRouter(prefix="/api/v1/sika", tags=["sika"])
@@ -65,6 +66,20 @@ def auth_me(authorization: Optional[str] = Header(None)):
     return {
         "status": "AUTHENTICATED",
         "user": payload
+    }
+
+
+@router.post("/auth/logout")
+def auth_logout(authorization: Optional[str] = Header(None)):
+    """Invalide et révoque le jeton Bearer JWT actif de l'utilisateur."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Jeton Authorization Bearer manquant.")
+    token = authorization.split(" ")[1]
+    security_rate_limiter.revoke_token(token)
+    return {
+        "success": True,
+        "status": "LOGGED_OUT",
+        "message": "Déconnexion réussie et jeton révoqué côté serveur."
     }
 
 # ============================================================================
@@ -155,8 +170,9 @@ async def sika_agent_process(data: Dict[str, Any], authorization: Optional[str] 
 
 @router.post("/agent/confirm")
 async def sika_agent_confirm(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
-    """Endpoint de validation humaine pour l'agent SIKA (Exige JWT)."""
+    """Endpoint de validation humaine pour l'agent SIKA (Exige JWT + protection anti-flood)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    security_rate_limiter.check_confirm_rate_limit(str(user_id))
     action_id = data.get("action_id", "")
     res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
     if res.get("status") == "UNAUTHORIZED_USER":

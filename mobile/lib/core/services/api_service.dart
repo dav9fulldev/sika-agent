@@ -102,6 +102,17 @@ class ApiService {
     throw Exception('Jeton OAuth2 invalide (${response.statusCode})');
   }
 
+  Future<void> logout() async {
+    try {
+      if (hasToken) {
+        await http.post(
+          Uri.parse('$baseUrl/api/v1/sika/auth/logout'),
+          headers: _headers,
+        );
+      }
+    } catch (_) {}
+  }
+
   // ============================================================================
   // SIKA AI & AGENT CONVERSATION
   // ============================================================================

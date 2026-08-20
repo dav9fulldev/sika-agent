@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Header
 from typing import Dict, Any, Optional
 from ..services.sika_perception_service import sika_perception_service
 from ..services.auth_service import oauth2_auth_service
-from .wallet_router import CONNECTED_USER_WALLETS
+from . import wallet_router
 
 router = APIRouter(prefix="/api/v1/perception", tags=["perception"])
 
@@ -32,7 +32,7 @@ def perceive_sms_notification(data: Dict[str, Any], authorization: Optional[str]
     # Mise à jour automatique du solde du portefeuille correspondant STRICTEMENT à cet utilisateur
     target_wallet = next(
         (
-            w for w in CONNECTED_USER_WALLETS
+            w for w in wallet_router.CONNECTED_USER_WALLETS
             if str(w.get("user_id")) == user_id
             and w.get("is_active", True)
             and w.get("provider", "").lower() in provider.lower()

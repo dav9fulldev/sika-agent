@@ -12,6 +12,8 @@ from app.agent.orchestrator import sika_orchestrator
 
 client = TestClient(app)
 
+from app.services.security_rate_limiter import security_rate_limiter
+
 @pytest.fixture(autouse=True)
 def setup_test_db():
     """Initialise et nettoie la base de données et les caches avant chaque test."""
@@ -20,6 +22,7 @@ def setup_test_db():
     wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
+    security_rate_limiter.clear()
 
     with Session(engine) as db:
         db.query(SikaActionModel).delete()
@@ -34,6 +37,7 @@ def setup_test_db():
     wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
+    security_rate_limiter.clear()
 
 
 def create_jwt_header(user_id: int, email: str = "user@sika.app", expired: bool = False) -> dict:

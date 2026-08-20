@@ -4,12 +4,13 @@ import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from ..services.wallet_integrations.wave_api_service import wave_api_service
 from ..services.wallet_integrations.orange_money_api_service import orange_money_api_service
 from ..services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
 from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
 from ..services.auth_service import oauth2_auth_service
+from ..services.security_rate_limiter import security_rate_limiter
 
 logger = logging.getLogger("WalletRouter")
 
@@ -182,7 +183,9 @@ def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str
         "provider": provider,
         "account_number": account_number,
         "auth_method": auth_method,
-        "created_at": datetime.utcnow().isoformat()
+        "attempts": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at_dt": datetime.now(timezone.utc)
     }
 
     msg = f"🔑 Code OTP envoyé au {account_number} pour valider le raccordement de votre compte {provider} !"
@@ -200,7 +203,7 @@ def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str
 
 @router.post("/verify-otp")
 def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
-    """Étape 2 : Vérification du code OTP et enrôlement effectif du compte (Exige JWT)."""
+    """Étape 2 : Vérification du code OTP et enrôlement effectif du compte (Exige JWT + protection anti-brute-force)."""
     user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     session_id = data.get("session_id")
     otp_code = data.get("otp_code")
@@ -210,12 +213,29 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
     if not session_id or not otp_code:
         raise HTTPException(status_code=400, detail="Champs 'session_id' et 'otp_code' obligatoires.")
 
-    session = PENDING_OTP_SESSIONS.pop(session_id, None)
+    session = PENDING_OTP_SESSIONS.get(session_id)
     if not session:
-        raise HTTPException(status_code=400, detail="Session OTP introuvable ou expirée.")
+        raise HTTPException(status_code=400, detail="Session OTP introuvable, expirée ou déjà consommée.")
+
+    # Vérification d'expiration de la session (TTL = 10 minutes)
+    created_dt = session.get("created_at_dt")
+    if created_dt and (datetime.now(timezone.utc) - created_dt) > timedelta(minutes=10):
+        PENDING_OTP_SESSIONS.pop(session_id, None)
+        raise HTTPException(status_code=400, detail="Session OTP expirée. Veuillez relancer la demande de connexion.")
 
     if str(session.get("user_id")) != user_id:
         raise HTTPException(status_code=403, detail="Session OTP non autorisée pour cet utilisateur.")
+
+    # Incrémentation et protection contre le brute-force OTP (max 3 tentatives)
+    attempts = session.get("attempts", 0) + 1
+    session["attempts"] = attempts
+
+    if attempts > 3:
+        PENDING_OTP_SESSIONS.pop(session_id, None)
+        raise HTTPException(
+            status_code=429,
+            detail="Nombre maximal de tentatives OTP dépassé (3). La session a été invalidée."
+        )
 
     target_user_id = user_id
     provider = session.get("provider", provider)
@@ -226,6 +246,12 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
 
     if "paymechap" in prov_lower:
         verify_res = paymechap_api_service.verify_otp_code(account_number, otp_code)
+        if not verify_res.get("success") and not verify_res.get("accessToken"):
+            if attempts >= 3:
+                PENDING_OTP_SESSIONS.pop(session_id, None)
+                raise HTTPException(status_code=429, detail="Code OTP incorrect. Nombre maximal de tentatives atteint (3). Session invalidée.")
+            raise HTTPException(status_code=400, detail=f"Code OTP incorrect ({attempts}/3 tentatives).")
+
         access_token = verify_res.get("accessToken")
         fetched = paymechap_api_service.fetch_live_balance(access_token, account_number)
     elif "wave" in prov_lower:
@@ -236,6 +262,9 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
         fetched = mtn_momo_api_service.fetch_live_balance("live_token", account_number)
     else:
         fetched = {"balance": 0.0, "currency": "XOF"}
+
+    # Consommation immédiate de la session OTP (Anti-Replay)
+    PENDING_OTP_SESSIONS.pop(session_id, None)
 
     real_balance = float(fetched.get("balance", 0.0))
 
@@ -272,8 +301,10 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
 
 @router.post("/verify-pin")
 def verify_transaction_pin(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
-    """Vérifie le code PIN de transaction auprès de PayMeChap (Exige JWT)."""
+    """Vérifie le code PIN de transaction auprès de PayMeChap (Exige JWT + protection anti-brute-force)."""
     user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
+    security_rate_limiter.check_pin_rate_limit(user_id)
+
     pin_code = data.get("pin", "")
     if not pin_code:
         raise HTTPException(status_code=400, detail="Le code PIN est obligatoire.")
@@ -288,8 +319,10 @@ def verify_transaction_pin(data: Dict[str, Any], authorization: Optional[str] = 
 
     res = paymechap_api_service.verify_transaction_pin(account_number, pin_code)
     if not res.get("success") or not res.get("valid"):
+        security_rate_limiter.record_pin_failure(user_id)
         raise HTTPException(status_code=401, detail=res.get("message", "Code PIN PayMeChap incorrect."))
 
+    security_rate_limiter.reset_pin_failures(user_id)
     return res
 
 

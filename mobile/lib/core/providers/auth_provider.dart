@@ -80,30 +80,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
           final uData = res["user"] ?? {};
           // P0.3: le backend renvoie 'full_name', pas 'name'
           final displayName = (uData["full_name"] ?? uData["name"] ?? 'Utilisateur').toString();
-          state = state.copyWith(
-            hasSeenOnboarding: true,
-            isAuthenticated: true,
-            accessToken: savedToken,
-            user: UserProfileData(
-              id: (uData["user_id"] ?? uData["id"] ?? 'usr_saved').toString(),
-              name: displayName,
-              email: (uData["sub"] ?? uData["email"] ?? 'utilisateur@sika.app').toString(),
-            ),
-          );
+          if (mounted) {
+            state = state.copyWith(
+              hasSeenOnboarding: true,
+              isAuthenticated: true,
+              accessToken: savedToken,
+              user: UserProfileData(
+                id: (uData["user_id"] ?? uData["id"] ?? 'usr_saved').toString(),
+                name: displayName,
+                email: (uData["sub"] ?? uData["email"] ?? 'utilisateur@sika.app').toString(),
+              ),
+            );
+          }
         } catch (e) {
           // P0.2: si le jeton est expiré ou invalide, on déconnecte proprement
           // au lieu de maintenir une session fantome avec une fausse identité.
           debugPrint('[AUTH PREFS] Jeton sauvegardé invalid ou expiré, déconnexion: $e');
           await prefs.remove(_keyAccessToken);
-          state = state.copyWith(
-            hasSeenOnboarding: true,
-            isAuthenticated: false,
-            accessToken: null,
-            user: null,
-          );
+          if (mounted) {
+            state = state.copyWith(
+              hasSeenOnboarding: true,
+              isAuthenticated: false,
+              accessToken: null,
+              user: null,
+            );
+          }
         }
       } else {
-        state = state.copyWith(hasSeenOnboarding: hasSeen);
+        if (mounted) {
+          state = state.copyWith(hasSeenOnboarding: hasSeen);
+        }
       }
     } catch (e) {
       debugPrint('[AUTH PREFS] Erreur chargement préférences: $e');
@@ -252,6 +258,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Déconnexion sécurisée (Log Out)
   Future<void> logout() async {
     debugPrint('[AUTH] User logged out');
+    try {
+      await _apiService.logout();
+    } catch (_) {}
+
     state = AuthState(
       isAuthenticated: false,
       hasSeenOnboarding: true, // Garde l'onboarding comme vu pour ne pas le ré-afficher !
@@ -260,8 +270,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isLoading: false,
     );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyAccessToken);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyAccessToken);
+    } catch (_) {}
   }
 }
 

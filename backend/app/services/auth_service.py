@@ -19,6 +19,7 @@ from fastapi import HTTPException
 from ..database import SessionLocal
 from ..models import UserModel
 import hashlib
+from .security_rate_limiter import security_rate_limiter
 
 def _hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
@@ -69,6 +70,9 @@ class OAuth2AuthService:
         """Vérifie la validité cryptographique d'un jeton Bearer JWT avec PyJWT et extrait le payload."""
         try:
             if not token:
+                return None
+            if security_rate_limiter.is_token_revoked(token):
+                logger.warning("[AUTH OAUTH2] Tentative d'accès avec un jeton révoqué (post-logout).")
                 return None
             # Decoding avec vérification stricte de l'algorithme HS256 et expiration
             payload = jwt.decode(
@@ -133,10 +137,12 @@ class OAuth2AuthService:
 
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
-        """Authentification OAuth2 vérifiée en base de données SQLAlchemy."""
+        """Authentification OAuth2 vérifiée en base de données SQLAlchemy avec protection brute-force."""
+        clean_email = email.strip().lower()
+        security_rate_limiter.check_login_rate_limit(clean_email)
+
         db = SessionLocal()
         try:
-            clean_email = email.strip().lower()
             user = db.query(UserModel).filter(UserModel.email == clean_email).first()
 
             # Si l'utilisateur n'existe pas en BDD
@@ -153,6 +159,7 @@ class OAuth2AuthService:
                     db.commit()
                     db.refresh(user)
                 else:
+                    security_rate_limiter.record_login_failure(clean_email)
                     raise HTTPException(
                         status_code=400,
                         detail="Compte inexistant. Veuillez créer un compte en cliquant sur 'Sign Up'."
@@ -160,10 +167,14 @@ class OAuth2AuthService:
             elif user.auth_provider == "email" and user.password_hash:
                 # Vérification du hash du mot de passe
                 if user.password_hash != _hash_password(password) and password != "••••••••":
+                    security_rate_limiter.record_login_failure(clean_email)
                     raise HTTPException(
                         status_code=401,
                         detail="Mot de passe incorrect."
                     )
+
+            # Connexion réussie -> réinitialisation du compteur d'échecs
+            security_rate_limiter.reset_login_failures(clean_email)
 
             user_data = {
                 "id": str(user.id),
