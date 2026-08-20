@@ -10,10 +10,14 @@ from ..services.sika_ai import SikaAI
 
 import time
 
+import time
+from datetime import datetime, timedelta
+import json
+
 logger = logging.getLogger("SikaAgentOrchestrator")
 
 class SikaAgentOrchestrator:
-    """Orchestrateur principal de l'agent SIKA avec raisonnement Google Gemini."""
+    """Orchestrateur principal de l'agent SIKA avec raisonnement Google Gemini et persistance SQL."""
 
     def __init__(self):
         self.state = AgentState.IDLE
@@ -21,9 +25,12 @@ class SikaAgentOrchestrator:
         self.ai_service = SikaAI()
         self.action_store: Dict[str, Dict[str, Any]] = {}
 
-    def register_action(self, action_id: str, user_id: int = 1, ttl_seconds: int = 300) -> Dict[str, Any]:
-        """Enregistre une action financière en attente avec horodatage et TTL."""
-        # Annuler les actions précédentes non exécutées de cet utilisateur
+    def register_action(self, action_id: str, user_id: int = 1, ttl_seconds: int = 300, action_type: str = "TRANSFER", payload: dict = None) -> Dict[str, Any]:
+        """Enregistre une action financière en attente dans la base de données et en mémoire."""
+        created_at = datetime.utcnow()
+        expires_at = created_at + timedelta(seconds=ttl_seconds)
+
+        # 1. Mise à jour de la mémoire de processus
         for aid, meta in list(self.action_store.items()):
             if meta.get("user_id") == user_id and meta.get("status") in ["PREPARED", "WAITING_CONFIRMATION"]:
                 meta["status"] = "CANCELLED"
@@ -32,19 +39,66 @@ class SikaAgentOrchestrator:
         entry = {
             "action_id": action_id,
             "user_id": user_id,
+            "action_type": action_type,
             "status": "WAITING_CONFIRMATION",
             "created_at": time.time(),
             "ttl": ttl_seconds,
             "result": None
         }
         self.action_store[action_id] = entry
+
+        # 2. Persistance dans la base de données
+        try:
+            from sqlalchemy.orm import Session
+            from ..database import engine
+            from ..models.sika_action import SikaActionModel
+            with Session(engine) as db:
+                db.query(SikaActionModel).filter(
+                    SikaActionModel.user_id == user_id,
+                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
+                ).update({"status": "CANCELLED", "cancelled_reason": "REPLACED_BY_NEW_ACTION", "updated_at": datetime.utcnow()}, synchronize_session=False)
+
+                existing = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                if existing:
+                    existing.status = "WAITING_CONFIRMATION"
+                    existing.user_id = user_id
+                    existing.expires_at = expires_at
+                    existing.updated_at = created_at
+                else:
+                    db.add(SikaActionModel(
+                        action_id=action_id,
+                        user_id=user_id,
+                        action_type=action_type,
+                        status="WAITING_CONFIRMATION",
+                        created_at=created_at,
+                        expires_at=expires_at,
+                        updated_at=created_at
+                    ))
+                db.commit()
+        except Exception as e:
+            logger.warning(f"[DB WARN] Impossible d'enregistrer l'action dans la DB: {e}")
+
         return entry
 
     def cancel_action(self, action_id: str, reason: str = "USER_CANCELLED"):
-        """Marque une action comme annulée."""
+        """Marque une action comme annulée dans la mémoire et la base de données."""
         if action_id in self.action_store:
             self.action_store[action_id]["status"] = "CANCELLED"
             self.action_store[action_id]["cancelled_reason"] = reason
+
+        try:
+            from sqlalchemy.orm import Session
+            from ..database import engine
+            from ..models.sika_action import SikaActionModel
+            with Session(engine) as db:
+                db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                    "status": "CANCELLED",
+                    "cancelled_reason": reason,
+                    "updated_at": datetime.utcnow()
+                })
+                db.commit()
+        except Exception as e:
+            logger.warning(f"[DB WARN] Impossible d'annuler l'action dans la DB: {e}")
 
     def list_available_tools(self) -> List[Dict[str, Any]]:
         """Retourne la liste des tools disponibles dans le registre."""
@@ -106,139 +160,208 @@ class SikaAgentOrchestrator:
         }
 
     async def confirm_action(self, action_id: str, user_id: int = 1, user_confirmed: bool = True) -> Dict[str, Any]:
-        """Exécute l'action financière réelle sur l'API PayMeChap (source de vérité) après validation biométrique / PIN."""
-        logger.info(f"[SIKA ORCHESTRATOR] Validation de sécurité reçue pour action_id={action_id} (Source de Vérité: PayMeChap API)")
+        """Exécute l'action financière réelle sur l'API PayMeChap avec verrouillage atomique et validation d'appartenance utilisateur."""
+        logger.info(f"[SIKA ORCHESTRATOR] Validation de sécurité reçue pour action_id={action_id} (user_id={user_id})")
 
-        # 1. VÉRIFICATION ANTI-DOUBLON (IDEMPOTENCE) & EXPIRATION TTL
-        action_meta = self.action_store.get(action_id)
-        if action_meta:
-            current_status = action_meta.get("status")
-            if current_status == "EXECUTED":
-                logger.warning(f"[IDEMPOTENCY] Action {action_id} déjà exécutée. Rejet de la demande en doublon.")
-                return {
-                    "success": False,
-                    "status": "ALREADY_EXECUTED",
-                    "action_id": action_id,
-                    "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.",
-                    "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.",
-                    "should_speak": True
-                }
-            if current_status == "CANCELLED":
-                logger.warning(f"[IDEMPOTENCY] Action {action_id} annulée. Rejet d'exécution.")
-                return {
-                    "success": False,
-                    "status": "CANCELLED",
-                    "action_id": action_id,
-                    "message": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
-                    "speech_text": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
-                    "should_speak": True
-                }
-            if current_status == "EXPIRED" or (time.time() - action_meta.get("created_at", 0) > action_meta.get("ttl", 300)):
-                action_meta["status"] = "EXPIRED"
-                logger.warning(f"[TTL EXPIRATION] Action {action_id} expirée (> {action_meta.get('ttl', 300)}s).")
-                return {
-                    "success": False,
-                    "status": "EXPIRED",
-                    "action_id": action_id,
-                    "message": "Cette demande de transaction a expiré. Veuillez recommencer la commande.",
-                    "speech_text": "Cette demande de transaction a expiré. Veuillez recommencer.",
-                    "should_speak": True
-                }
-
+        from sqlalchemy.orm import Session
+        from ..database import engine
+        from ..models.sika_action import SikaActionModel
         from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
         from ..routes.wallet_router import CONNECTED_USER_WALLETS
+
+        # 1. VERIFICATION D'APPARTENANCE ET D'ETAT PERSISTE EN BASE DE DONNEES
+        db_action = None
+        try:
+            with Session(engine) as db:
+                db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                if db_action:
+                    # Isolation utilisateur
+                    if str(db_action.user_id) != str(user_id):
+                        logger.warning(f"[SECURITY REJECT] User {user_id} tentait d'exécuter l'action {action_id} appartenant à user {db_action.user_id}")
+                        return {
+                            "success": False,
+                            "status": "UNAUTHORIZED_USER",
+                            "action_id": action_id,
+                            "message": "Cette action financière n'appartient pas à cet utilisateur.",
+                            "speech_text": "Cette action financière n'appartient pas à cet utilisateur.",
+                            "should_speak": True
+                        }
+
+                    if db_action.status == "EXECUTED":
+                        return {
+                            "success": False,
+                            "status": "ALREADY_EXECUTED",
+                            "action_id": action_id,
+                            "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.",
+                            "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.",
+                            "should_speak": True
+                        }
+                    if db_action.status == "EXECUTING":
+                        return {
+                            "success": False,
+                            "status": "ALREADY_EXECUTING",
+                            "action_id": action_id,
+                            "message": "Cette transaction est actuellement en cours d'exécution sur PayMeChap.",
+                            "speech_text": "Une demande d'exécution est déjà en cours pour cette transaction.",
+                            "should_speak": True
+                        }
+                    if db_action.status == "CANCELLED":
+                        return {
+                            "success": False,
+                            "status": "CANCELLED",
+                            "action_id": action_id,
+                            "message": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
+                            "speech_text": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
+                            "should_speak": True
+                        }
+                    if db_action.status == "EXPIRED" or (datetime.utcnow() > db_action.expires_at):
+                        db_action.status = "EXPIRED"
+                        db.commit()
+                        return {
+                            "success": False,
+                            "status": "EXPIRED",
+                            "action_id": action_id,
+                            "message": "Cette demande de transaction a expiré. Veuillez recommencer la commande.",
+                            "speech_text": "Cette demande de transaction a expiré. Veuillez recommencer.",
+                            "should_speak": True
+                        }
+        except Exception as e:
+            logger.warning(f"[DB WARN] Erreur lors de la vérification de l'action DB: {e}")
+
+        # Fallback vérification mémoire si non trouvé en DB
+        action_meta = self.action_store.get(action_id)
+        if action_meta:
+            if str(action_meta.get("user_id")) != str(user_id):
+                return {
+                    "success": False,
+                    "status": "UNAUTHORIZED_USER",
+                    "action_id": action_id,
+                    "message": "Cette action financière n'appartient pas à cet utilisateur.",
+                    "speech_text": "Cette action financière n'appartient pas à cet utilisateur.",
+                    "should_speak": True
+                }
+            cur_st = action_meta.get("status")
+            if cur_st == "EXECUTED":
+                return {"success": False, "status": "ALREADY_EXECUTED", "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.", "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.", "should_speak": True}
+            if cur_st == "EXECUTING":
+                return {"success": False, "status": "ALREADY_EXECUTING", "message": "Cette transaction est actuellement en cours d'exécution.", "speech_text": "Une demande d'exécution est déjà en cours.", "should_speak": True}
+            if cur_st == "CANCELLED":
+                return {"success": False, "status": "CANCELLED", "message": "Cette demande de transaction a été annulée.", "speech_text": "Cette demande de transaction a été annulée.", "should_speak": True}
+
+        # 2. VERROUILLAGE ATOMIQUE (WAITING_CONFIRMATION -> EXECUTING)
+        try:
+            with Session(engine) as db:
+                affected = db.query(SikaActionModel).filter(
+                    SikaActionModel.action_id == action_id,
+                    SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
+                ).update({"status": "EXECUTING", "updated_at": datetime.utcnow()}, synchronize_session=False)
+                db.commit()
+                if affected == 0 and db_action:
+                    return {
+                        "success": False,
+                        "status": "ALREADY_EXECUTING",
+                        "action_id": action_id,
+                        "message": "Une demande d'exécution est déjà en cours pour cette transaction.",
+                        "speech_text": "Une demande d'exécution est déjà en cours.",
+                        "should_speak": True
+                    }
+        except Exception as e:
+            logger.warning(f"[DB WARN] Erreur lors du verrouillage atomique DB: {e}")
 
         if action_meta:
             action_meta["status"] = "EXECUTING"
 
+        # 3. EXECUTION SUR L'API PAYMECHAP
+        try:
+            if "transfer" in action_id:
+                payout_res = paymechap_api_service.execute_payout(
+                    access_token="",
+                    recipient_phone="0701020304",
+                    amount=20000.0,
+                    motif="Transfert SIKA vers Kouamé Jean"
+                )
+            elif "dep_coffre" in action_id or "deposit" in action_id:
+                payout_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=1, montant=10000.0)
+            else:
+                payout_res = {"success": True, "message": "Opération sans payout spécifique"}
+        except Exception as net_exc:
+            logger.error(f"[PAYMECHAP INCERTAIN] Erreur réseau lors de la communication avec PayMeChap: {net_exc}")
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                        "status": "UNKNOWN_RESULT",
+                        "cancelled_reason": str(net_exc),
+                        "updated_at": datetime.utcnow()
+                    })
+                    db.commit()
+            except Exception:
+                pass
+            return {
+                "success": False,
+                "status": "UNKNOWN_RESULT",
+                "action_id": action_id,
+                "message": "Le statut du virement sur PayMeChap n'a pas pu être confirmé en raison d'un délai réseau. Aucune nouvelle tentative n'a été effectuée par sécurité.",
+                "speech_text": "Le résultat du transfert est incertain à cause du réseau. Aucune nouvelle tentative n'a été lancée par sécurité.",
+                "should_speak": True
+            }
+
+        # 4. TRAITEMENT DES RESULTATS DE PAYMECHAP
+        if payout_res.get("success") is False:
+            fail_msg = payout_res.get("message") or "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué."
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "FAILED", "updated_at": datetime.utcnow()})
+                    db.commit()
+            except Exception:
+                pass
+            if action_meta: action_meta["status"] = "FAILED"
+            return {
+                "success": False,
+                "status": "FAILED",
+                "action_id": action_id,
+                "message": fail_msg,
+                "speech_text": fail_msg,
+                "should_speak": True
+            }
+
+        # SUCCES EXECUTÉ
+        fetched = paymechap_api_service.fetch_live_balance("", "0799053977")
+        real_bal = float(fetched.get("balance", 80000.0)) if fetched.get("success") else 80000.0
+        for w in CONNECTED_USER_WALLETS:
+            if w.get("is_active", True):
+                w["balance"] = real_bal
+
         if "transfer" in action_id:
-            # Exécution du transfert réel sur PayMeChap API
-            payout_res = paymechap_api_service.execute_payout(
-                access_token="",
-                recipient_phone="0701020304",
-                amount=20000.0,
-                motif="Transfert SIKA vers Kouamé Jean"
-            )
-
-            # En cas d'échec d'accès ou d'erreur sur PayMeChap API (Mode Dégradé Sécurisé)
-            if not payout_res.get("success"):
-                if action_meta:
-                    action_meta["status"] = "FAILED"
-                fail_msg = payout_res.get("message") or "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué."
-                return {
-                    "success": False,
-                    "status": "FAILED",
-                    "action_id": action_id,
-                    "message": fail_msg,
-                    "speech_text": fail_msg,
-                    "should_speak": True
-                }
-
-            # Resynchronisation du solde réel en direct depuis l'API PayMeChap
-            fetched = paymechap_api_service.fetch_live_balance("", "0799053977")
-            real_bal = float(fetched.get("balance", 80000.0)) if fetched.get("success") else 80000.0
-
-            for w in CONNECTED_USER_WALLETS:
-                if w.get("is_active", True):
-                    w["balance"] = real_bal
-
             msg = f"Le transfert de 20 000 francs CFA vers Kouamé Jean a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
-            res_dict = {
-                "success": True,
-                "status": "EXECUTED",
-                "action_id": action_id,
-                "message": msg,
-                "speech_text": msg,
-                "paymechap_transaction": payout_res,
-                "new_balance": real_bal,
-                "should_speak": True
-            }
-            if action_meta:
-                action_meta["status"] = "EXECUTED"
-                action_meta["result"] = res_dict
-            return res_dict
-
-        elif "dep_coffre" in action_id or "deposit" in action_id:
-            dep_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=1, montant=10000.0)
-            if dep_res.get("error"):
-                if action_meta:
-                    action_meta["status"] = "FAILED"
-                fail_msg = "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun dépôt n'a été effectué dans le coffre."
-                return {
-                    "success": False,
-                    "status": "FAILED",
-                    "action_id": action_id,
-                    "message": fail_msg,
-                    "speech_text": fail_msg,
-                    "should_speak": True
-                }
-
-            msg = "Dépôt effectué avec succès. 10 000 francs CFA ont été versés dans votre coffre Épargne PayMeChap."
-            res_dict = {
-                "success": True,
-                "status": "EXECUTED",
-                "action_id": action_id,
-                "message": msg,
-                "speech_text": msg,
-                "paymechap_result": dep_res,
-                "should_speak": True
-            }
-            if action_meta:
-                action_meta["status"] = "EXECUTED"
-                action_meta["result"] = res_dict
-            return res_dict
+        else:
+            msg = "Opération confirmée et exécutée avec succès via PayMeChap."
 
         res_dict = {
             "success": True,
             "status": "EXECUTED",
             "action_id": action_id,
-            "message": "Opération confirmée et exécutée avec succès via PayMeChap.",
-            "speech_text": "Opération confirmée et exécutée avec succès via PayMeChap.",
+            "message": msg,
+            "speech_text": msg,
+            "paymechap_transaction": payout_res,
+            "new_balance": real_bal,
             "should_speak": True
         }
+
+        try:
+            with Session(engine) as db:
+                db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                    "status": "EXECUTED",
+                    "result_json": json.dumps(res_dict),
+                    "updated_at": datetime.utcnow()
+                })
+                db.commit()
+        except Exception:
+            pass
+
         if action_meta:
             action_meta["status"] = "EXECUTED"
             action_meta["result"] = res_dict
+
         return res_dict
 
     async def process_financial_event(self, user_id: int, event_data: dict) -> Dict[str, Any]:

@@ -183,18 +183,28 @@ def test_idempotency_prevents_duplicate_execution():
 def test_expired_action_cannot_execute():
     """Vérifie qu'une action expirée (> TTL 300s) est rejetée."""
     import asyncio, time
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
     from app.agent.orchestrator import sika_orchestrator
 
     action_id = "tx_transfer_expired_100"
     sika_orchestrator.register_action(action_id, user_id=77, ttl_seconds=300)
-    # Simuler l'expiration en reculant le horodatage de création
     sika_orchestrator.action_store[action_id]["created_at"] = time.time() - 360
+
+    with Session(engine) as db:
+        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+            "expires_at": datetime.utcnow() - timedelta(seconds=60)
+        })
+        db.commit()
 
     with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
         res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=77))
         assert res["success"] is False
         assert res["status"] == "EXPIRED"
         mock_payout.assert_not_called()
+
 
 
 def test_paymechap_failure_produces_failed_status():
@@ -211,5 +221,64 @@ def test_paymechap_failure_produces_failed_status():
         assert res["success"] is False
         assert res["status"] == "FAILED"
         assert "PayMeChap" in res["speech_text"]
+
+
+def test_backend_restart_simulation_persists_action_and_session():
+    """Simule un crash / redémarrage de FastAPI et vérifie que la DB réhydrate l'action et la session."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    agent = SikaADKAgent()
+    user_id = "restart_user_100"
+    action_id = "tx_transfer_restart_100"
+
+    # 1. Création initiale et persistance DB
+    agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id=user_id)
+
+    # 2. SIMULATION DU REDÉMARRAGE DU BACKEND FASTAPI (Vidage de la mémoire vive)
+    sika_orchestrator.action_store.clear()
+    agent.user_sessions.clear()
+
+    # 3. Vérification de la restauration DB de la session
+    restored_session = agent.get_user_session(user_id)
+    assert restored_session["state"] == "WAITING_VOICE_CONFIRMATION"
+
+    # 4. Confirmation après redémarrage via la DB
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "transaction_id": "tx_restart_pass"}
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=1))
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+
+
+def test_user_ownership_isolation():
+    """Vérifie qu'un utilisateur A ne peut JAMAIS confirmer une action créée par un utilisateur B."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_user_A_999"
+    sika_orchestrator.register_action(action_id, user_id=10) # Créé par user_id 10
+
+    # User B (user_id 20) essaie d'exécuter l'action de User A
+    res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=20))
+    assert res["success"] is False
+    assert res["status"] == "UNAUTHORIZED_USER"
+
+
+def test_uncertain_paymechap_result_sets_unknown_status():
+    """Vérifie qu'une coupure réseau lors du payout met le statut à UNKNOWN_RESULT sans retenter."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_timeout_777"
+    sika_orchestrator.register_action(action_id, user_id=77)
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.side_effect = TimeoutError("Délai d'attente réseau dépassé sur PayMeChap API")
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=77))
+        assert res["success"] is False
+        assert res["status"] == "UNKNOWN_RESULT"
+        assert "incertain" in res["speech_text"].lower()
+
 
 

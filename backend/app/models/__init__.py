@@ -10,6 +10,8 @@ from .connected_wallet import ConnectedWalletModel
 from .user_preference import UserPreferenceModel
 from .savings_goal import SavingsGoalModel
 from .agent_memory import AgentMemoryModel
+from .sika_action import SikaActionModel
+from .sika_session import SikaSessionModel
 
 __all__ = [
     "UserModel",
@@ -17,4 +19,7 @@ __all__ = [
     "UserPreferenceModel",
     "SavingsGoalModel",
     "AgentMemoryModel",
+    "SikaActionModel",
+    "SikaSessionModel",
 ]
+
