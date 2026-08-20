@@ -35,3 +35,24 @@ def test_gcp_tts_voices_list():
     data = response.json()
     assert data.get("success") is True
     assert isinstance(data.get("voices"), list)
+
+def test_chat_endpoint_does_not_embed_audio_base64():
+    """Vérifie que /chat retourne speech_text et should_speak sans doubler la génération audio base64."""
+    response = client.post(
+        "/api/v1/sika/chat",
+        json={"query": "Quel est mon solde ?"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "speech_text" in data
+    assert "should_speak" in data
+    assert data.get("audio_base64") is None  # Separation de responsabilité validée
+
+def test_gcp_tts_empty_text_validation():
+    """Vérifie que /tts retourne HTTP 400 si le texte est vide."""
+    response = client.post(
+        "/api/v1/sika/tts",
+        json={"text": ""}
+    )
+    assert response.status_code == 400
+

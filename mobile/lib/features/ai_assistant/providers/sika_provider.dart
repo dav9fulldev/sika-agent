@@ -362,15 +362,28 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   final AudioPlayer _audioPlayer = AudioPlayer();
+  int _activeSpeechRequestId = 0;
 
   Future<void> _speak(String text, {required String ttsLocale}) async {
+    final currentRequestId = ++_activeSpeechRequestId;
+    debugPrint('[SIKA TTS] Preparing speech output (ReqID: $currentRequestId, $ttsLocale): "$text"');
+
+    // Interrompt tout flux audio précédent
+    await stopSpeaking(resetState: false);
+
     try {
-      debugPrint('[SIKA TTS] Preparing speech output ($ttsLocale): "$text"');
       String? b64;
 
       // 1. MOTEUR PRINCIPAL : Appel de l'endpoint dédié POST /api/v1/sika/tts
       try {
         final ttsRes = await _apiService.fetchGcpTtsAudio(text);
+
+        // Protection anti-course (Race Condition / Stale Request Protection)
+        if (currentRequestId != _activeSpeechRequestId) {
+          debugPrint('[GCP TTS] 🛑 Requête obsolète (ReqID $currentRequestId vs Active $_activeSpeechRequestId). Abandon de l\'audio.');
+          return;
+        }
+
         if (ttsRes['success'] == true && ttsRes['audio_base64'] != null) {
           b64 = ttsRes['audio_base64'] as String;
         }
@@ -378,15 +391,16 @@ class SikaNotifier extends StateNotifier<SikaData> {
         debugPrint('[GCP TTS API] Indisponible ($e). Basculement automatique sur flutter_tts.');
       }
 
+      if (currentRequestId != _activeSpeechRequestId) return;
+
       // 2. LECTURE AUDIO GCP TTS MP3
       if (b64 != null && b64.isNotEmpty) {
-        debugPrint('[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets)');
+        debugPrint('[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets, ReqID: $currentRequestId)');
         final bytes = base64Decode(b64);
-        await _audioPlayer.stop();
         await _audioPlayer.play(BytesSource(bytes));
 
         _audioPlayer.onPlayerComplete.first.then((_) {
-          if (state.state == SikaState.speaking) {
+          if (currentRequestId == _activeSpeechRequestId && state.state == SikaState.speaking) {
             state = state.copyWith(state: SikaState.idle);
           }
         });
@@ -394,20 +408,25 @@ class SikaNotifier extends StateNotifier<SikaData> {
       }
 
       // 3. FALLBACK : flutter_tts
-      debugPrint('[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale du téléphone');
+      if (currentRequestId != _activeSpeechRequestId) return;
+      debugPrint('[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale (ReqID: $currentRequestId)');
       await _flutterTts.setLanguage(ttsLocale);
       await _flutterTts.speak(text);
     } catch (e) {
       debugPrint('[SIKA TTS] Error in TTS speak: $e');
-      state = state.copyWith(state: SikaState.idle);
+      if (currentRequestId == _activeSpeechRequestId) {
+        state = state.copyWith(state: SikaState.idle);
+      }
     }
   }
 
-  Future<void> stopSpeaking() async {
+  Future<void> stopSpeaking({bool resetState = true}) async {
     try {
       await _audioPlayer.stop();
       await _flutterTts.stop();
-      state = state.copyWith(state: SikaState.idle);
+      if (resetState) {
+        state = state.copyWith(state: SikaState.idle);
+      }
     } catch (e) {
       debugPrint('[SIKA TTS] Error stopping TTS: $e');
     }
