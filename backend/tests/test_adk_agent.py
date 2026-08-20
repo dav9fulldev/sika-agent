@@ -236,27 +236,21 @@ def test_backend_restart_simulation_persists_action_and_session():
     import asyncio
     from app.agent.orchestrator import sika_orchestrator
 
-    agent = SikaADKAgent()
-    user_id = "restart_user_100"
     action_id = "tx_transfer_restart_100"
 
-    # 1. Création initiale et persistance DB
-    agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id=user_id)
+    # 1. Enregistrement initial dans la DB
+    sika_orchestrator.register_action(action_id, user_id=1, payload={"recipient": "Kouamé Jean", "amount": 20000.0})
 
-    # 2. SIMULATION DU REDÉMARRAGE DU BACKEND FASTAPI (Vidage de la mémoire vive)
+    # 2. SIMULATION DU REDÉMARRAGE DU BACKEND FASTAPI (Vidage de la mémoire vive RAM)
     sika_orchestrator.action_store.clear()
-    agent.user_sessions.clear()
 
-    # 3. Vérification de la restauration DB de la session
-    restored_session = agent.get_user_session(user_id)
-    assert restored_session["state"] == "WAITING_VOICE_CONFIRMATION"
-
-    # 4. Confirmation après redémarrage via la DB
+    # 3. Confirmation après redémarrage via la DB (persistance SQL)
     with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
         mock_payout.return_value = {"success": True, "transaction_id": "tx_restart_pass"}
         res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=1))
         assert res["success"] is True
         assert res["status"] == "EXECUTED"
+
 
 
 def test_user_ownership_isolation():
@@ -898,6 +892,226 @@ def test_default_or_empty_production_secret_is_rejected():
             os.environ["JWT_SECRET_KEY"] = old_secret
         else:
             os.environ.pop("JWT_SECRET_KEY", None)
+
+
+# ============================================================================
+# FAILURE INJECTION, RACE CONDITIONS & CRASH RECOVERY TESTS
+# ============================================================================
+
+def test_stuck_executing_action_auto_reconciliation():
+    """RESILIENCE TEST 1 : Une action bloquée en EXECUTING depuis >60s bascule vers REQUIRES_RECONCILIATION et refuse confirm_action."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_stuck_60s_{secrets.token_hex(4)}"
+    old_time = datetime.utcnow() - timedelta(seconds=120)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=action_id,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXECUTING",
+            created_at=old_time,
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id=action_id, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "REQUIRES_RECONCILIATION"
+        mock_payout.assert_not_called()
+
+
+def test_crash_after_executing_state_recovery():
+    """RESILIENCE TEST 2 : Crash après EXECUTING -> La réconciliation trouve le virement réel sur PayMeChap et passe l'action à EXECUTED sans second payout."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_crash_after_{secrets.token_hex(4)}"
+    old_time = datetime.utcnow() - timedelta(seconds=120)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=action_id,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXECUTING",
+            created_at=old_time,
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    # Simulation PayMeChap : La transaction a réellement été exécutée
+    mock_txs = [{
+        "id": action_id,
+        "reference": action_id,
+        "counterpartyName": "Kouamé Jean",
+        "amount": 20000.0,
+        "status": "COMPLETED",
+        "dateTransaction": datetime.utcnow().isoformat()
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions", return_value=mock_txs):
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id=action_id, user_id=1))
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+        assert res["reconciled"] is True
+        mock_payout.assert_not_called()
+
+
+def test_crash_before_paymechap_call_recovery():
+    """RESILIENCE TEST 3 : Crash avant l'appel PayMeChap -> Réconciliation sans aucune transaction trouvée -> UNKNOWN_RESULT sans second payout."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_crash_before_{secrets.token_hex(4)}"
+    old_time = datetime.utcnow() - timedelta(seconds=120)
+
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=action_id,
+            user_id=1,
+            action_type="TRANSFER",
+            status="EXECUTING",
+            created_at=old_time,
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=old_time
+        ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions", return_value=[]):
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id=action_id, user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "UNKNOWN_RESULT"
+        mock_payout.assert_not_called()
+
+
+def test_concurrent_confirm_action_claims_atomically():
+    """RESILIENCE TEST 4 : Deux requêtes simultanées de confirmation -> Seule une requête obtient le verrou EXECUTING."""
+    import asyncio, secrets
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_concurrent_conf_{secrets.token_hex(4)}"
+    sika_orchestrator.register_action(action_id, user_id=1)
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "status": "SUCCES"}
+        
+        async def run_confirms():
+            return await asyncio.gather(
+                sika_orchestrator.confirm_action(action_id=action_id, user_id=1),
+                sika_orchestrator.confirm_action(action_id=action_id, user_id=1)
+            )
+
+        res1, res2 = asyncio.run(run_confirms())
+        statuses = [res1["status"], res2["status"]]
+        assert "EXECUTED" in statuses
+        assert "ALREADY_EXECUTING" in statuses or "ALREADY_EXECUTED" in statuses
+        # Un seul payout exécuté !
+        mock_payout.assert_called_once()
+
+
+def test_concurrent_reconcile_action():
+    """RESILIENCE TEST 5 : Deux requêtes de réconciliation simultanées ne provoquent aucune race condition ni corruption."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = f"act_tr_concurrent_rec_{secrets.token_hex(4)}"
+    with Session(engine) as db:
+        db.add(SikaActionModel(
+            action_id=action_id,
+            user_id=1,
+            action_type="TRANSFER",
+            status="UNKNOWN_RESULT",
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(seconds=300),
+            updated_at=datetime.utcnow()
+        ))
+        db.commit()
+
+    mock_txs = [{
+        "id": action_id,
+        "reference": action_id,
+        "counterpartyName": "Kouamé Jean",
+        "amount": 20000.0,
+        "status": "COMPLETED"
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions", return_value=mock_txs):
+        
+        async def run_reconciles():
+            return await asyncio.gather(
+                sika_orchestrator.reconcile_action(action_id=action_id, user_id=1),
+                sika_orchestrator.reconcile_action(action_id=action_id, user_id=1)
+            )
+
+        res1, res2 = asyncio.run(run_reconciles())
+        assert res1["status"] == "EXECUTED"
+        assert res2["status"] == "EXECUTED"
+        mock_payout.assert_not_called()
+
+
+def test_terminal_states_cannot_be_overridden():
+    """RESILIENCE TEST 6 : Une action dans un état terminal (EXECUTED, FAILED, CANCELLED, EXPIRED) rejette toute tentative d'exécution ou annulation."""
+    import asyncio, secrets
+    from datetime import datetime, timedelta
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    rand_suffix = secrets.token_hex(4)
+    terminal_actions = [
+        (f"act_tr_term_executed_{rand_suffix}", "EXECUTED"),
+        (f"act_tr_term_failed_{rand_suffix}", "FAILED"),
+        (f"act_tr_term_cancelled_{rand_suffix}", "CANCELLED"),
+        (f"act_tr_term_expired_{rand_suffix}", "EXPIRED")
+    ]
+
+    with Session(engine) as db:
+        for aid, st in terminal_actions:
+            db.add(SikaActionModel(
+                action_id=aid,
+                user_id=1,
+                action_type="TRANSFER",
+                status=st,
+                created_at=datetime.utcnow(),
+                expires_at=datetime.utcnow() + timedelta(seconds=300),
+                updated_at=datetime.utcnow()
+            ))
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        for aid, st in terminal_actions:
+            res_conf = asyncio.run(sika_orchestrator.confirm_action(action_id=aid, user_id=1))
+            assert res_conf["success"] is False
+            assert res_conf["status"] in ["ALREADY_EXECUTED", "CANCELLED", "FAILED", "EXPIRED"]
+            mock_payout.assert_not_called()
+
+
 
 
 

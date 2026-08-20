@@ -443,16 +443,19 @@ class PayMeChapAPIService:
 
         return []
 
-    def execute_payout(self, access_token: str, recipient_phone: str, amount: float, motif: str = "Transfert SIKA") -> Dict[str, Any]:
+    def execute_payout(self, access_token: str, recipient_phone: str, amount: float, motif: str = "Transfert SIKA", action_id: Optional[str] = None) -> Dict[str, Any]:
         """Exécute un transfert de fonds PayMeChap via l'API Partenaire (POST /api/v1/partners/transactions/{sender_phone}/transfer)."""
         token = self.get_partner_access_token() or access_token
         clean_recipient = recipient_phone.replace(" ", "").replace("+225", "")
         endpoint = f"{self.base_url}/api/v1/partners/transactions/{clean_recipient}/transfer"
 
+        full_motif = f"{motif} [{action_id}]" if action_id else motif
         payload = {
             "telephoneDestination": clean_recipient,
             "montant": amount,
-            "motif": motif,
+            "motif": full_motif,
+            "reference": action_id or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
+            "idempotency_key": action_id,
         }
 
         try:
@@ -460,15 +463,18 @@ class PayMeChapAPIService:
                 "Authorization": f"Bearer {token}" if token else "",
                 "Content-Type": "application/json",
             }
-            logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient}")
+            if action_id:
+                headers["X-Idempotency-Key"] = action_id
+
+            logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient} (action_id={action_id})")
             resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
             if resp.status_code in [200, 201]:
                 data = resp.json()
                 res_data = data.get("data") or data
                 return {
                     "success": True,
-                    "transaction_id": res_data.get("transaction_id") or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
-                    "reference": res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
+                    "transaction_id": res_data.get("transaction_id") or action_id or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
+                    "reference": action_id or res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
                     "amount": float(res_data.get("amount") or amount),
                     "fees": float(res_data.get("fees") or 0.0),
                     "currency": res_data.get("currency") or "XOF",
@@ -484,6 +490,7 @@ class PayMeChapAPIService:
             "status": "TEMPORARILY_UNAVAILABLE",
             "message": "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué.",
         }
+
 
 
 paymechap_api_service = PayMeChapAPIService()

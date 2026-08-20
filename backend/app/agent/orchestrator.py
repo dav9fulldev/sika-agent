@@ -170,7 +170,7 @@ class SikaAgentOrchestrator:
         }
 
     async def confirm_action(self, action_id: str, user_id: int = 1, user_confirmed: bool = True) -> Dict[str, Any]:
-        """Exécute l'action financière réelle sur l'API PayMeChap avec verrouillage atomique et validation d'appartenance utilisateur."""
+        """Exécute l'action financière réelle sur l'API PayMeChap avec verrouillage atomique, validation d'appartenance utilisateur et gestion des crashs."""
         logger.info(f"[SIKA ORCHESTRATOR] Validation de sécurité reçue pour action_id={action_id} (user_id={user_id})")
 
         from sqlalchemy.orm import Session
@@ -179,7 +179,7 @@ class SikaAgentOrchestrator:
         from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
         from ..routes.wallet_router import CONNECTED_USER_WALLETS
 
-        # 1. VERIFICATION D'APPARTENANCE ET D'ETAT PERSISTE EN BASE DE DONNEES
+        # 1. VÉRIFICATION D'APPARTENANCE ET D'ÉTAT PERSISTÉ EN BASE DE DONNÉES
         db_action = None
         try:
             with Session(engine) as db:
@@ -197,6 +197,7 @@ class SikaAgentOrchestrator:
                             "should_speak": True
                         }
 
+                    # États terminaux (Transition strictement interdite)
                     if db_action.status == "EXECUTED":
                         return {
                             "success": False,
@@ -204,15 +205,6 @@ class SikaAgentOrchestrator:
                             "action_id": action_id,
                             "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.",
                             "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.",
-                            "should_speak": True
-                        }
-                    if db_action.status == "EXECUTING":
-                        return {
-                            "success": False,
-                            "status": "ALREADY_EXECUTING",
-                            "action_id": action_id,
-                            "message": "Cette transaction est actuellement en cours d'exécution sur PayMeChap.",
-                            "speech_text": "Une demande d'exécution est déjà en cours pour cette transaction.",
                             "should_speak": True
                         }
                     if db_action.status == "CANCELLED":
@@ -224,6 +216,15 @@ class SikaAgentOrchestrator:
                             "speech_text": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
                             "should_speak": True
                         }
+                    if db_action.status == "FAILED":
+                        return {
+                            "success": False,
+                            "status": "FAILED",
+                            "action_id": action_id,
+                            "message": "Cette transaction est en échec définitif et ne peut plus être exécutée.",
+                            "speech_text": "Cette transaction est en échec définitif.",
+                            "should_speak": True
+                        }
                     if db_action.status == "UNKNOWN_RESULT":
                         return {
                             "success": False,
@@ -231,6 +232,40 @@ class SikaAgentOrchestrator:
                             "action_id": action_id,
                             "message": "Cette transaction a un résultat incertain. Aucune nouvelle tentative n'est autorisée sans réconciliation.",
                             "speech_text": "Cette transaction a un résultat incertain. Aucune nouvelle tentative n'est autorisée.",
+                            "should_speak": True
+                        }
+                    if db_action.status == "REQUIRES_RECONCILIATION":
+                        return {
+                            "success": False,
+                            "status": "REQUIRES_RECONCILIATION",
+                            "action_id": action_id,
+                            "message": "Cette transaction a été interrompue et nécessite une réconciliation préalable.",
+                            "speech_text": "Cette transaction a été interrompue et nécessite une réconciliation.",
+                            "should_speak": True
+                        }
+
+                    # Gestion d'une action EXECUTING bloquée (Crash recovery / Timeout > 60s)
+                    if db_action.status == "EXECUTING":
+                        now = datetime.utcnow()
+                        if (now - db_action.updated_at) > timedelta(seconds=60):
+                            logger.warning(f"[CRASH RECOVERY] Action {action_id} bloquée en EXECUTING depuis > 60s. Bascule vers REQUIRES_RECONCILIATION.")
+                            db_action.status = "REQUIRES_RECONCILIATION"
+                            db_action.cancelled_reason = "STUCK_EXECUTING_TIMEOUT"
+                            db.commit()
+                            return {
+                                "success": False,
+                                "status": "REQUIRES_RECONCILIATION",
+                                "action_id": action_id,
+                                "message": "Cette transaction a été interrompue suite à un délai réseau. Une réconciliation est requise.",
+                                "speech_text": "Cette transaction a subi une interruption. Une réconciliation est requise.",
+                                "should_speak": True
+                            }
+                        return {
+                            "success": False,
+                            "status": "ALREADY_EXECUTING",
+                            "action_id": action_id,
+                            "message": "Cette transaction est actuellement en cours d'exécution sur PayMeChap.",
+                            "speech_text": "Une demande d'exécution est déjà en cours pour cette transaction.",
                             "should_speak": True
                         }
 
@@ -262,13 +297,13 @@ class SikaAgentOrchestrator:
                 }
             cur_st = action_meta.get("status")
             if cur_st == "EXECUTED":
-                return {"success": False, "status": "ALREADY_EXECUTED", "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.", "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.", "should_speak": True}
-            if cur_st == "EXECUTING":
-                return {"success": False, "status": "ALREADY_EXECUTING", "message": "Cette transaction est actuellement en cours d'exécution.", "speech_text": "Une demande d'exécution est déjà en cours.", "should_speak": True}
+                return {"success": False, "status": "ALREADY_EXECUTED", "message": "Cette transaction a déjà été exécutée sur PayMeChap.", "speech_text": "Cette transaction a déjà été exécutée.", "should_speak": True}
+            if cur_st in ["EXECUTING", "REQUIRES_RECONCILIATION"]:
+                return {"success": False, "status": cur_st, "message": "Une exécution ou réconciliation est en cours.", "speech_text": "Une exécution ou réconciliation est déjà en cours.", "should_speak": True}
             if cur_st == "CANCELLED":
                 return {"success": False, "status": "CANCELLED", "message": "Cette demande de transaction a été annulée.", "speech_text": "Cette demande de transaction a été annulée.", "should_speak": True}
 
-        # 2. VERROUILLAGE ATOMIQUE (WAITING_CONFIRMATION -> EXECUTING)
+        # 2. VERROUILLAGE ATOMIQUE SQL (WAITING_CONFIRMATION / PREPARED -> EXECUTING)
         try:
             with Session(engine) as db:
                 affected = db.query(SikaActionModel).filter(
@@ -276,12 +311,13 @@ class SikaAgentOrchestrator:
                     SikaActionModel.status.in_(["WAITING_CONFIRMATION", "PREPARED"])
                 ).update({"status": "EXECUTING", "updated_at": datetime.utcnow()}, synchronize_session=False)
                 db.commit()
-                if affected == 0 and db_action:
+                if affected == 0:
+                    logger.warning(f"[ATOMIC LOCK REJECT] Action {action_id} déjà verrouillée ou changée d'état.")
                     return {
                         "success": False,
                         "status": "ALREADY_EXECUTING",
                         "action_id": action_id,
-                        "message": "Une demande d'exécution est déjà en cours pour cette transaction.",
+                        "message": "Une demande d'exécution est déjà en cours ou traitée pour cette transaction.",
                         "speech_text": "Une demande d'exécution est déjà en cours.",
                         "should_speak": True
                     }
@@ -291,14 +327,15 @@ class SikaAgentOrchestrator:
         if action_meta:
             action_meta["status"] = "EXECUTING"
 
-        # 3. EXECUTION SUR L'API PAYMECHAP
+        # 3. EXÉCUTION SUR L'API PAYMECHAP (TRANSACTION SQL FERMÉE PENDANT L'APPEL RÉSEAU)
         try:
             if "transfer" in action_id or "act_tr" in action_id:
                 payout_res = paymechap_api_service.execute_payout(
                     access_token="",
                     recipient_phone="0701020304",
                     amount=20000.0,
-                    motif="Transfert SIKA vers Kouamé Jean"
+                    motif="Transfert SIKA vers Kouamé Jean",
+                    action_id=action_id
                 )
 
             elif "dep_coffre" in action_id or "deposit" in action_id:
@@ -326,7 +363,7 @@ class SikaAgentOrchestrator:
                 "should_speak": True
             }
 
-        # 4. TRAITEMENT DES RESULTATS DE PAYMECHAP
+        # 4. TRAITEMENT DES RÉSULTATS DE PAYMECHAP
         if payout_res.get("success") is False:
             fail_msg = payout_res.get("message") or "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué."
             try:
@@ -345,7 +382,7 @@ class SikaAgentOrchestrator:
                 "should_speak": True
             }
 
-        # SUCCES EXECUTÉ
+        # SUCCÈS EXÉCUTÉ
         fetched = paymechap_api_service.fetch_live_balance("", "0799053977")
         real_bal = float(fetched.get("balance", 80000.0)) if fetched.get("success") else 80000.0
         for w in CONNECTED_USER_WALLETS:
@@ -356,7 +393,6 @@ class SikaAgentOrchestrator:
             msg = f"Le transfert de 20 000 francs CFA vers Kouamé Jean a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
         else:
             msg = "Opération confirmée et exécutée avec succès via PayMeChap."
-
 
         res_dict = {
             "success": True,
@@ -387,7 +423,7 @@ class SikaAgentOrchestrator:
         return res_dict
 
     async def reconcile_action(self, action_id: str, user_id: int = 1) -> Dict[str, Any]:
-        """Interroge directement l'API PayMeChap pour réconcilier une transaction à l'état UNKNOWN_RESULT sans JAMAIS la ré-exécuter."""
+        """Interroge directement l'API PayMeChap pour réconcilier une transaction (UNKNOWN_RESULT, REQUIRES_RECONCILIATION, EXECUTING bloquée) sans JAMAIS la ré-exécuter."""
         logger.info(f"[RECONCILIATION] Demande de réconciliation pour action_id={action_id} (user_id={user_id})")
 
         from sqlalchemy.orm import Session
@@ -396,7 +432,7 @@ class SikaAgentOrchestrator:
         from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
         from ..routes.wallet_router import CONNECTED_USER_WALLETS
 
-        # 1. Vérification d'appartenance utilisateur & extraction de l'action DB
+        # 1. VÉRIFICATION D'APPARTENANCE ET D'ÉTAT TERMINAL
         db_action = None
         try:
             with Session(engine) as db:
@@ -413,6 +449,7 @@ class SikaAgentOrchestrator:
                             "should_speak": True
                         }
 
+                    # Si l'action est déjà dans un état terminal, retourner la confirmation directement
                     if db_action.status == "EXECUTED":
                         return {
                             "success": True,
@@ -423,14 +460,14 @@ class SikaAgentOrchestrator:
                             "speech_text": "PayMeChap confirme que le transfert a bien été effectué avec succès.",
                             "should_speak": True
                         }
-                    if db_action.status in ["FAILED", "CANCELLED"]:
+                    if db_action.status in ["FAILED", "CANCELLED", "EXPIRED"]:
                         return {
                             "success": False,
                             "status": db_action.status,
                             "reconciled": True,
                             "action_id": action_id,
-                            "message": f"La réconciliation confirme que cette transaction a le statut : {db_action.status}.",
-                            "speech_text": "PayMeChap confirme que la transaction est annulée ou en échec.",
+                            "message": f"La réconciliation confirme que cette transaction a le statut terminal : {db_action.status}.",
+                            "speech_text": f"PayMeChap confirme que la transaction est {db_action.status.lower()}.",
                             "should_speak": True
                         }
         except Exception as e:
@@ -447,7 +484,7 @@ class SikaAgentOrchestrator:
                 "should_speak": True
             }
 
-        # 2. Interrogation directe des transactions réelles sur l'API PayMeChap (SOURCE UNIQUE DE VÉRITÉ)
+        # 2. INTERROGATION EN DIRECT DE PAYMECHAP (SOURCE UNIQUE DE VÉRITÉ FINANCIÈRE)
         live_txs = paymechap_api_service.fetch_live_transactions(access_token="", account_number="0799053977", limit=20)
         fetched_bal = paymechap_api_service.fetch_live_balance(access_token="", account_number="0799053977")
         real_bal = float(fetched_bal.get("balance", 80000.0)) if fetched_bal.get("success") else 80000.0
@@ -460,23 +497,29 @@ class SikaAgentOrchestrator:
         for tx in live_txs:
             tx_id_str = str(tx.get("id", ""))
             tx_desc = str(tx.get("description", "")).lower()
-            if action_id in tx_id_str or "kouamé" in tx_desc or "kouame" in tx_desc or float(tx.get("amount", 0)) == 20000.0:
+            tx_ref = str(tx.get("reference", ""))
+            if action_id in tx_id_str or action_id in tx_ref or "kouamé" in tx_desc or "kouame" in tx_desc or float(tx.get("amount", 0)) == 20000.0:
                 matching_tx = tx
                 break
 
+        # 3. VERROUILLAGE ATOMIQUE ET MISE À JOUR SÉCURISÉE D'ÉTAT
         if matching_tx:
             tx_stat = str(matching_tx.get("status", "")).upper()
             if tx_stat in ["COMPLETED", "EFFECTUÉ", "SUCCESS", "SUCCES"]:
                 msg = f"PayMeChap confirme que le transfert de 20 000 FCFA vers Kouamé Jean a bien été effectué. Votre solde réel actuel est de {int(real_bal):,} FCFA.".replace(",", " ")
                 try:
                     with Session(engine) as db:
-                        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                        db.query(SikaActionModel).filter(
+                            SikaActionModel.action_id == action_id,
+                            SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
+                        ).update({
                             "status": "EXECUTED",
                             "updated_at": datetime.utcnow()
-                        })
+                        }, synchronize_session=False)
                         db.commit()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[DB WARN] Erreur mise à jour réconciliation EXECUTED: {e}")
+
                 if action_id in self.action_store:
                     self.action_store[action_id]["status"] = "EXECUTED"
 
@@ -494,13 +537,17 @@ class SikaAgentOrchestrator:
                 msg = f"PayMeChap confirme que le transfert est en échec. Votre solde est de {int(real_bal):,} FCFA.".replace(",", " ")
                 try:
                     with Session(engine) as db:
-                        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                        db.query(SikaActionModel).filter(
+                            SikaActionModel.action_id == action_id,
+                            SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
+                        ).update({
                             "status": "FAILED",
                             "updated_at": datetime.utcnow()
-                        })
+                        }, synchronize_session=False)
                         db.commit()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[DB WARN] Erreur mise à jour réconciliation FAILED: {e}")
+
                 if action_id in self.action_store:
                     self.action_store[action_id]["status"] = "FAILED"
 
@@ -515,6 +562,21 @@ class SikaAgentOrchestrator:
                     "should_speak": True
                 }
         else:
+            # Aucune transaction trouvée sur PayMeChap
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(
+                        SikaActionModel.action_id == action_id,
+                        SikaActionModel.status == "EXECUTING"
+                    ).update({
+                        "status": "REQUIRES_RECONCILIATION",
+                        "cancelled_reason": "NO_MATCHING_TRANSACTION_FOUND",
+                        "updated_at": datetime.utcnow()
+                    }, synchronize_session=False)
+                    db.commit()
+            except Exception:
+                pass
+
             msg = "Je ne peux pas encore confirmer le statut de cette opération sur PayMeChap. Aucun nouveau transfert ne sera lancé automatiquement."
             return {
                 "success": False,
@@ -525,6 +587,7 @@ class SikaAgentOrchestrator:
                 "speech_text": msg,
                 "should_speak": True
             }
+
 
     async def process_financial_event(self, user_id: int, event_data: dict) -> Dict[str, Any]:
         """Traitement d'un événement financier passif (ex: notification Mobile Money)."""
