@@ -258,6 +258,21 @@ def verify_wallet_otp(data: Dict[str, Any]):
     }
 
 
+@router.post("/verify-pin")
+def verify_transaction_pin(data: Dict[str, Any]):
+    """Vérifie le code PIN de transaction auprès de PayMeChap (POST /api/v1/wallets/verify-pin)."""
+    account_number = data.get("account_number", "")
+    pin_code = data.get("pin", "")
+    if not pin_code:
+        raise HTTPException(status_code=400, detail="Le code PIN est obligatoire.")
+
+    res = paymechap_api_service.verify_transaction_pin(account_number, pin_code)
+    if not res.get("success") or not res.get("valid"):
+        raise HTTPException(status_code=401, detail=res.get("message", "Code PIN PayMeChap incorrect."))
+
+    return res
+
+
 @router.post("/sync")
 def sync_user_wallets(user_id: str = "usr_default"):
     """Synchronise les soldes en direct des comptes réellement connectés."""
