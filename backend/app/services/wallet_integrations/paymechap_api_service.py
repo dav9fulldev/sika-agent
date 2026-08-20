@@ -409,38 +409,34 @@ class PayMeChapAPIService:
             "motif": motif,
         }
 
-        if token and not token.startswith("pmc_token_"):
-            try:
-                headers = {
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
+        try:
+            headers = {
+                "Authorization": f"Bearer {token}" if token else "",
+                "Content-Type": "application/json",
+            }
+            logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient}")
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+            if resp.status_code in [200, 201]:
+                data = resp.json()
+                res_data = data.get("data") or data
+                return {
+                    "success": True,
+                    "transaction_id": res_data.get("transaction_id") or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
+                    "reference": res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
+                    "amount": float(res_data.get("amount") or amount),
+                    "fees": float(res_data.get("fees") or 0.0),
+                    "currency": res_data.get("currency") or "XOF",
+                    "status": (res_data.get("status") or "COMPLETED").lower(),
+                    "created_at": res_data.get("created_at") or datetime.utcnow().isoformat(),
                 }
-                resp = requests.post(endpoint, json=payload, headers=headers, timeout=10)
-                if resp.status_code in [200, 201]:
-                    data = resp.json()
-                    res_data = data.get("data") or data
-                    return {
-                        "success": True,
-                        "transaction_id": res_data.get("transaction_id") or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
-                        "reference": res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
-                        "amount": float(res_data.get("amount") or amount),
-                        "fees": float(res_data.get("fees") or 0.0),
-                        "currency": res_data.get("currency") or "XOF",
-                        "status": (res_data.get("status") or "COMPLETED").lower(),
-                        "created_at": res_data.get("created_at") or datetime.utcnow().isoformat(),
-                    }
-            except Exception as e:
-                logger.warning(f"[PayMeChap Payout API] Exception: {e}")
+            logger.warning(f"[PayMeChap Payout API] Échec HTTP {resp.status_code}: {resp.text}")
+        except Exception as e:
+            logger.warning(f"[PayMeChap Payout API] Exception réseau sur {endpoint}: {e}")
 
         return {
-            "success": True,
-            "transaction_id": f"TRANSFER-{int(datetime.utcnow().timestamp())}",
-            "reference": f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
-            "amount": amount,
-            "fees": 0.0,
-            "currency": "XOF",
-            "status": "completed",
-            "created_at": datetime.utcnow().isoformat(),
+            "success": False,
+            "status": "TEMPORARILY_UNAVAILABLE",
+            "message": "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué.",
         }
 
 
