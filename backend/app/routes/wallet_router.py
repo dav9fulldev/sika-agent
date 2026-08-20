@@ -261,10 +261,17 @@ def verify_wallet_otp(data: Dict[str, Any]):
 @router.post("/verify-pin")
 def verify_transaction_pin(data: Dict[str, Any]):
     """Vérifie le code PIN de transaction auprès de PayMeChap (POST /api/v1/wallets/verify-pin)."""
-    account_number = data.get("account_number", "")
+    account_number = data.get("account_number") or data.get("telephone") or ""
     pin_code = data.get("pin", "")
     if not pin_code:
         raise HTTPException(status_code=400, detail="Le code PIN est obligatoire.")
+
+    if not account_number:
+        active_pmc = [w for w in CONNECTED_USER_WALLETS if "paymechap" in w.get("provider", "").lower()]
+        if active_pmc:
+            account_number = active_pmc[0].get("account_number", "")
+        else:
+            account_number = "0799053977"
 
     res = paymechap_api_service.verify_transaction_pin(account_number, pin_code)
     if not res.get("success") or not res.get("valid"):

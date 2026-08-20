@@ -121,41 +121,45 @@ class PayMeChapAPIService:
         }
 
     def verify_transaction_pin(self, phone_number: str, pin_code: str) -> Dict[str, Any]:
-        """Vérifie le code PIN de transaction auprès de l'API PayMeChap (POST /api/v1/partners/transactions/verify-pin)."""
+        """Vérifie le code PIN de transaction auprès de l'API PayMeChap (POST /api/v1/partners/wallets/{telephone}/verify-pin)."""
         clean_phone = phone_number.replace(" ", "").replace("+225", "")
         token = self.get_partner_access_token()
-        endpoint = f"{self.base_url}/api/v1/partners/transactions/verify-pin"
+        endpoint = f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/verify-pin"
         headers = {
             "Authorization": f"Bearer {token}" if token else "",
             "Content-Type": "application/json",
         }
-        payload = {"telephone": clean_phone, "pin": pin_code}
+        payload = {"pin": str(pin_code)}
         logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint}")
 
         try:
             resp = requests.post(endpoint, json=payload, headers=headers, timeout=8)
             if resp.status_code in [200, 201]:
+                res_data = resp.json()
+                stat = str(res_data.get("status", "")).upper()
+                if stat in ["SUCCES", "SUCCESS", "VALID", "PROCESSED"] or res_data.get("success"):
+                    logger.info(f"[PayMeChap PIN API] PIN validé avec succès pour {clean_phone}")
+                    return {
+                        "success": True,
+                        "valid": True,
+                        "message": res_data.get("message") or "✅ Code PIN PayMeChap validé avec succès !",
+                        "data": res_data
+                    }
+            elif resp.status_code == 401:
+                logger.warning(f"[PayMeChap PIN API] PIN incorrect ou non défini (HTTP 401) pour {clean_phone}")
                 return {
-                    "success": True,
-                    "valid": True,
-                    "message": "✅ Code PIN PayMeChap validé avec succès !",
+                    "success": False,
+                    "valid": False,
+                    "message": "❌ Code PIN PayMeChap incorrect ou non défini (HTTP 401)."
                 }
-            logger.warning(f"[PayMeChap PIN API] Code PIN invalide ou échec HTTP {resp.status_code}: {resp.text}")
+            logger.warning(f"[PayMeChap PIN API] Échec HTTP {resp.status_code}: {resp.text}")
         except Exception as e:
             logger.warning(f"[PayMeChap PIN API] Exception réseau sur {endpoint}: {e}")
-
-        # En cas de test ou si le PIN correspond à un PIN de test générique à 4 chiffres
-        if pin_code and len(pin_code) == 4 and pin_code.isdigit():
-            return {
-                "success": True,
-                "valid": True,
-                "message": "✅ Code PIN validé avec succès !"
-            }
 
         return {
             "success": False,
             "valid": False,
-            "message": "❌ Code PIN PayMeChap incorrect."
+            "message": "❌ Impossible de vérifier le code PIN PayMeChap. Veuillez réessayer."
         }
 
     def fetch_live_balance(self, access_token: str, account_number: Optional[str] = None) -> Dict[str, Any]:
