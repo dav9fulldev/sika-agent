@@ -99,7 +99,20 @@ def get_all_wallets_transaction_history(
 ):
     """API de collecte d'historique et des mouvements des comptes de l'utilisateur authentifié (Exige JWT)."""
     user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
-    user_wallets = [w for w in CONNECTED_USER_WALLETS if str(w.get("user_id")) == user_id and w.get("is_active", True)]
+    wallets = _load_persisted_wallets()
+    user_wallets = [w for w in wallets if str(w.get("user_id")) == user_id and w.get("is_active", True)]
+    
+    # Si aucun portefeuille n'est connecté par cet utilisateur, retour immédiat sans appel API externe
+    if not user_wallets:
+        return {
+            "status": "SUCCESS",
+            "user_id": user_id,
+            "count": 0,
+            "total_spent_xof": 0.0,
+            "total_received_xof": 0.0,
+            "movements": []
+        }
+
     movements: List[Dict[str, Any]] = []
 
     try:
@@ -142,14 +155,17 @@ def get_user_coffres(authorization: Optional[str] = Header(None)):
     wallets = _load_persisted_wallets()
     user_wallets = [w for w in wallets if str(w.get("user_id")) == user_id and w.get("is_active", True)]
 
-    pmc_token = None
-    pmc_account = None
-    for w in user_wallets:
-        if "paymechap" in w.get("provider", "").lower():
-            pmc_token = w.get("access_token")
-            pmc_account = w.get("account_number")
-            break
+    pmc_wallet = next((w for w in user_wallets if "paymechap" in w.get("provider", "").lower()), None)
+    if not pmc_wallet:
+        return {
+            "status": "SUCCESS",
+            "user_id": user_id,
+            "count": 0,
+            "coffres": []
+        }
 
+    pmc_token = pmc_wallet.get("access_token")
+    pmc_account = pmc_wallet.get("account_number")
     coffres = paymechap_api_service.fetch_user_coffres(pmc_token, account_number=pmc_account)
     return {
         "status": "SUCCESS",

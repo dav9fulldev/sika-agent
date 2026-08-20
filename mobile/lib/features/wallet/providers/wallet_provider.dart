@@ -372,9 +372,13 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
-  /// Réinitialise l'état local du portefeuille lors de la déconnexion
-  void clearData() {
+  /// Réinitialise l'état local du portefeuille et vide le cache local
+  Future<void> clearData() async {
     state = WalletState();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cachedWalletsKey);
+    } catch (_) {}
   }
 }
 
