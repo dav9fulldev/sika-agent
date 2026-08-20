@@ -24,7 +24,9 @@ class PayMeChapAPIService:
         self._token_expires_at: Optional[datetime] = None
 
     def get_partner_access_token(self) -> Optional[str]:
-        """Obtient un jeton OAuth2 partenaire depuis l'API PayMeChap (POST /api/v1/oauth/token)."""
+        """Obtient un jeton OAuth2 partenaire depuis l'API PayMeChap (POST /api/v1/oauth/token).
+        Optimisé avec retry et timeout adapté pour supporter l'offre gratuite Render (cold start).
+        """
         if self._cached_token and self._token_expires_at and datetime.utcnow() < self._token_expires_at:
             return self._cached_token
 
@@ -35,25 +37,27 @@ class PayMeChapAPIService:
             "client_secret": self.client_secret,
         }
 
-        try:
-            logger.info(f"[PayMeChap OAuth] Demande de token OAuth2 partenaire vers {endpoint}")
-            resp = requests.post(
-                endpoint,
-                data=payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=10,
-            )
-            if resp.status_code in [200, 201]:
-                data = resp.json()
-                token = data.get("accessToken") or data.get("access_token") or data.get("token")
-                if token:
-                    self._cached_token = token
-                    self._token_expires_at = datetime.utcnow() + timedelta(hours=1)
-                    logger.info("[PayMeChap OAuth] Token partenaire obtenu avec succès !")
-                    return token
-            logger.warning(f"[PayMeChap OAuth] Erreur réponse {resp.status_code}: {resp.text}")
-        except Exception as e:
-            logger.warning(f"[PayMeChap OAuth] Exception lors de la connexion à Render: {e}")
+        # Tentatives adaptées au Cold Start Render Free Tier (jusqu'à 2 essais avec 20s de timeout)
+        for attempt in range(1, 3):
+            try:
+                logger.info(f"[PayMeChap OAuth] Demande de token OAuth2 partenaire vers {endpoint} (Essai {attempt})")
+                resp = requests.post(
+                    endpoint,
+                    data=payload,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    timeout=20,
+                )
+                if resp.status_code in [200, 201]:
+                    data = resp.json()
+                    token = data.get("accessToken") or data.get("access_token") or data.get("token")
+                    if token:
+                        self._cached_token = token
+                        self._token_expires_at = datetime.utcnow() + timedelta(hours=1)
+                        logger.info("[PayMeChap OAuth] Token partenaire obtenu avec succès !")
+                        return token
+                logger.warning(f"[PayMeChap OAuth] Erreur réponse {resp.status_code}: {resp.text}")
+            except Exception as e:
+                logger.warning(f"[PayMeChap OAuth] Exception lors de la connexion à Render (Essai {attempt}): {e}")
 
         return None
 
@@ -457,7 +461,7 @@ class PayMeChapAPIService:
                 "Content-Type": "application/json",
             }
             logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient}")
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
             if resp.status_code in [200, 201]:
                 data = resp.json()
                 res_data = data.get("data") or data
