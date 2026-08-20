@@ -29,6 +29,29 @@ def perceive_sms_notification(data: Dict[str, Any], authorization: Optional[str]
     new_balance = parsed.get("new_balance")
     parsed["user_id"] = user_id
 
+    # Idempotence : Si ce SMS a déjà été perçu récemment pour cet utilisateur, on ne duplique pas le log
+    duplicate = next(
+        (p for p in PERCEPTIONS_LOG[:10] if p.get("user_id") == user_id and p.get("raw_text", p.get("text")) == raw_text),
+        None
+    )
+    if duplicate:
+        target_wallet = next(
+            (
+                w for w in wallet_router.CONNECTED_USER_WALLETS
+                if str(w.get("user_id")) == user_id
+                and w.get("is_active", True)
+                and w.get("provider", "").lower() in provider.lower()
+            ),
+            None
+        )
+        return {
+            "status": "ALREADY_PERCEIVED",
+            "user_id": user_id,
+            "message": f"⚡ SMS {provider} déjà traité (idempotent).",
+            "parsed_data": duplicate,
+            "updated_wallet": target_wallet
+        }
+
     # Mise à jour automatique du solde du portefeuille correspondant STRICTEMENT à cet utilisateur
     target_wallet = next(
         (
@@ -43,6 +66,7 @@ def perceive_sms_notification(data: Dict[str, Any], authorization: Optional[str]
         target_wallet["balance"] = new_balance
         target_wallet["last_synced_at"] = parsed.get("timestamp")
 
+    parsed["text"] = raw_text
     PERCEPTIONS_LOG.insert(0, parsed)
 
     return {

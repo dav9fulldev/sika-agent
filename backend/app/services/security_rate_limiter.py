@@ -42,24 +42,30 @@ class SecurityRateLimiter:
     # 1. GESTION DES TOKENS RÉVOQUÉS (LOGOUT)
     # =========================================================================
 
-    def revoke_token(self, token: str, expires_at: Optional[datetime] = None) -> None:
-        """Enregistre un jeton dans la deny-list jusqu'à sa date d'expiration."""
-        if not token:
-            return
+    def revoke_token(self, token: str, jti: Optional[str] = None, expires_at: Optional[datetime] = None) -> None:
+        """Enregistre un jeton et/ou son JTI dans la deny-list jusqu'à sa date d'expiration."""
         exp = expires_at or (datetime.now(timezone.utc) + timedelta(days=30))
-        self._revoked_tokens[token] = exp
+        if token:
+            self._revoked_tokens[token] = exp
+        if jti:
+            self._revoked_tokens[f"jti_{jti}"] = exp
         self._cleanup_expired_revoked_tokens()
-        logger.info(f"[SECURITY LOGOUT] Jeton révoqué avec succès jusqu'à {exp}")
+        logger.info(f"[SECURITY LOGOUT] Jeton/JTI révoqué avec succès jusqu'à {exp}")
 
-    def is_token_revoked(self, token: str) -> bool:
-        """Vérifie si un token a été invalidé après un logout."""
-        if not token or token not in self._revoked_tokens:
-            return False
-        exp = self._revoked_tokens[token]
-        if datetime.now(timezone.utc) > exp:
+    def is_token_revoked(self, token: str, jti: Optional[str] = None) -> bool:
+        """Vérifie si un token ou son JTI a été invalidé après un logout."""
+        now = datetime.now(timezone.utc)
+        if token and token in self._revoked_tokens:
+            if now <= self._revoked_tokens[token]:
+                return True
             self._revoked_tokens.pop(token, None)
-            return False
-        return True
+
+        if jti and f"jti_{jti}" in self._revoked_tokens:
+            if now <= self._revoked_tokens[f"jti_{jti}"]:
+                return True
+            self._revoked_tokens.pop(f"jti_{jti}", None)
+
+        return False
 
     def _cleanup_expired_revoked_tokens(self) -> None:
         now = datetime.now(timezone.utc)

@@ -32,13 +32,32 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
     Prépares une transaction SANS l'exécuter.
     Passe en état CONFIRMATION_REQUIRED pour validation humaine.
     """
-    if amount <= 0:
+    import math
+    if not isinstance(amount, (int, float)) or math.isnan(amount) or math.isinf(amount) or amount <= 0:
         return ToolResult(
             success=False,
             tool_name="prepare_transfer",
             risk_level=RiskLevel.CONFIRMATION_REQUIRED,
             data={},
             error_message="Le montant du transfert doit être supérieur à 0."
+        )
+
+    if amount > 50_000_000:
+        return ToolResult(
+            success=False,
+            tool_name="prepare_transfer",
+            risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+            data={},
+            error_message="Le montant du transfert dépasse le plafond maximal autorisé de 50 000 000 FCFA."
+        )
+
+    if not recipient or not str(recipient).strip():
+        return ToolResult(
+            success=False,
+            tool_name="prepare_transfer",
+            risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+            data={},
+            error_message="Le destinataire du transfert est obligatoire."
         )
 
     action_id = f"act_{uuid.uuid4().hex[:8]}"
@@ -50,11 +69,11 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
         data={
             "action_id": action_id,
             "status": "confirmation_required",
-            "provider": provider.lower(),
-            "amount": amount,
+            "provider": provider.lower() if provider else "wave",
+            "amount": float(amount),
             "currency": currency,
-            "recipient": recipient,
-            "summary": f"Préparation transfert de {amount} {currency} vers {recipient} via {provider.capitalize()}"
+            "recipient": str(recipient).strip(),
+            "summary": f"Préparation transfert de {amount} {currency} vers {recipient} via {(provider or 'wave').capitalize()}"
         }
     )
 

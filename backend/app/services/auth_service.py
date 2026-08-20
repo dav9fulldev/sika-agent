@@ -26,6 +26,8 @@ def _hash_password(password: str) -> str:
 
 import jwt
 
+import uuid
+
 class OAuth2AuthService:
     """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT sécurisés via PyJWT (HS256)."""
 
@@ -52,11 +54,13 @@ class OAuth2AuthService:
         u_id = user_data.get("id") or user_data.get("user_id") or 1
         now = datetime.now(timezone.utc)
         exp_time = now + (expires_delta if expires_delta is not None else timedelta(hours=self.TOKEN_EXPIRE_HOURS))
+        jti_val = user_data.get("jti") or str(uuid.uuid4())
         payload = {
             "sub": user_data.get("email", "david.yao@email.com"),
             "user_id": int(u_id) if str(u_id).isdigit() else 1,
             "name": user_data.get("name", "David YAO"),
             "is_premium": user_data.get("is_premium", True),
+            "jti": jti_val,
             "iat": now,
             "exp": exp_time,
             "iss": "SIKA_AUTH_SERVER"
@@ -81,6 +85,10 @@ class OAuth2AuthService:
                 algorithms=[self.ALGORITHM],
                 options={"require": ["exp", "user_id", "sub", "iss"]}
             )
+            jti = payload.get("jti")
+            if jti and security_rate_limiter.is_token_revoked(token, jti=jti):
+                logger.warning("[AUTH OAUTH2] Tentative d'accès avec un JTI révoqué.")
+                return None
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("[AUTH OAUTH2] Jeton JWT expiré")

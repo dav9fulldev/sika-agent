@@ -22,6 +22,8 @@ try:
 except Exception:
     pass
 
+import os
+
 app = FastAPI(
     title="SIKA AI API",
     description="Microservice indépendant pour l'Assistant Vocal et Financier SIKA",
@@ -30,22 +32,28 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "*")
+allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+is_wildcard = "*" in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=not is_wildcard,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
 @app.middleware("http")
 async def add_security_headers(request, call_next):
-    """En-têtes de sécurité HTTP OWASP contre Clickjacking, XSS et MitM."""
+    """En-têtes de sécurité HTTP OWASP contre Clickjacking, XSS, MitM et fuites de données."""
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self' https://cdn.jsdelivr.net; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
