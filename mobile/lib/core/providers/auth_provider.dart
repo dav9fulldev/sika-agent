@@ -78,27 +78,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
         try {
           final res = await _apiService.getMe(savedToken);
           final uData = res["user"] ?? {};
+          // P0.3: le backend renvoie 'full_name', pas 'name'
+          final displayName = (uData["full_name"] ?? uData["name"] ?? 'Utilisateur').toString();
           state = state.copyWith(
             hasSeenOnboarding: true,
             isAuthenticated: true,
             accessToken: savedToken,
             user: UserProfileData(
-              id: uData["user_id"] ?? "usr_saved",
-              name: uData["name"] ?? "David YAO",
-              email: uData["sub"] ?? "david.yao@email.com",
+              id: (uData["user_id"] ?? uData["id"] ?? 'usr_saved').toString(),
+              name: displayName,
+              email: (uData["sub"] ?? uData["email"] ?? 'utilisateur@sika.app').toString(),
             ),
           );
-        } catch (_) {
-          // Si le jeton est expiré ou invalide
+        } catch (e) {
+          // P0.2: si le jeton est expiré ou invalide, on déconnecte proprement
+          // au lieu de maintenir une session fantome avec une fausse identité.
+          debugPrint('[AUTH PREFS] Jeton sauvegardé invalid ou expiré, déconnexion: $e');
+          await prefs.remove(_keyAccessToken);
           state = state.copyWith(
             hasSeenOnboarding: true,
-            isAuthenticated: true,
-            accessToken: savedToken,
-            user: UserProfileData(
-              id: "usr_saved",
-              name: "David YAO",
-              email: "david.yao@email.com",
-            ),
+            isAuthenticated: false,
+            accessToken: null,
+            user: null,
           );
         }
       } else {
@@ -136,6 +137,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.login(email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
+      // P0.3: le backend renvoie 'full_name'
+      final displayName = (uData["full_name"] ?? uData["name"] ?? email.trim()).toString();
 
       state = state.copyWith(
         isAuthenticated: true,
@@ -143,9 +146,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: uData["id"] ?? "usr_1",
-          name: uData["name"] ?? "David YAO",
-          email: uData["email"] ?? email.trim(),
+          id: (uData["id"] ?? 'usr_1').toString(),
+          name: displayName,
+          email: (uData["email"] ?? email.trim()).toString(),
         ),
       );
 
@@ -179,6 +182,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.register(name.trim(), email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
+      // P0.3: le backend renvoie 'full_name'
+      final displayName = (uData["full_name"] ?? uData["name"] ?? name.trim()).toString();
 
       state = state.copyWith(
         isAuthenticated: true,
@@ -186,9 +191,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: uData["id"] ?? "usr_1",
-          name: uData["name"] ?? name.trim(),
-          email: uData["email"] ?? email.trim(),
+          id: (uData["id"] ?? 'usr_1').toString(),
+          name: displayName,
+          email: (uData["email"] ?? email.trim()).toString(),
         ),
       );
 
@@ -214,6 +219,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.googleLogin(email: email, name: name);
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
+      // P0.3: le backend renvoie 'full_name'
+      final displayName = (uData["full_name"] ?? uData["name"] ?? name).toString();
 
       state = state.copyWith(
         isAuthenticated: true,
@@ -221,9 +228,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: uData["id"] ?? "usr_google_1",
-          name: uData["name"] ?? name,
-          email: uData["email"] ?? email,
+          id: (uData["id"] ?? 'usr_google_1').toString(),
+          name: displayName,
+          email: (uData["email"] ?? email).toString(),
           isGoogleAuth: true,
         ),
       );

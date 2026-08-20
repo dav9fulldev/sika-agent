@@ -33,8 +33,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
   late Animation<double> _robotFloatAnimation;
   final TextEditingController _inputController = TextEditingController();
 
-  bool _showAlert = true;
-  bool _showConfirmation = false;
+  bool _showAlert = false;
 
   @override
   void initState() {
@@ -88,6 +87,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
     final walletState = ref.watch(walletProvider);
+    final sikaData = ref.watch(sikaProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xff020614),
@@ -196,10 +196,12 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // 2. MODULE CŒUR 1: INDICE D'AUTONOMIE FINANCIÈRE (RUNWAY)
-                    const RunwayCardWidget(
-                      totalBalanceFcfa: 45000.0,
-                      dailyBurnRateFcfa: 2500.0,
+                    // 2. MODULE CŒUR 1: INDICE D'AUTONOMIE FINANCIÈRE (RUNWAY) DYNAMIQUE
+                    RunwayCardWidget(
+                      totalBalanceFcfa: walletState.totalBalanceFcfa,
+                      dailyBurnRateFcfa: walletState.movements.isEmpty 
+                          ? 0.0 
+                          : (walletState.movements.fold<double>(0.0, (sum, m) => sum + m.amount) / 30.0),
                     ),
                     const SizedBox(height: 16),
 
@@ -270,17 +272,21 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // 4. MODULE CŒUR 2: ÉQUILIBRAGE MULTI-PORTEFEUILLES (AUTO-BALANCER)
-                    WalletRebalanceCard(
-                      onRebalanceConfirmed: () => widget.onOpenChat(),
-                    ),
-                    const SizedBox(height: 16),
+                    // 4. MODULE CŒUR 2: ÉQUILIBRAGE MULTI-PORTEFEUILLES (Si au moins 2 comptes connectes)
+                    if (walletState.wallets.length >= 2) ...[
+                      WalletRebalanceCard(
+                        onRebalanceConfirmed: () => widget.onOpenChat(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
-                    // 5. MODULE CŒUR 3: BOOSTER D'ÉPARGNE AUTONOME
-                    SavingsBoosterCard(
-                      onBoostConfirmed: () => widget.onOpenChat(),
-                    ),
-                    const SizedBox(height: 16),
+                    // 5. MODULE CŒUR 3: BOOSTER D'ÉPARGNE AUTONOME (Si au moins 1 compte connecte)
+                    if (walletState.wallets.isNotEmpty) ...[
+                      SavingsBoosterCard(
+                        onBoostConfirmed: () => widget.onOpenChat(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // PROACTIVE ALERT BANNER (Si active)
                     if (_showAlert)
@@ -296,22 +302,33 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         },
                       ),
 
-                    // HUMAN CONFIRMATION BANNER (Si active)
-                    if (_showConfirmation)
-                      HumanConfirmationCard(
-                        actionTitle: langNotifier.tr('Préparation du transfert', 'Transfer Preparation'),
-                        recipientText: 'Kouamé (Wave)',
-                        amountText: currNotifier.format(10000),
-                        onConfirm: () {
-                          sikaNotifier.sendTextMessage(langNotifier.tr('Je confirme le transfert de ${currNotifier.format(10000)}.', 'I confirm the transfer of ${currNotifier.format(10000)}.'));
-                          setState(() => _showConfirmation = false);
-                        },
-                        onCancel: () {
-                          setState(() => _showConfirmation = false);
-                        },
-                      ),
+                    // HUMAN CONFIRMATION BANNER (Pilote par l'action reelle de SIKA)
+                    if (sikaData.pendingActionId != null && sikaData.state == SikaState.securityValidation) ...[
+                      Builder(builder: (context) {
+                        final actionData = sikaData.pendingActionData ?? {};
+                        final recipient = actionData['recipient']?.toString() ??
+                            actionData['destinataire']?.toString() ??
+                            actionData['account_number']?.toString() ??
+                            'Destinataire';
+                        final amountVal = (actionData['amount'] is num)
+                            ? (actionData['amount'] as num).toDouble()
+                            : (actionData['montant'] is num ? (actionData['montant'] as num).toDouble() : 0.0);
+                        final amountDisplay = amountVal > 0 ? currNotifier.format(amountVal) : '---';
 
-                    const SizedBox(height: 16),
+                        return HumanConfirmationCard(
+                          actionTitle: langNotifier.tr('Validation requise pour le transfert', 'Transfer Confirmation Required'),
+                          recipientText: recipient,
+                          amountText: amountDisplay,
+                          onConfirm: () {
+                            sikaNotifier.executeSecurityValidationAndConfirm(sikaData.pendingActionId!);
+                          },
+                          onCancel: () {
+                            sikaNotifier.clearConversation();
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                    ],
 
                     // TEXTE SECTION SUGGESTIONS
                     Text(

@@ -8,6 +8,8 @@ import 'features/splash/splash_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/ai_assistant/presentation/pages/sika_main_navigation_page.dart';
+import 'features/wallet/providers/wallet_provider.dart';
+import 'features/ai_assistant/providers/sika_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,18 @@ class _SikaAppState extends State<SikaApp> {
       builder: (context, ref, child) {
         final authState = ref.watch(authProvider);
         final authNotifier = ref.read(authProvider.notifier);
+
+        // P1.2 — Effacement des données sensibles lors de la déconnexion.
+        // Lorsque isAuthenticated passe de true à false, on vide
+        // immédiatement le wallet et l'historique de conversation SIKA
+        // pour empêcher toute fuite de données entre sessions utilisateur.
+        ref.listen<AuthState>(authProvider, (previous, next) {
+          if ((previous?.isAuthenticated ?? false) && !next.isAuthenticated) {
+            debugPrint('[AUTH] Déconnexion détectée — vidage du wallet et de SIKA.');
+            ref.read(walletProvider.notifier).clearData();
+            ref.read(sikaProvider.notifier).clearConversation();
+          }
+        });
 
         Widget currentScreen;
 

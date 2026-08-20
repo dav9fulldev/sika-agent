@@ -22,18 +22,34 @@ class RunwayCardWidget extends ConsumerWidget {
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
 
-    final int estimatedDays = (totalBalanceFcfa / dailyBurnRateFcfa).round();
-    final Color badgeColor = estimatedDays > 15
-        ? const Color(0xFF10B981) // Safely green
-        : estimatedDays > 7
-            ? const Color(0xFFF59E0B) // Amber warning
-            : const Color(0xFFEF4444); // Red danger
+    // Calcul sécurisé anti-division par zéro (Infinity / NaN)
+    final int estimatedDays;
+    if (dailyBurnRateFcfa <= 0 || !dailyBurnRateFcfa.isFinite) {
+      estimatedDays = totalBalanceFcfa <= 0 ? 0 : 30;
+    } else {
+      final ratio = totalBalanceFcfa / dailyBurnRateFcfa;
+      if (ratio.isFinite && !ratio.isNaN) {
+        estimatedDays = ratio.clamp(0.0, 365.0).round();
+      } else {
+        estimatedDays = totalBalanceFcfa <= 0 ? 0 : 30;
+      }
+    }
 
-    final String statusLabel = estimatedDays > 15
-        ? langNotifier.tr('Sain', 'Healthy')
-        : estimatedDays > 7
-            ? langNotifier.tr('Attention', 'Warning')
-            : langNotifier.tr('Critique', 'Critical');
+    final Color badgeColor = totalBalanceFcfa <= 0
+        ? const Color(0xFF94A3B8)
+        : estimatedDays > 15
+            ? const Color(0xFF10B981) // Safely green
+            : estimatedDays > 7
+                ? const Color(0xFFF59E0B) // Amber warning
+                : const Color(0xFFEF4444); // Red danger
+
+    final String statusLabel = totalBalanceFcfa <= 0
+        ? langNotifier.tr('Neutre', 'Neutral')
+        : estimatedDays > 15
+            ? langNotifier.tr('Sain', 'Healthy')
+            : estimatedDays > 7
+                ? langNotifier.tr('Attention', 'Warning')
+                : langNotifier.tr('Critique', 'Critical');
 
     return Container(
       width: double.infinity,
@@ -116,10 +132,15 @@ class RunwayCardWidget extends ConsumerWidget {
           const SizedBox(height: 8),
 
           Text(
-            langNotifier.tr(
-              'Basé sur un rythme moyen de ${currNotifier.format(dailyBurnRateFcfa)} / jour.',
-              'Based on an average daily spend of ${currNotifier.format(dailyBurnRateFcfa)} / day.',
-            ),
+            dailyBurnRateFcfa > 0
+                ? langNotifier.tr(
+                    'Basé sur un rythme moyen de ${currNotifier.format(dailyBurnRateFcfa)} / jour.',
+                    'Based on an average daily spend of ${currNotifier.format(dailyBurnRateFcfa)} / day.',
+                  )
+                : langNotifier.tr(
+                    'Estimation basée sur votre solde actuel sans dépenses récentes.',
+                    'Estimated based on your current balance with no recent expenses.',
+                  ),
             style: const TextStyle(
               color: Color(0xFF64748B),
               fontSize: 12,

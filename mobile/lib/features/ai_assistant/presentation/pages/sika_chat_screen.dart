@@ -121,6 +121,43 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
               ),
             ),
 
+          // RECONCILIATION PROMPT BANNER (UNKNOWN_RESULT / REQUIRES_RECONCILIATION)
+          if (sikaData.pendingActionId != null && sikaData.state == SikaState.error)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 24),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Statut incertain. Vérifiez l\'opération avant de réessayer.',
+                      style: TextStyle(color: Color(0xFFFDE68A), fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      sikaNotifier.executeActionReconciliation(sikaData.pendingActionId!);
+                    },
+                    icon: const Icon(Icons.sync, size: 14, color: Colors.black),
+                    label: const Text('Vérifier', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF59E0B),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // MESSAGES LIST
           Expanded(
             child: sikaData.messages.isEmpty

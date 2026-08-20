@@ -5,16 +5,29 @@ import '../constants/api_constants.dart';
 class ApiService {
   final String baseUrl;
   String? token;
+  void Function()? onUnauthorized;
 
-  ApiService({this.baseUrl = ApiConstants.baseUrl});
+  ApiService({this.baseUrl = ApiConstants.baseUrl, this.onUnauthorized});
 
   bool get hasToken => token != null && token!.isNotEmpty;
 
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    if (hasToken) 'Authorization': 'Bearer $token',
+  };
+
   // ============================================================================
-  // OAUTH2 AUTHENTICATION API ENDPOINTS
+  // ERROR & RESPONSE HANDLING
   // ============================================================================
 
+  void _handleStatusCode(int statusCode) {
+    if (statusCode == 401) {
+      onUnauthorized?.call();
+    }
+  }
+
   String _extractErrorMessage(http.Response response, String fallbackPrefix) {
+    _handleStatusCode(response.statusCode);
     try {
       final body = jsonDecode(response.body);
       if (body is Map && body.containsKey('detail')) {
@@ -23,6 +36,10 @@ class ApiService {
     } catch (_) {}
     return '$fallbackPrefix (${response.statusCode})';
   }
+
+  // ============================================================================
+  // OAUTH2 AUTHENTICATION API ENDPOINTS
+  // ============================================================================
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await http.post(
@@ -81,8 +98,13 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Jeton OAuth2 invalide (${response.statusCode})');
   }
+
+  // ============================================================================
+  // SIKA AI & AGENT CONVERSATION
+  // ============================================================================
 
   Future<Map<String, dynamic>> sikaChat(
     String query, {
@@ -96,18 +118,22 @@ class ApiService {
       body: jsonEncode({
         'query': query,
         'context': {
-          'user_id': 1,
           'user_firstname': userFirstName ?? "David",
-          'currency_code': currencyCode ?? "USD",
-          'currency_symbol': currencySymbol ?? "\$",
+          'currency_code': currencyCode ?? "XOF",
+          'currency_symbol': currencySymbol ?? "FCFA",
         }
       }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to communicate with SIKA AI: ${response.statusCode}');
   }
+
+  // ============================================================================
+  // WALLET & TRANSACTION ENDPOINTS (AUTHENTICATED)
+  // ============================================================================
 
   Future<Map<String, dynamic>> fetchMyWallets() async {
     final response = await http.get(
@@ -117,6 +143,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to fetch wallets: ${response.statusCode}');
   }
 
@@ -128,6 +155,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to fetch transaction movements: ${response.statusCode}');
   }
 
@@ -139,6 +167,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to fetch user coffres: ${response.statusCode}');
   }
 
@@ -149,7 +178,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/wallets/connect'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'provider': provider,
         'account_number': accountNumber,
@@ -159,6 +188,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to initiate wallet connection: ${response.statusCode}');
   }
 
@@ -170,7 +200,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/wallets/verify-otp'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'session_id': sessionId,
         'otp_code': otpCode,
@@ -181,8 +211,25 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to verify OTP: ${response.statusCode}');
   }
+
+  Future<Map<String, dynamic>> syncWallets() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/wallets/sync'),
+      headers: _headers,
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    _handleStatusCode(response.statusCode);
+    throw Exception('Failed to sync wallets: ${response.statusCode}');
+  }
+
+  // ============================================================================
+  // SMS PERCEPTION
+  // ============================================================================
 
   Future<Map<String, dynamic>> perceiveSms({
     required String text,
@@ -190,23 +237,23 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/perception/sms'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'text': text,
         'sender': sender,
-        'user_id': 1,
       }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to send SMS perception: ${response.statusCode}');
   }
 
   Future<Map<String, dynamic>> simulateSmsPerception(String smsText) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/perception/simulate'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({
         'sms_text': smsText,
         'sender': 'WAVE',
@@ -215,83 +262,40 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to simulate SMS perception: ${response.statusCode}');
   }
 
-  Future<Map<String, dynamic>> syncWallets() async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/v1/wallets/sync'),
-      headers: {'Content-Type': 'application/json'},
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    throw Exception('Failed to sync wallets: ${response.statusCode}');
-  }
+  // ============================================================================
+  // AGENT FINANCIAL ACTIONS (CONFIRM / RECONCILE)
+  // ============================================================================
 
-  Future<Map<String, dynamic>> sikaConfirmTransaction({
-    required double amount,
-    required String category,
-    String? description,
-  }) async {
-    return createTransaction(amount: amount, category: category, description: description);
-  }
-
-  Future<Map<String, dynamic>> createTransaction({
-    required double amount,
-    required String category,
-    String? description,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl${ApiConstants.sikaConfirm}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'amount': amount,
-        'category': category,
-        'description': description ?? 'Dépense via Sika',
-      }),
-    );
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
-    }
-    throw Exception('Failed to create transaction: ${response.statusCode}');
-  }
-
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    if (hasToken) 'Authorization': 'Bearer $token',
-  };
-
-  Future<Map<String, dynamic>> sikaAgentConfirm(String actionId, {int userId = 1}) async {
+  Future<Map<String, dynamic>> sikaAgentConfirm(String actionId) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/agent/confirm'),
       headers: _headers,
       body: jsonEncode({
         'action_id': actionId,
-        'user_id': userId,
       }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to confirm agent action: ${response.statusCode}');
   }
 
-  Future<Map<String, dynamic>> sikaReconcileAction(String actionId, {int userId = 1}) async {
+  Future<Map<String, dynamic>> sikaReconcileAction(String actionId) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/actions/$actionId/reconcile'),
       headers: _headers,
-      body: jsonEncode({
-        'user_id': userId,
-      }),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
+    _handleStatusCode(response.statusCode);
     throw Exception('Failed to reconcile agent action: ${response.statusCode}');
   }
-
-
 
   Future<Map<String, dynamic>> fetchGcpTtsAudio(String text, {String voiceName = 'fr-FR-Neural2-C'}) async {
     final response = await http.post(

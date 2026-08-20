@@ -2,13 +2,14 @@
 import json
 import logging
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..services.wallet_integrations.wave_api_service import wave_api_service
 from ..services.wallet_integrations.orange_money_api_service import orange_money_api_service
 from ..services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
 from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
+from ..services.auth_service import oauth2_auth_service
 
 logger = logging.getLogger("WalletRouter")
 
@@ -43,7 +44,7 @@ def _save_persisted_wallets(wallets: List[Dict[str, Any]]):
         for w in wallets:
             w_copy = {
                 "id": w.get("id"),
-                "user_id": w.get("user_id", "usr_default"),
+                "user_id": str(w.get("user_id", "1")),
                 "provider": w.get("provider"),
                 "account_number": w.get("account_number"),
                 "auth_method": w.get("auth_method", "PAYMECHAP_PARTNER_API"),
@@ -63,10 +64,11 @@ CONNECTED_USER_WALLETS: List[Dict[str, Any]] = _load_persisted_wallets()
 
 
 @router.get("/me")
-def get_my_wallets(user_id: str = "usr_default"):
-    """Retourne la liste complète des portefeuilles connectés avec calcul du solde 100% en direct via l'API (en mémoire RAM)."""
+def get_my_wallets(authorization: Optional[str] = Header(None)):
+    """Retourne la liste complète des portefeuilles connectés pour l'utilisateur authentifié (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     persisted = _load_persisted_wallets()
-    user_wallets = [dict(w) for w in persisted if w.get("user_id") == user_id and w.get("is_active", True)]
+    user_wallets = [dict(w) for w in persisted if str(w.get("user_id")) == user_id and w.get("is_active", True)]
 
     # Auto-synchronisation des soldes en direct à la consultation (uniquement en mémoire)
     for w in user_wallets:
@@ -91,11 +93,12 @@ def get_my_wallets(user_id: str = "usr_default"):
 
 @router.get("/transactions/history")
 def get_all_wallets_transaction_history(
-    user_id: str = "usr_default",
-    limit: int = Query(default=30, ge=1, le=100)
+    limit: int = Query(default=30, ge=1, le=100),
+    authorization: Optional[str] = Header(None)
 ):
-    """API de collecte d'historique et des mouvements des comptes réellement enrôlés."""
-    user_wallets = [w for w in CONNECTED_USER_WALLETS if w.get("user_id") == user_id and w.get("is_active", True)]
+    """API de collecte d'historique et des mouvements des comptes de l'utilisateur authentifié (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
+    user_wallets = [w for w in CONNECTED_USER_WALLETS if str(w.get("user_id")) == user_id and w.get("is_active", True)]
     movements: List[Dict[str, Any]] = []
 
     try:
@@ -132,12 +135,15 @@ def get_all_wallets_transaction_history(
 
 
 @router.get("/coffres")
-def get_user_coffres():
-    """Récupère la liste des Coffres-forts (Objectifs d'Épargne) connectés via PayMeChap."""
+def get_user_coffres(authorization: Optional[str] = Header(None)):
+    """Récupère la liste des Coffres-forts connectés via PayMeChap pour l'utilisateur authentifié (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     wallets = _load_persisted_wallets()
+    user_wallets = [w for w in wallets if str(w.get("user_id")) == user_id and w.get("is_active", True)]
+
     pmc_token = None
     pmc_account = None
-    for w in wallets:
+    for w in user_wallets:
         if "paymechap" in w.get("provider", "").lower():
             pmc_token = w.get("access_token")
             pmc_account = w.get("account_number")
@@ -146,14 +152,16 @@ def get_user_coffres():
     coffres = paymechap_api_service.fetch_user_coffres(pmc_token, account_number=pmc_account)
     return {
         "status": "SUCCESS",
+        "user_id": user_id,
         "count": len(coffres),
         "coffres": coffres
     }
 
 
 @router.post("/connect")
-def initiate_wallet_connection(data: Dict[str, Any]):
-    """Étape 1 : Demande de connexion d'un portefeuille (Déclenchement OTP SMS/API)."""
+def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """Étape 1 : Demande de connexion d'un portefeuille (Déclenchement OTP SMS/API) (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     provider = data.get("provider")
     account_number = data.get("account_number")
     auth_method = data.get("auth_method", "OAUTH2_API")
@@ -170,6 +178,7 @@ def initiate_wallet_connection(data: Dict[str, Any]):
 
     PENDING_OTP_SESSIONS[session_id] = {
         "session_id": session_id,
+        "user_id": user_id,
         "provider": provider,
         "account_number": account_number,
         "auth_method": auth_method,
@@ -190,25 +199,25 @@ def initiate_wallet_connection(data: Dict[str, Any]):
 
 
 @router.post("/verify-otp")
-def verify_wallet_otp(data: Dict[str, Any]):
-    """Étape 2 : Vérification du code OTP et enrôlement effectif du compte."""
+def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """Étape 2 : Vérification du code OTP et enrôlement effectif du compte (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     session_id = data.get("session_id")
     otp_code = data.get("otp_code")
     provider = data.get("provider", "PayMeChap")
     account_number = data.get("account_number", "")
-    user_id = data.get("user_id", "usr_default")
 
     if not session_id or not otp_code:
         raise HTTPException(status_code=400, detail="Champs 'session_id' et 'otp_code' obligatoires.")
 
     session = PENDING_OTP_SESSIONS.pop(session_id, None)
     if not session:
-        session = {
-            "provider": provider,
-            "account_number": account_number,
-            "auth_method": "OAUTH2_API"
-        }
+        raise HTTPException(status_code=400, detail="Session OTP introuvable ou expirée.")
 
+    if str(session.get("user_id")) != user_id:
+        raise HTTPException(status_code=403, detail="Session OTP non autorisée pour cet utilisateur.")
+
+    target_user_id = user_id
     provider = session.get("provider", provider)
     account_number = session.get("account_number", account_number)
     prov_lower = provider.lower()
@@ -230,14 +239,17 @@ def verify_wallet_otp(data: Dict[str, Any]):
 
     real_balance = float(fetched.get("balance", 0.0))
 
-    # Suppression de tout ancien doublon du même compte
+    # Suppression de tout ancien doublon du même compte pour cet utilisateur
     global CONNECTED_USER_WALLETS
-    CONNECTED_USER_WALLETS = [w for w in CONNECTED_USER_WALLETS if not (w.get("provider") == provider and w.get("account_number") == account_number)]
+    CONNECTED_USER_WALLETS = [
+        w for w in CONNECTED_USER_WALLETS 
+        if not (str(w.get("user_id")) == str(target_user_id) and w.get("provider") == provider and w.get("account_number") == account_number)
+    ]
 
     new_id = f"w_{provider.lower().replace(' ', '')}_{int(datetime.utcnow().timestamp())}"
     wallet_entry = {
         "id": new_id,
-        "user_id": user_id,
+        "user_id": str(target_user_id),
         "provider": provider,
         "balance": real_balance,
         "currency": "XOF",
@@ -259,15 +271,16 @@ def verify_wallet_otp(data: Dict[str, Any]):
 
 
 @router.post("/verify-pin")
-def verify_transaction_pin(data: Dict[str, Any]):
-    """Vérifie le code PIN de transaction auprès de PayMeChap (POST /api/v1/wallets/verify-pin)."""
-    account_number = data.get("account_number") or data.get("telephone") or ""
+def verify_transaction_pin(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """Vérifie le code PIN de transaction auprès de PayMeChap (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     pin_code = data.get("pin", "")
     if not pin_code:
         raise HTTPException(status_code=400, detail="Le code PIN est obligatoire.")
 
+    account_number = data.get("account_number") or data.get("telephone") or ""
     if not account_number:
-        active_pmc = [w for w in CONNECTED_USER_WALLETS if "paymechap" in w.get("provider", "").lower()]
+        active_pmc = [w for w in CONNECTED_USER_WALLETS if str(w.get("user_id")) == user_id and "paymechap" in w.get("provider", "").lower()]
         if active_pmc:
             account_number = active_pmc[0].get("account_number", "")
         else:
@@ -281,12 +294,13 @@ def verify_transaction_pin(data: Dict[str, Any]):
 
 
 @router.post("/sync")
-def sync_user_wallets(user_id: str = "usr_default"):
-    """Synchronise les soldes en direct des comptes réellement connectés."""
+def sync_user_wallets(authorization: Optional[str] = Header(None)):
+    """Synchronise les soldes en direct des comptes de l'utilisateur authentifié (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     global CONNECTED_USER_WALLETS
     synced_wallets = []
     for w in CONNECTED_USER_WALLETS:
-        if w.get("user_id") == user_id and w.get("is_active", True):
+        if str(w.get("user_id")) == user_id and w.get("is_active", True):
             prov = w.get("provider", "").lower()
             token = w.get("access_token") or "token"
             acc_num = w.get("account_number") or ""
@@ -315,23 +329,25 @@ def sync_user_wallets(user_id: str = "usr_default"):
 
 
 @router.post("/reset")
-def reset_all_wallets():
-    """Réinitialise complètement les portefeuilles et données enregistrées pour permettre à l'utilisateur de recommencer à zéro."""
+def reset_all_wallets(authorization: Optional[str] = Header(None)):
+    """Réinitialise les portefeuilles de l'utilisateur authentifié (Exige JWT)."""
+    user_id = str(oauth2_auth_service.require_authenticated_user_id(authorization))
     global CONNECTED_USER_WALLETS, PENDING_OTP_SESSIONS
-    CONNECTED_USER_WALLETS.clear()
-    PENDING_OTP_SESSIONS.clear()
+    CONNECTED_USER_WALLETS = [w for w in CONNECTED_USER_WALLETS if str(w.get("user_id")) != user_id]
     
-    if WALLETS_DATA_FILE.exists():
-        try:
-            WALLETS_DATA_FILE.write_text("[]", encoding="utf-8")
-        except Exception as e:
-            logger.warning(f"[RESET WALLETS] Impossible d'effacer {WALLETS_DATA_FILE}: {e}")
+    # Clean up pending OTPs for this user
+    for sid, sess in list(PENDING_OTP_SESSIONS.items()):
+        if str(sess.get("user_id")) == user_id:
+            PENDING_OTP_SESSIONS.pop(sid, None)
+            
+    _save_persisted_wallets(CONNECTED_USER_WALLETS)
             
     from ..agents.sika_agent import sika_adk_agent
     sika_adk_agent.reset_all_sessions()
     
-    logger.info("[RESET SYSTEM] Le système a été réinitialisé à zéro avec succès !")
+    logger.info(f"[RESET SYSTEM] Portefeuilles de l'utilisateur {user_id} réinitialisés avec succès !")
     return {
         "status": "RESET_SUCCESSFUL",
-        "message": "🧹 Le système a été réinitialisé à zéro. Vous pouvez créer un nouveau compte et connecter vos moyens de paiement."
+        "user_id": user_id,
+        "message": "🧹 Vos portefeuilles ont été réinitialisés. Vous pouvez reconnecter vos moyens de paiement."
     }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/api_service.dart';
 
 class ConnectedWalletItem {
@@ -189,7 +190,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
         final List decoded = jsonDecode(jsonStr);
         final List<ConnectedWalletItem> cachedItems =
             decoded.map((e) => ConnectedWalletItem.fromJson(e)).toList();
-        if (cachedItems.isNotEmpty) {
+        if (cachedItems.isNotEmpty && mounted) {
           state = state.copyWith(wallets: cachedItems);
           debugPrint('[WALLET CACHE] Loaded ${cachedItems.length} wallet(s) from device storage.');
         }
@@ -211,6 +212,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }
 
   Future<void> fetchWallets() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final res = await _apiService.fetchMyWallets();
@@ -218,14 +220,17 @@ class WalletNotifier extends StateNotifier<WalletState> {
       final List<ConnectedWalletItem> items =
           rawList.map((e) => ConnectedWalletItem.fromJson(e)).toList();
 
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, wallets: items);
       await saveCachedWallets(items);
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching wallets: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Erreur lors du chargement des portefeuilles.',
-      );
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Erreur lors du chargement des portefeuilles.',
+        );
+      }
     }
   }
 
@@ -236,7 +241,9 @@ class WalletNotifier extends StateNotifier<WalletState> {
       final List<WalletMovementItem> items =
           rawMovements.map((e) => WalletMovementItem.fromJson(e)).toList();
 
-      state = state.copyWith(movements: items);
+      if (mounted) {
+        state = state.copyWith(movements: items);
+      }
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching movements: $e');
     }
@@ -249,7 +256,9 @@ class WalletNotifier extends StateNotifier<WalletState> {
       final List<CoffreItem> items =
           rawCoffres.map((e) => CoffreItem.fromJson(e)).toList();
 
-      state = state.copyWith(coffres: items);
+      if (mounted) {
+        state = state.copyWith(coffres: items);
+      }
     } catch (e) {
       debugPrint('[WALLET PROVIDER] Error fetching coffres: $e');
     }
@@ -362,9 +371,16 @@ class WalletNotifier extends StateNotifier<WalletState> {
       state = state.copyWith(isLoading: false);
     }
   }
+
+  /// Réinitialise l'état local du portefeuille lors de la déconnexion
+  void clearData() {
+    state = WalletState();
+  }
 }
 
 final walletProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
-  final apiService = ApiService();
+  // Utilise l'instance partagée dont le token JWT est synchronisé
+  // automatiquement depuis authProvider.
+  final apiService = ref.watch(apiServiceProvider);
   return WalletNotifier(apiService);
 });

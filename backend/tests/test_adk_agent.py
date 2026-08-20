@@ -672,6 +672,7 @@ def test_expired_jwt_cannot_execute_pending_action():
 def test_user_b_token_cannot_execute_user_a_action():
     """TEST 11 : Le jeton de l'utilisateur B ne peut pas exécuter l'action de l'utilisateur A."""
     import asyncio
+    from fastapi import HTTPException
     from app.routes.sika_router import sika_agent_confirm
     from app.agent.orchestrator import sika_orchestrator
     from app.services.auth_service import oauth2_auth_service
@@ -682,15 +683,18 @@ def test_user_b_token_cannot_execute_user_a_action():
     token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
 
     with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
-        res = asyncio.run(sika_agent_confirm({"action_id": action_id}, authorization=f"Bearer {token_B}"))
-        assert res["success"] is False
-        assert res["status"] == "UNAUTHORIZED_USER"
+        try:
+            res = asyncio.run(sika_agent_confirm({"action_id": action_id}, authorization=f"Bearer {token_B}"))
+            assert res.get("status") == "UNAUTHORIZED_USER"
+        except HTTPException as exc:
+            assert exc.status_code == 403
         mock_payout.assert_not_called()
 
 
 def test_user_b_token_cannot_cancel_user_a_action():
     """TEST 12 : Le jeton de l'utilisateur B ne peut pas annuler l'action de l'utilisateur A."""
     import asyncio
+    from fastapi import HTTPException
     from app.routes.sika_router import sika_agent_cancel
     from app.agent.orchestrator import sika_orchestrator
     from app.services.auth_service import oauth2_auth_service
@@ -699,14 +703,17 @@ def test_user_b_token_cannot_cancel_user_a_action():
     sika_orchestrator.register_action(action_id, user_id=100)
 
     token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
-    res = asyncio.run(sika_agent_cancel({"action_id": action_id}, authorization=f"Bearer {token_B}"))
-    assert res["success"] is False
-    assert res["status"] == "UNAUTHORIZED_USER"
+    try:
+        res = asyncio.run(sika_agent_cancel({"action_id": action_id}, authorization=f"Bearer {token_B}"))
+        assert res.get("status") == "UNAUTHORIZED_USER"
+    except HTTPException as exc:
+        assert exc.status_code == 403
 
 
 def test_user_b_token_cannot_reconcile_user_a_action():
     """TEST 13 : Le jeton de l'utilisateur B ne peut pas réconcilier l'action de l'utilisateur A."""
     import asyncio
+    from fastapi import HTTPException
     from app.routes.sika_router import sika_reconcile_action
     from app.agent.orchestrator import sika_orchestrator
     from app.services.auth_service import oauth2_auth_service
@@ -715,9 +722,11 @@ def test_user_b_token_cannot_reconcile_user_a_action():
     sika_orchestrator.register_action(action_id, user_id=100)
 
     token_B = oauth2_auth_service.create_access_token({"id": 200, "email": "userB@sika.ci"})
-    res = asyncio.run(sika_reconcile_action(action_id, authorization=f"Bearer {token_B}"))
-    assert res["success"] is False
-    assert res["status"] == "UNAUTHORIZED_USER"
+    try:
+        res = asyncio.run(sika_reconcile_action(action_id, authorization=f"Bearer {token_B}"))
+        assert res.get("status") == "UNAUTHORIZED_USER"
+    except HTTPException as exc:
+        assert exc.status_code == 403
 
 
 def test_missing_token_cannot_access_private_paymechap_data():

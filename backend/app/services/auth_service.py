@@ -46,17 +46,18 @@ class OAuth2AuthService:
             raise RuntimeError("Weak JWT_SECRET_KEY in production mode.")
         return secret
 
-    def create_access_token(self, user_data: Dict[str, Any]) -> str:
+    def create_access_token(self, user_data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """Génère un jeton d'accès OAuth2 Bearer JWT pour l'utilisateur avec signature cryptographique PyJWT HS256."""
         u_id = user_data.get("id") or user_data.get("user_id") or 1
         now = datetime.now(timezone.utc)
+        exp_time = now + (expires_delta if expires_delta is not None else timedelta(hours=self.TOKEN_EXPIRE_HOURS))
         payload = {
             "sub": user_data.get("email", "david.yao@email.com"),
             "user_id": int(u_id) if str(u_id).isdigit() else 1,
             "name": user_data.get("name", "David YAO"),
             "is_premium": user_data.get("is_premium", True),
             "iat": now,
-            "exp": now + timedelta(hours=self.TOKEN_EXPIRE_HOURS),
+            "exp": exp_time,
             "iss": "SIKA_AUTH_SERVER"
         }
 

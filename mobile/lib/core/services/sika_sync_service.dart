@@ -57,8 +57,10 @@ class SikaSyncService {
           }
 
           final response = await apiService
-              .createTransaction(
-                  amount: amount, category: category, description: description)
+              .perceiveSms(
+                text: 'Dépense de $amount FCFA en $category ($description)',
+                sender: 'OFFLINE_SYNC',
+              )
               .timeout(
             const Duration(seconds: 10),
             onTimeout: () {
@@ -67,7 +69,7 @@ class SikaSyncService {
             },
           );
 
-          if (response['id'] != null) {
+          if (response['status'] == 'PROCESSED' || response['success'] == true) {
             debugPrint(
                 '[SikaSync] ✅ Transaction #$i synced successfully (id=$txId)');
             syncedCount++;

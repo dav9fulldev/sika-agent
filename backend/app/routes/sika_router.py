@@ -158,7 +158,12 @@ async def sika_agent_confirm(data: Dict[str, Any], authorization: Optional[str] 
     """Endpoint de validation humaine pour l'agent SIKA (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     action_id = data.get("action_id", "")
-    return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
+    res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
+    if res.get("status") == "UNAUTHORIZED_USER":
+        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
+    if res.get("status") == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail="Action financière introuvable.")
+    return res
 
 
 @router.post("/agent/cancel")
@@ -166,21 +171,31 @@ async def sika_agent_cancel(data: Dict[str, Any], authorization: Optional[str] =
     """Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     action_id = data.get("action_id", "")
-    return sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.get("reason", "USER_CANCELLED"))
+    res = sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.get("reason", "USER_CANCELLED"))
+    if res.get("status") == "UNAUTHORIZED_USER":
+        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
+    if res.get("status") == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail="Action financière introuvable.")
+    return res
 
 
 @router.post("/actions/{action_id}/reconcile")
 async def sika_reconcile_action(action_id: str, data: Optional[Dict[str, Any]] = None, authorization: Optional[str] = Header(None)):
     """Endpoint de réconciliation d'une transaction au statut incertain UNKNOWN_RESULT auprès de PayMeChap (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    return await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
+    res = await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
+    if res.get("status") == "UNAUTHORIZED_USER":
+        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
+    if res.get("status") == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail="Action financière introuvable.")
+    return res
 
 
 @router.post("/actions/cleanup-stale")
 def sika_cleanup_stale_actions(authorization: Optional[str] = Header(None)):
     """Endpoint de nettoyage périodique / arrière-plan des actions expirées."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    expired_ids = sika_orchestrator.cleanup_stale_actions()
+    expired_ids = sika_orchestrator.cleanup_stale_actions(user_id=user_id)
     return {
         "success": True,
         "expired_count": len(expired_ids),
