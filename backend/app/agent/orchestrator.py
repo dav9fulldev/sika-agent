@@ -8,6 +8,8 @@ from .tools.tool_models import ToolResult
 from . import tools
 from ..services.sika_ai import SikaAI
 
+import time
+
 logger = logging.getLogger("SikaAgentOrchestrator")
 
 class SikaAgentOrchestrator:
@@ -17,6 +19,32 @@ class SikaAgentOrchestrator:
         self.state = AgentState.IDLE
         self.registry = tool_registry
         self.ai_service = SikaAI()
+        self.action_store: Dict[str, Dict[str, Any]] = {}
+
+    def register_action(self, action_id: str, user_id: int = 1, ttl_seconds: int = 300) -> Dict[str, Any]:
+        """Enregistre une action financière en attente avec horodatage et TTL."""
+        # Annuler les actions précédentes non exécutées de cet utilisateur
+        for aid, meta in list(self.action_store.items()):
+            if meta.get("user_id") == user_id and meta.get("status") in ["PREPARED", "WAITING_CONFIRMATION"]:
+                meta["status"] = "CANCELLED"
+                meta["cancelled_reason"] = "REPLACED_BY_NEW_ACTION"
+
+        entry = {
+            "action_id": action_id,
+            "user_id": user_id,
+            "status": "WAITING_CONFIRMATION",
+            "created_at": time.time(),
+            "ttl": ttl_seconds,
+            "result": None
+        }
+        self.action_store[action_id] = entry
+        return entry
+
+    def cancel_action(self, action_id: str, reason: str = "USER_CANCELLED"):
+        """Marque une action comme annulée."""
+        if action_id in self.action_store:
+            self.action_store[action_id]["status"] = "CANCELLED"
+            self.action_store[action_id]["cancelled_reason"] = reason
 
     def list_available_tools(self) -> List[Dict[str, Any]]:
         """Retourne la liste des tools disponibles dans le registre."""
@@ -81,8 +109,47 @@ class SikaAgentOrchestrator:
         """Exécute l'action financière réelle sur l'API PayMeChap (source de vérité) après validation biométrique / PIN."""
         logger.info(f"[SIKA ORCHESTRATOR] Validation de sécurité reçue pour action_id={action_id} (Source de Vérité: PayMeChap API)")
 
+        # 1. VÉRIFICATION ANTI-DOUBLON (IDEMPOTENCE) & EXPIRATION TTL
+        action_meta = self.action_store.get(action_id)
+        if action_meta:
+            current_status = action_meta.get("status")
+            if current_status == "EXECUTED":
+                logger.warning(f"[IDEMPOTENCY] Action {action_id} déjà exécutée. Rejet de la demande en doublon.")
+                return {
+                    "success": False,
+                    "status": "ALREADY_EXECUTED",
+                    "action_id": action_id,
+                    "message": "Cette transaction a déjà été exécutée sur PayMeChap. Impossible de la soumettre une seconde fois.",
+                    "speech_text": "Cette transaction a déjà été exécutée. Impossible de la soumettre à nouveau.",
+                    "should_speak": True
+                }
+            if current_status == "CANCELLED":
+                logger.warning(f"[IDEMPOTENCY] Action {action_id} annulée. Rejet d'exécution.")
+                return {
+                    "success": False,
+                    "status": "CANCELLED",
+                    "action_id": action_id,
+                    "message": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
+                    "speech_text": "Cette demande de transaction a été annulée et ne peut plus être exécutée.",
+                    "should_speak": True
+                }
+            if current_status == "EXPIRED" or (time.time() - action_meta.get("created_at", 0) > action_meta.get("ttl", 300)):
+                action_meta["status"] = "EXPIRED"
+                logger.warning(f"[TTL EXPIRATION] Action {action_id} expirée (> {action_meta.get('ttl', 300)}s).")
+                return {
+                    "success": False,
+                    "status": "EXPIRED",
+                    "action_id": action_id,
+                    "message": "Cette demande de transaction a expiré. Veuillez recommencer la commande.",
+                    "speech_text": "Cette demande de transaction a expiré. Veuillez recommencer.",
+                    "should_speak": True
+                }
+
         from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
         from ..routes.wallet_router import CONNECTED_USER_WALLETS
+
+        if action_meta:
+            action_meta["status"] = "EXECUTING"
 
         if "transfer" in action_id:
             # Exécution du transfert réel sur PayMeChap API
@@ -95,6 +162,8 @@ class SikaAgentOrchestrator:
 
             # En cas d'échec d'accès ou d'erreur sur PayMeChap API (Mode Dégradé Sécurisé)
             if not payout_res.get("success"):
+                if action_meta:
+                    action_meta["status"] = "FAILED"
                 fail_msg = payout_res.get("message") or "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué."
                 return {
                     "success": False,
@@ -114,7 +183,7 @@ class SikaAgentOrchestrator:
                     w["balance"] = real_bal
 
             msg = f"Le transfert de 20 000 francs CFA vers Kouamé Jean a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
-            return {
+            res_dict = {
                 "success": True,
                 "status": "EXECUTED",
                 "action_id": action_id,
@@ -124,10 +193,16 @@ class SikaAgentOrchestrator:
                 "new_balance": real_bal,
                 "should_speak": True
             }
+            if action_meta:
+                action_meta["status"] = "EXECUTED"
+                action_meta["result"] = res_dict
+            return res_dict
 
         elif "dep_coffre" in action_id or "deposit" in action_id:
             dep_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=1, montant=10000.0)
             if dep_res.get("error"):
+                if action_meta:
+                    action_meta["status"] = "FAILED"
                 fail_msg = "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun dépôt n'a été effectué dans le coffre."
                 return {
                     "success": False,
@@ -139,7 +214,7 @@ class SikaAgentOrchestrator:
                 }
 
             msg = "Dépôt effectué avec succès. 10 000 francs CFA ont été versés dans votre coffre Épargne PayMeChap."
-            return {
+            res_dict = {
                 "success": True,
                 "status": "EXECUTED",
                 "action_id": action_id,
@@ -148,8 +223,12 @@ class SikaAgentOrchestrator:
                 "paymechap_result": dep_res,
                 "should_speak": True
             }
+            if action_meta:
+                action_meta["status"] = "EXECUTED"
+                action_meta["result"] = res_dict
+            return res_dict
 
-        return {
+        res_dict = {
             "success": True,
             "status": "EXECUTED",
             "action_id": action_id,
@@ -157,6 +236,10 @@ class SikaAgentOrchestrator:
             "speech_text": "Opération confirmée et exécutée avec succès via PayMeChap.",
             "should_speak": True
         }
+        if action_meta:
+            action_meta["status"] = "EXECUTED"
+            action_meta["result"] = res_dict
+        return res_dict
 
     async def process_financial_event(self, user_id: int, event_data: dict) -> Dict[str, Any]:
         """Traitement d'un événement financier passif (ex: notification Mobile Money)."""

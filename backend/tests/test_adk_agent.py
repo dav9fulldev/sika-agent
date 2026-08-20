@@ -143,3 +143,73 @@ def test_new_request_while_action_pending():
     assert res_new["tool_used"] == "get_total_balance"
     assert session["state"] == "EXECUTED"
 
+
+def test_cancelled_action_cannot_execute():
+    """Vérifie qu'une action annulée ne peut pas être exécutée sur PayMeChap."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    agent = SikaADKAgent()
+    agent.process_query("Sika, envoie 20 000 francs à Kouamé.", user_id="u_cancel")
+    agent.process_query("Non, annule", user_id="u_cancel")
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action("tx_transfer_kouame_20000", user_id=1))
+        assert res["success"] is False
+        assert res["status"] == "CANCELLED"
+        mock_payout.assert_not_called()
+
+
+def test_idempotency_prevents_duplicate_execution():
+    """Vérifie qu'un même action_id ne peut pas être exécuté deux fois (Idempotence)."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_idem_20000"
+    sika_orchestrator.register_action(action_id, user_id=99)
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": True, "transaction_id": "tx_first_call"}
+        res1 = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=99))
+        assert res1["success"] is True
+
+        # Deuxième tentative avec le même action_id
+        res2 = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=99))
+        assert res2["success"] is False
+        assert res2["status"] == "ALREADY_EXECUTED"
+        assert mock_payout.call_count == 1  # L'API PayMeChap n'est appelée qu'une seule fois !
+
+
+def test_expired_action_cannot_execute():
+    """Vérifie qu'une action expirée (> TTL 300s) est rejetée."""
+    import asyncio, time
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_expired_100"
+    sika_orchestrator.register_action(action_id, user_id=77, ttl_seconds=300)
+    # Simuler l'expiration en reculant le horodatage de création
+    sika_orchestrator.action_store[action_id]["created_at"] = time.time() - 360
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=77))
+        assert res["success"] is False
+        assert res["status"] == "EXPIRED"
+        mock_payout.assert_not_called()
+
+
+def test_paymechap_failure_produces_failed_status():
+    """Vérifie qu'un échec de l'API PayMeChap produit le statut FAILED sans solde fictif."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_fail_55"
+    sika_orchestrator.register_action(action_id, user_id=55)
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_payout.return_value = {"success": False, "message": "PayMeChap inaccessible"}
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=55))
+        assert res["success"] is False
+        assert res["status"] == "FAILED"
+        assert "PayMeChap" in res["speech_text"]
+
+

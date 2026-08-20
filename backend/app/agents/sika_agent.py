@@ -92,6 +92,9 @@ class SikaADKAgent:
                 action_id = f"tx_transfer_{chosen_name.lower().replace(' ', '_')}_{int(amount)}"
                 tool_used = "prepare_transfer"
 
+                from ..agent.orchestrator import sika_orchestrator
+                sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1)
+
                 session["state"] = "WAITING_VOICE_CONFIRMATION"
                 session["active_action"] = {
                     "action_id": action_id,
@@ -149,6 +152,8 @@ class SikaADKAgent:
                     "provider": "GOOGLE_ADK_VERTEX_AI" if self.client else "GOOGLE_ADK_FALLBACK"
                 }
             elif any(w in msg_lower for w in neg_kw):
+                from ..agent.orchestrator import sika_orchestrator
+                sika_orchestrator.cancel_action(action["action_id"], reason="USER_VOICE_CANCEL")
                 session["state"] = "CANCELLED"
                 session["active_action"] = None
                 res_msg = f"L'opération a été annulée."
@@ -206,6 +211,9 @@ class SikaADKAgent:
                 "provider": "Wave",
                 "currency": "XOF"
             }
+            from ..agent.orchestrator import sika_orchestrator
+            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1)
+
             session["state"] = "WAITING_VOICE_CONFIRMATION"
             session["active_action"] = {
                 "action_id": action_id,
@@ -225,6 +233,10 @@ class SikaADKAgent:
             requires_confirmation = True
             action_id = "dep_coffre_10000"
             tool_data = get_savings_status()
+
+            from ..agent.orchestrator import sika_orchestrator
+            sika_orchestrator.register_action(action_id, user_id=int(user_id) if str(user_id).isdigit() else 1)
+
             session["state"] = "WAITING_VOICE_CONFIRMATION"
             session["active_action"] = {
                 "action_id": action_id,
