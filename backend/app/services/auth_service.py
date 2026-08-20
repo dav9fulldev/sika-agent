@@ -9,7 +9,8 @@ import base64
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
 
 
 logger = logging.getLogger("SikaAuthService")
@@ -22,76 +23,70 @@ import hashlib
 def _hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-class OAuth2AuthService:
-    """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT."""
+import jwt
 
-    SECRET_KEY = os.getenv("JWT_SECRET_KEY", "SIKA_SUPER_SECRET_JWT_KEY_2026")
+class OAuth2AuthService:
+    """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT sécurisés via PyJWT (HS256)."""
+
     ALGORITHM = "HS256"
     TOKEN_EXPIRE_HOURS = 24 * 30 # Validité 30 jours pour l'application mobile
 
+    @property
+    def SECRET_KEY(self) -> str:
+        secret = os.getenv("JWT_SECRET_KEY")
+        env = os.getenv("ENV", "development").lower()
+        if not secret:
+            if env in ["production", "prod", "staging"]:
+                logger.critical("[AUTH OAUTH2] FATAL: JWT_SECRET_KEY is missing in production environment!")
+                raise RuntimeError("JWT_SECRET_KEY environment variable is required in production mode.")
+            # Fallback de développement uniquement si ENV != production
+            return "SIKA_SUPER_SECRET_JWT_KEY_2026_DEV_ONLY"
+        if env in ["production", "prod"] and (secret in ["secret", "changeme", "123456", "default"] or len(secret) < 32):
+            logger.critical("[AUTH OAUTH2] FATAL: Weak JWT_SECRET_KEY detected in production!")
+            raise RuntimeError("Weak JWT_SECRET_KEY in production mode.")
+        return secret
+
     def create_access_token(self, user_data: Dict[str, Any]) -> str:
-        """Génère un jeton d'accès OAuth2 Bearer JWT pour l'utilisateur."""
+        """Génère un jeton d'accès OAuth2 Bearer JWT pour l'utilisateur avec signature cryptographique PyJWT HS256."""
         u_id = user_data.get("id") or user_data.get("user_id") or 1
+        now = datetime.now(timezone.utc)
         payload = {
             "sub": user_data.get("email", "david.yao@email.com"),
             "user_id": int(u_id) if str(u_id).isdigit() else 1,
             "name": user_data.get("name", "David YAO"),
             "is_premium": user_data.get("is_premium", True),
-            "iat": datetime.utcnow().timestamp(),
-            "exp": (datetime.utcnow() + timedelta(hours=self.TOKEN_EXPIRE_HOURS)).timestamp(),
+            "iat": now,
+            "exp": now + timedelta(hours=self.TOKEN_EXPIRE_HOURS),
             "iss": "SIKA_AUTH_SERVER"
         }
 
-        # Signature JWT (Base64 Encoded JSON Token)
-        header = {"alg": self.ALGORITHM, "typ": "JWT"}
-        header_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().strip("=")
-        payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().strip("=")
-        signature = base64.urlsafe_b64encode(f"{header_b64}.{payload_b64}.{self.SECRET_KEY}".encode()).decode().strip("=")
-
-        jwt_token = f"{header_b64}.{payload_b64}.{signature}"
-        logger.info(f"[AUTH OAUTH2] Jeton JWT généré avec succès pour {user_data.get('email')}")
+        jwt_token = jwt.encode(payload, self.SECRET_KEY, algorithm=self.ALGORITHM)
+        logger.info(f"[AUTH OAUTH2] Jeton JWT (PyJWT HS256) généré avec succès pour {user_data.get('email')}")
         return jwt_token
 
-
     def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Vérifie la validité d'un jeton Bearer JWT et extrait les informations utilisateur."""
+        """Vérifie la validité cryptographique d'un jeton Bearer JWT avec PyJWT et extrait le payload."""
         try:
-            if not token or not token.startswith("eyJ"):
+            if not token:
                 return None
-            parts = token.split(".")
-            if len(parts) != 3:
-                return None
-
-            header_b64, payload_b64, signature_provided = parts
-
-            # 1. Vérification de l'en-tête JWT (Algorithme HS256 obligatoire)
-            header_padded = header_b64 + "=" * (-len(header_b64) % 4)
-            header_json = base64.urlsafe_b64decode(header_padded.encode()).decode()
-            header = json.loads(header_json)
-            if header.get("alg") != self.ALGORITHM:
-                logger.warning(f"[AUTH OAUTH2] Algorithme non autorisé: {header.get('alg')}")
-                return None
-
-            # 2. Vérification de la signature cryptographique
-            expected_signature = base64.urlsafe_b64encode(f"{header_b64}.{payload_b64}.{self.SECRET_KEY}".encode()).decode().strip("=")
-            if signature_provided != expected_signature:
-                logger.warning("[AUTH OAUTH2] Signature JWT invalide")
-                return None
-
-            # 3. Décodage du payload
-            padded_b64 = payload_b64 + "=" * (-len(payload_b64) % 4)
-            payload_json = base64.urlsafe_b64decode(padded_b64.encode()).decode()
-            payload = json.loads(payload_json)
-
-            # 4. Vérification d'expiration
-            if payload.get("exp") and datetime.utcnow().timestamp() > payload["exp"]:
-                logger.warning("[AUTH OAUTH2] Jeton JWT expiré")
-                return None
-
+            # Decoding avec vérification stricte de l'algorithme HS256 et expiration
+            payload = jwt.decode(
+                token,
+                self.SECRET_KEY,
+                algorithms=[self.ALGORITHM],
+                options={"require": ["exp", "user_id", "sub", "iss"]}
+            )
             return payload
-        except Exception as e:
-            logger.error(f"[AUTH OAUTH2] Erreur de validation du jeton: {e}")
+        except jwt.ExpiredSignatureError:
+            logger.warning("[AUTH OAUTH2] Jeton JWT expiré")
             return None
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"[AUTH OAUTH2] Jeton JWT invalide ou signature altérée: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[AUTH OAUTH2] Erreur inattendue de validation du jeton: {e}")
+            return None
+
 
     def require_authenticated_user_id(self, authorization_header: Optional[str] = None) -> int:
         """Exige la présence d'un jeton Bearer JWT valide et non expiré.

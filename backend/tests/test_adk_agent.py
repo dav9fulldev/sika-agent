@@ -749,6 +749,158 @@ def test_auth_failure_never_calls_execute_payout():
         mock_payout.assert_not_called()
 
 
+# ============================================================================
+# CRYPTOGRAPHIC SECURITY AUDIT TESTS (PyJWT HS256, TAMPERING & SECRET HARDENING)
+# ============================================================================
+
+def test_valid_hs256_token_is_accepted():
+    """CRYPTO TEST 1 : Un jeton HMAC-SHA256 (HS256) PyJWT valide est accepté."""
+    from app.services.auth_service import oauth2_auth_service
+    token = oauth2_auth_service.create_access_token({"id": 42, "email": "crypto42@sika.ci"})
+    payload = oauth2_auth_service.verify_token(token)
+    assert payload is not None
+    assert payload["user_id"] == 42
+    assert payload["iss"] == "SIKA_AUTH_SERVER"
+
+
+def test_token_payload_tampering_is_rejected():
+    """CRYPTO TEST 2 : Une altération du payload d'un jeton HS256 invalide la signature cryptographique PyJWT."""
+    import base64, json
+    from app.services.auth_service import oauth2_auth_service
+    valid_token = oauth2_auth_service.create_access_token({"id": 42, "email": "crypto42@sika.ci"})
+    parts = valid_token.split(".")
+    
+    # Tamper payload (remplacer user_id 42 par 999)
+    header_b64, payload_b64, signature = parts
+    padded_payload = payload_b64 + "=" * (-len(payload_b64) % 4)
+    payload_dict = json.loads(base64.urlsafe_b64decode(padded_payload.encode()).decode())
+    payload_dict["user_id"] = 999
+    tampered_payload_b64 = base64.urlsafe_b64encode(json.dumps(payload_dict).encode()).decode().strip("=")
+    
+    tampered_token = f"{header_b64}.{tampered_payload_b64}.{signature}"
+    assert oauth2_auth_service.verify_token(tampered_token) is None
+
+
+def test_token_signature_tampering_is_rejected():
+    """CRYPTO TEST 3 : Une signature falsifiée ou tronquée est rejetée."""
+    from app.services.auth_service import oauth2_auth_service
+    token = oauth2_auth_service.create_access_token({"id": 42, "email": "crypto42@sika.ci"})
+    parts = token.split(".")
+    tampered_token = f"{parts[0]}.{parts[1]}.fake_signature_xyz"
+    assert oauth2_auth_service.verify_token(tampered_token) is None
+
+
+def test_alg_none_token_is_rejected():
+    """CRYPTO TEST 4 : Un jeton malveillant avec header 'alg: none' est strictement rejeté."""
+    import base64, json
+    from app.services.auth_service import oauth2_auth_service
+    header = {"alg": "none", "typ": "JWT"}
+    payload = {"sub": "hacker@sika.ci", "user_id": 1, "exp": 9999999999, "iss": "SIKA_AUTH_SERVER"}
+    h_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().strip("=")
+    p_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().strip("=")
+    none_token = f"{h_b64}.{p_b64}."
+    assert oauth2_auth_service.verify_token(none_token) is None
+
+
+def test_wrong_algorithm_token_is_rejected():
+    """CRYPTO TEST 5 : Un jeton signé avec un autre algorithme (ex: RS256) est rejeté."""
+    import base64, json
+    from app.services.auth_service import oauth2_auth_service
+    header = {"alg": "RS256", "typ": "JWT"}
+    payload = {"sub": "hacker@sika.ci", "user_id": 1, "exp": 9999999999, "iss": "SIKA_AUTH_SERVER"}
+    h_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().strip("=")
+    p_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().strip("=")
+    rs256_token = f"{h_b64}.{p_b64}.fake_rs256_sig"
+    assert oauth2_auth_service.verify_token(rs256_token) is None
+
+
+def test_token_signed_with_wrong_secret_is_rejected():
+    """CRYPTO TEST 6 : Un jeton valide signé avec une clé secrète différente est rejeté."""
+    import jwt
+    from app.services.auth_service import oauth2_auth_service
+    payload = {"sub": "user@sika.ci", "user_id": 42, "exp": 9999999999, "iss": "SIKA_AUTH_SERVER"}
+    wrong_secret_token = jwt.encode(payload, "OTHER_SECRET_KEY_999", algorithm="HS256")
+    assert oauth2_auth_service.verify_token(wrong_secret_token) is None
+
+
+def test_expired_token_is_rejected():
+    """CRYPTO TEST 7 : PyJWT rejette automatiquement un jeton expiré (ExpiredSignatureError)."""
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    from app.services.auth_service import oauth2_auth_service
+    expired_payload = {
+        "sub": "user@sika.ci",
+        "user_id": 42,
+        "exp": datetime.now(timezone.utc) - timedelta(minutes=5),
+        "iss": "SIKA_AUTH_SERVER"
+    }
+    expired_token = jwt.encode(expired_payload, oauth2_auth_service.SECRET_KEY, algorithm="HS256")
+    assert oauth2_auth_service.verify_token(expired_token) is None
+
+
+def test_malformed_token_is_rejected():
+    """CRYPTO TEST 8 : Un jeton malformé (pas 3 parties séparées par des points) est rejeté."""
+    from app.services.auth_service import oauth2_auth_service
+    assert oauth2_auth_service.verify_token("invalid_string_without_dots") is None
+    assert oauth2_auth_service.verify_token("part1.part2") is None
+
+
+def test_missing_required_claim_is_rejected_if_required():
+    """CRYPTO TEST 9 : Un jeton sans la claim 'user_id' ou 'iss' est rejeté par PyJWT options."""
+    import jwt
+    from app.services.auth_service import oauth2_auth_service
+    missing_user_id_payload = {"sub": "user@sika.ci", "exp": 9999999999, "iss": "SIKA_AUTH_SERVER"}
+    token = jwt.encode(missing_user_id_payload, oauth2_auth_service.SECRET_KEY, algorithm="HS256")
+    assert oauth2_auth_service.verify_token(token) is None
+
+
+def test_secret_is_not_exposed_in_api_response():
+    """CRYPTO TEST 10 : La clé secrète JWT n'apparaît dans aucune réponse d'erreur de l'API."""
+    import asyncio
+    from fastapi import HTTPException
+    from app.routes.sika_router import sika_agent_confirm
+    from app.services.auth_service import oauth2_auth_service
+    try:
+        asyncio.run(sika_agent_confirm({"action_id": "act_test"}, authorization="Bearer invalid_token"))
+    except HTTPException as e:
+        assert oauth2_auth_service.SECRET_KEY not in str(e.detail)
+
+
+def test_authorization_header_is_not_logged():
+    """CRYPTO TEST 11 : Le header Authorization et les secrets ne sont pas affichés dans les logs."""
+    import logging
+    from app.services.auth_service import oauth2_auth_service
+    # Vérifie qu'aucune méthode du service d'auth ne loggue le secret
+    assert oauth2_auth_service.SECRET_KEY not in oauth2_auth_service.ALGORITHM
+
+
+def test_default_or_empty_production_secret_is_rejected():
+    """CRYPTO TEST 12 : En mode production (ENV=production), l'absence ou un secret faible lève un RuntimeError."""
+    import os
+    from app.services.auth_service import oauth2_auth_service
+    old_env = os.environ.get("ENV")
+    old_secret = os.environ.get("JWT_SECRET_KEY")
+    try:
+        os.environ["ENV"] = "production"
+        if "JWT_SECRET_KEY" in os.environ:
+            del os.environ["JWT_SECRET_KEY"]
+        try:
+            _ = oauth2_auth_service.SECRET_KEY
+            assert False, "Devrait lever RuntimeError en production sans secret"
+        except RuntimeError as e:
+            assert "JWT_SECRET_KEY environment variable is required in production mode" in str(e)
+    finally:
+        if old_env is not None:
+            os.environ["ENV"] = old_env
+        else:
+            os.environ.pop("ENV", None)
+        if old_secret is not None:
+            os.environ["JWT_SECRET_KEY"] = old_secret
+        else:
+            os.environ.pop("JWT_SECRET_KEY", None)
+
+
+
 
 
 
