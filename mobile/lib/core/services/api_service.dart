@@ -72,13 +72,20 @@ class ApiService {
     throw Exception(_extractErrorMessage(response, 'Erreur d\'inscription'));
   }
 
-  Future<Map<String, dynamic>> googleLogin({String email = "david.yao@gmail.com", String name = "David YAO"}) async {
+  Future<Map<String, dynamic>> googleLogin({
+    String? idToken,
+    String? email,
+    String? name,
+    String? photoUrl,
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/sika/auth/google'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'email': email,
-        'name': name,
+        if (idToken != null) 'id_token': idToken,
+        if (email != null) 'email': email,
+        if (name != null) 'name': name,
+        if (photoUrl != null) 'photo_url': photoUrl,
       }),
     );
     if (response.statusCode == 200) {

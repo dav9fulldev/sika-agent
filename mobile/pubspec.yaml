@@ -20,6 +20,9 @@ dependencies:
   # Storage & Preferences
   shared_preferences: ^2.2.2
 
+  # Google Authentication
+  google_sign_in: ^6.2.1
+
   # Voice & Audio AI
   speech_to_text: ^7.4.0
   flutter_tts: ^3.8.5

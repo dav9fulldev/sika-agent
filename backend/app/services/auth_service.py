@@ -226,16 +226,19 @@ class OAuth2AuthService:
         finally:
             db.close()
 
-    def google_login(self, email: str = "david.yao@gmail.com", name: str = "David YAO") -> Dict[str, Any]:
+    def google_login(self, email: Optional[str] = None, name: str = "Utilisateur Google", id_token: Optional[str] = None) -> Dict[str, Any]:
         """Authentification OAuth2 Google enregistrée / vérifiée en BDD."""
+        clean_email = (email or "").strip().lower()
+        if not clean_email:
+            raise HTTPException(status_code=400, detail="Adresse email Google invalide ou manquante.")
+
         db = SessionLocal()
         try:
-            clean_email = email.strip().lower()
             user = db.query(UserModel).filter(UserModel.email == clean_email).first()
 
             if not user:
                 user = UserModel(
-                    full_name=name,
+                    full_name=name.strip() if name else "Utilisateur Google",
                     email=clean_email,
                     google_id=f"goog_{hashlib.md5(clean_email.encode()).hexdigest()[:12]}",
                     auth_provider="google"

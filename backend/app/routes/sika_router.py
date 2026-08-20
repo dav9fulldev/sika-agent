@@ -49,10 +49,13 @@ def auth_register(data: Dict[str, Any]):
 
 @router.post("/auth/google")
 def auth_google(data: Dict[str, Any]):
-    """Authentification OAuth2 via Google Sign-In."""
-    email = data.get("email", "david.yao@gmail.com")
-    name = data.get("name", "David YAO")
-    return oauth2_auth_service.google_login(email, name)
+    """Authentification OAuth2 via Google Sign-In officiel."""
+    email = data.get("email")
+    name = data.get("name") or "Utilisateur Google"
+    id_token = data.get("id_token")
+    if not email and not id_token:
+        raise HTTPException(status_code=400, detail="Adresse email ou id_token Google requis.")
+    return oauth2_auth_service.google_login(email=email, name=name, id_token=id_token)
 
 @router.get("/auth/me")
 def auth_me(authorization: Optional[str] = Header(None)):

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
+import 'package:google_sign_in/google_sign_in.dart';
+
 class UserProfileData {
   final String id;
   final String name;
@@ -62,6 +64,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const String _keyAccessToken = 'sika_access_token';
 
   final ApiService _apiService = ApiService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
 
   AuthNotifier() : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false)) {
     _loadInitialPreferences();
@@ -187,15 +192,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Connexion et inscription instantanée via Google Sign-In (OAuth2)
-  Future<bool> loginWithGoogle({String email = "david.yao@gmail.com", String name = "David YAO"}) async {
+  /// Connexion et inscription instantanée via le SDK officiel Google Sign-In (OAuth2 / OIDC)
+  Future<bool> loginWithGoogle() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final res = await _apiService.googleLogin(email: email, name: name);
+      debugPrint('[GOOGLE AUTH] Lancement du flux natif Google Sign-In...');
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+
+      if (account == null) {
+        // L'utilisateur a fermé ou annulé la boîte de dialogue Google
+        debugPrint('[GOOGLE AUTH] Authentification annulée par l\'utilisateur.');
+        state = state.copyWith(isLoading: false);
+        return false;
+      }
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final email = account.email;
+      final name = account.displayName ?? email.split('@').first;
+      final photoUrl = account.photoUrl;
+
+      debugPrint('[GOOGLE AUTH] Compte Google sélectionné: $email ($name)');
+
+      final res = await _apiService.googleLogin(
+        idToken: auth.idToken,
+        email: email,
+        name: name,
+        photoUrl: photoUrl,
+      );
+
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      // P0.3: le backend renvoie 'full_name'
       final displayName = (uData["full_name"] ?? uData["name"] ?? name).toString();
 
       state = state.copyWith(
@@ -207,6 +234,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           id: (uData["id"] ?? 'usr_google_1').toString(),
           name: displayName,
           email: (uData["email"] ?? email).toString(),
+          photoUrl: photoUrl,
           isGoogleAuth: true,
         ),
       );
@@ -216,7 +244,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await prefs.setString(_keyAccessToken, token);
       return true;
     } catch (e) {
-      debugPrint('[AUTH ERROR] Erreur Google login API: $e');
+      debugPrint('[AUTH ERROR] Erreur Google Sign-In natif: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString().replaceAll('Exception: ', ''),
