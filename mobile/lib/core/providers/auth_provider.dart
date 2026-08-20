@@ -67,49 +67,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _loadInitialPreferences();
   }
 
-  /// Charge les préférences locales (Onboarding vu / Jeton OAuth2 sauvegardé)
+  /// Charge les préférences locales et force l'arrivée sur l'écran de connexion / inscription
   Future<void> _loadInitialPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final hasSeen = prefs.getBool(_keyHasSeenOnboarding) ?? false;
-      final savedToken = prefs.getString(_keyAccessToken);
-
-      if (savedToken != null && savedToken.isNotEmpty) {
-        try {
-          final res = await _apiService.getMe(savedToken);
-          final uData = res["user"] ?? {};
-          // P0.3: le backend renvoie 'full_name', pas 'name'
-          final displayName = (uData["full_name"] ?? uData["name"] ?? 'Utilisateur').toString();
-          if (mounted) {
-            state = state.copyWith(
-              hasSeenOnboarding: true,
-              isAuthenticated: true,
-              accessToken: savedToken,
-              user: UserProfileData(
-                id: (uData["user_id"] ?? uData["id"] ?? 'usr_saved').toString(),
-                name: displayName,
-                email: (uData["sub"] ?? uData["email"] ?? 'utilisateur@sika.app').toString(),
-              ),
-            );
-          }
-        } catch (e) {
-          // P0.2: si le jeton est expiré ou invalide, on déconnecte proprement
-          // au lieu de maintenir une session fantome avec une fausse identité.
-          debugPrint('[AUTH PREFS] Jeton sauvegardé invalid ou expiré, déconnexion: $e');
-          await prefs.remove(_keyAccessToken);
-          if (mounted) {
-            state = state.copyWith(
-              hasSeenOnboarding: true,
-              isAuthenticated: false,
-              accessToken: null,
-              user: null,
-            );
-          }
-        }
-      } else {
-        if (mounted) {
-          state = state.copyWith(hasSeenOnboarding: hasSeen);
-        }
+      // Effacement du jeton pour démarrer directement sur l'écran de connexion/inscription
+      await prefs.remove(_keyAccessToken);
+      if (mounted) {
+        state = state.copyWith(
+          hasSeenOnboarding: true,
+          isAuthenticated: false,
+          accessToken: null,
+          user: null,
+        );
       }
     } catch (e) {
       debugPrint('[AUTH PREFS] Erreur chargement préférences: $e');

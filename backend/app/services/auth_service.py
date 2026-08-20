@@ -155,26 +155,14 @@ class OAuth2AuthService:
 
             # Si l'utilisateur n'existe pas en BDD
             if not user:
-                # Si c'est le compte de démo par défaut, on l'initialise en BDD
-                if clean_email == "david.yao@email.com":
-                    user = UserModel(
-                        email="david.yao@email.com",
-                        full_name="David YAO",
-                        password_hash=_hash_password("••••••••"),
-                        auth_provider="email"
-                    )
-                    db.add(user)
-                    db.commit()
-                    db.refresh(user)
-                else:
-                    security_rate_limiter.record_login_failure(clean_email)
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Compte inexistant. Veuillez créer un compte en cliquant sur 'Sign Up'."
-                    )
+                security_rate_limiter.record_login_failure(clean_email)
+                raise HTTPException(
+                    status_code=400,
+                    detail="Compte inexistant. Veuillez créer votre compte en cliquant sur 'Sign Up'."
+                )
             elif user.auth_provider == "email" and user.password_hash:
                 # Vérification du hash du mot de passe
-                if user.password_hash != _hash_password(password) and password != "••••••••":
+                if user.password_hash != _hash_password(password):
                     security_rate_limiter.record_login_failure(clean_email)
                     raise HTTPException(
                         status_code=401,
