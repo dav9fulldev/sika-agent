@@ -75,7 +75,11 @@ class PayMeChapAPIService:
                 timeout=10,
             )
             if resp.status_code in [200, 201]:
-                data = resp.json() if resp.text else {}
+                data = {}
+                try:
+                    data = resp.json()
+                except Exception:
+                    pass
                 return {
                     "success": True,
                     "provider": "PayMeChap",
@@ -89,7 +93,8 @@ class PayMeChapAPIService:
                     err_data = resp.json()
                 except Exception:
                     pass
-                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or f"Ce numéro ({clean_phone}) n'est pas enregistré sur PayMeChap (HTTP {resp.status_code})."
+                err_text = resp.text.strip() if resp.text else ""
+                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or (err_text if err_text else f"Ce numéro ({clean_phone}) n'est pas enregistré sur PayMeChap.")
                 logger.warning(f"[PayMeChap OTP] Échec {resp.status_code}: {err_msg}")
                 return {
                     "success": False,
@@ -118,7 +123,11 @@ class PayMeChapAPIService:
                 timeout=10,
             )
             if resp.status_code in [200, 201]:
-                data = resp.json() if resp.text else {}
+                data = {}
+                try:
+                    data = resp.json()
+                except Exception:
+                    pass
                 return {
                     "success": True,
                     "accessToken": data.get("accessToken") or data.get("token") or f"pmc_token_{clean_phone}",
@@ -131,7 +140,8 @@ class PayMeChapAPIService:
                     err_data = resp.json()
                 except Exception:
                     pass
-                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or "Code OTP incorrect ou expiré sur PayMeChap."
+                err_text = resp.text.strip() if resp.text else ""
+                err_msg = err_data.get("message") or err_data.get("detail") or err_data.get("error") or (err_text if err_text else "Code OTP incorrect ou expiré sur PayMeChap.")
                 logger.warning(f"[PayMeChap Verify OTP] Échec {resp.status_code}: {err_msg}")
                 return {
                     "success": False,
