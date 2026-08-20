@@ -159,3 +159,12 @@ async def sika_agent_confirm(data: Dict[str, Any]):
     action_id = data.get("action_id", "")
     user_id = data.get("user_id", 1)
     return await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
+
+
+@router.post("/actions/{action_id}/reconcile")
+async def sika_reconcile_action(action_id: str, data: Optional[Dict[str, Any]] = None):
+    """Endpoint de réconciliation d'une transaction au statut incertain UNKNOWN_RESULT auprès de PayMeChap."""
+    body = data or {}
+    user_id = body.get("user_id", 1)
+    return await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
+

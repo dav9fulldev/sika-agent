@@ -506,7 +506,32 @@ class SikaNotifier extends StateNotifier<SikaData> {
     }
   }
 
+  Future<void> executeActionReconciliation(String actionId) async {
+    final currentLang = _ref.read(languageProvider);
+    try {
+      debugPrint('[RECONCILIATION] Triggering reconciliation for actionId: $actionId');
+      final res = await _apiService.sikaReconcileAction(actionId);
+      final String speechText = (res['speech_text'] as String?) ?? (res['message'] as String?) ?? 'Statut vérifié auprès de PayMeChap.';
+
+      final sikaMessage = SikaMessage(text: speechText, isUser: false);
+      final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
+
+      final isExecuted = res['status'] == 'EXECUTED';
+      state = state.copyWith(
+        state: SikaState.speaking,
+        messages: finalMessages,
+        pendingNextState: isExecuted ? SikaState.completed : SikaState.idle,
+        pendingActionId: null,
+      );
+
+      await _speak(speechText, ttsLocale: currentLang.ttsLanguage);
+    } catch (e) {
+      debugPrint('[RECONCILIATION ERROR] $e');
+    }
+  }
+
   Future<void> stopSpeaking({bool resetState = true}) async {
+
     try {
       await _audioPlayer.stop();
       await _flutterTts.stop();

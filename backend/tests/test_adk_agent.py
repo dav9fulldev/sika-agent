@@ -281,4 +281,136 @@ def test_uncertain_paymechap_result_sets_unknown_status():
         assert "incertain" in res["speech_text"].lower()
 
 
+def test_reconciliation_finds_successful_transaction():
+    """TEST 3 : UNKNOWN_RESULT -> Réconciliation -> Transaction retrouvée PayMeChap -> EXECUTED."""
+    import asyncio
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_rec_succ_1"
+    sika_orchestrator.register_action(action_id, user_id=12)
+    sika_orchestrator.action_store[action_id]["status"] = "UNKNOWN_RESULT"
+    with Session(engine) as db:
+        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "UNKNOWN_RESULT"})
+        db.commit()
+
+    mock_txs = [{
+        "id": "tx_pmc_found_123",
+        "description": "Transfert vers Kouamé Jean",
+        "amount": 20000.0,
+        "status": "COMPLETED"
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions") as mock_fetch_txs, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_fetch_txs.return_value = mock_txs
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id, user_id=12))
+
+        assert res["success"] is True
+        assert res["status"] == "EXECUTED"
+        assert res["reconciled"] is True
+        mock_payout.assert_not_called()  # AUCUN DEUXIÈME PAYOUT N'EST LANCÉ !
+
+
+def test_reconciliation_finds_failed_transaction():
+    """TEST 4 : UNKNOWN_RESULT -> Réconciliation -> Transaction retrouvée en échec -> FAILED."""
+    import asyncio
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_rec_fail_2"
+    sika_orchestrator.register_action(action_id, user_id=14)
+    sika_orchestrator.action_store[action_id]["status"] = "UNKNOWN_RESULT"
+    with Session(engine) as db:
+        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "UNKNOWN_RESULT"})
+        db.commit()
+
+    mock_txs = [{
+        "id": "tx_pmc_failed_456",
+        "description": "Transfert vers Kouamé Jean",
+        "amount": 20000.0,
+        "status": "FAILED"
+    }]
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions") as mock_fetch_txs, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_fetch_txs.return_value = mock_txs
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id, user_id=14))
+
+        assert res["success"] is False
+        assert res["status"] == "FAILED"
+        assert res["reconciled"] is True
+        mock_payout.assert_not_called()
+
+
+def test_reconciliation_transaction_not_found():
+    """TEST 5 : UNKNOWN_RESULT -> Réconciliation -> Introuvable -> Conservé UNKNOWN_RESULT sans deuxième payout."""
+    import asyncio
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_not_found_3"
+    sika_orchestrator.register_action(action_id, user_id=16)
+    sika_orchestrator.action_store[action_id]["status"] = "UNKNOWN_RESULT"
+    with Session(engine) as db:
+        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "UNKNOWN_RESULT"})
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.fetch_live_transactions") as mock_fetch_txs, \
+         patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        mock_fetch_txs.return_value = [] # Aucune transaction trouvée
+        res = asyncio.run(sika_orchestrator.reconcile_action(action_id, user_id=16))
+
+        assert res["success"] is False
+        assert res["status"] == "UNKNOWN_RESULT"
+        assert res["reconciled"] is False
+        mock_payout.assert_not_called()
+
+
+
+def test_unknown_result_prevents_second_payout_execution():
+    """TEST 6 : Tentative de second confirm_action sur un UNKNOWN_RESULT -> DOIT ÊTRE IMPOSSIBLE."""
+    import asyncio
+    from sqlalchemy.orm import Session
+    from app.database import engine
+    from app.models.sika_action import SikaActionModel
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_no_double_payout"
+    sika_orchestrator.register_action(action_id, user_id=18)
+    sika_orchestrator.action_store[action_id]["status"] = "UNKNOWN_RESULT"
+
+    with Session(engine) as db:
+        db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "UNKNOWN_RESULT"})
+        db.commit()
+
+    with patch("app.services.wallet_integrations.paymechap_api_service.paymechap_api_service.execute_payout") as mock_payout:
+        res = asyncio.run(sika_orchestrator.confirm_action(action_id, user_id=18))
+        assert res["success"] is False
+        assert res["status"] in ["ALREADY_EXECUTING", "UNKNOWN_RESULT", "ALREADY_EXECUTED"]
+        mock_payout.assert_not_called() # IMPOSSIBLE DE LANCER UN SECOND PAYOUT !
+
+
+
+def test_reconciliation_user_ownership_isolation():
+    """TEST 9 : Utilisateur A tente de réconcilier l'action de l'utilisateur B -> UNAUTHORIZED_USER."""
+    import asyncio
+    from app.agent.orchestrator import sika_orchestrator
+
+    action_id = "tx_transfer_owner_A_888"
+    sika_orchestrator.register_action(action_id, user_id=100) # Appatient à User 100
+
+    # User 200 essaie de réconcilier l'action de User 100
+    res = asyncio.run(sika_orchestrator.reconcile_action(action_id, user_id=200))
+    assert res["success"] is False
+    assert res["status"] == "UNAUTHORIZED_USER"
+
+
+
 
