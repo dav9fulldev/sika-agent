@@ -32,7 +32,12 @@ class FinancialRepository:
         try:
             query = db.query(ConnectedWalletModel)
             if user_id is not None:
-                query = query.filter(ConnectedWalletModel.user_id == user_id)
+                try:
+                    numeric_user_id = int(user_id)
+                    query = query.filter(ConnectedWalletModel.user_id == numeric_user_id)
+                except (ValueError, TypeError):
+                    # Si user_id n'est pas convertible en entier (ex: identifiant legacy string), aucun wallet SQL ne correspond
+                    return []
             wallets = query.all()
             return [
                 {

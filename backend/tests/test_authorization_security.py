@@ -1,6 +1,9 @@
+# pyrefly: ignore [missing-import]
 import pytest
 from datetime import datetime, timezone, timedelta
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from app.main import app
@@ -13,6 +16,22 @@ from app.agent.orchestrator import sika_orchestrator
 client = TestClient(app)
 
 from app.services.security_rate_limiter import security_rate_limiter
+from app.models import UserModel, ConnectedWalletModel
+
+from app.models import (
+    UserModel, ConnectedWalletModel, SikaActionModel,
+    SavingsGoalModel, AgentMemoryModel, UserPreferenceModel,
+    SikaActionEventModel, SikaSessionModel
+)
+
+def _reset_db_safely():
+    with Session(engine) as db:
+        for model in [SikaActionEventModel, SikaSessionModel, SikaActionModel, ConnectedWalletModel, SavingsGoalModel, AgentMemoryModel, UserPreferenceModel, UserModel]:
+            try:
+                db.query(model).delete(synchronize_session=False)
+                db.commit()
+            except Exception:
+                db.rollback()
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
@@ -24,15 +43,21 @@ def setup_test_db():
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()
 
+    _reset_db_safely()
     with Session(engine) as db:
-        db.query(SikaActionModel).delete()
+        for uid in [1, 101, 202, 303, 999]:
+            db.add(UserModel(
+                id=uid,
+                full_name=f"User {uid}",
+                email=f"user{uid}@sika.app",
+                password_hash="test_hash",
+                auth_provider="email"
+            ))
         db.commit()
 
     yield
 
-    with Session(engine) as db:
-        db.query(SikaActionModel).delete()
-        db.commit()
+    _reset_db_safely()
     wallet_router.CONNECTED_USER_WALLETS.clear()
     wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
@@ -41,6 +66,16 @@ def setup_test_db():
 
 
 def create_jwt_header(user_id: int, email: str = "user@sika.app", expired: bool = False) -> dict:
+    with Session(engine) as db:
+        if not db.query(UserModel).filter(UserModel.id == user_id).first():
+            db.add(UserModel(
+                id=user_id,
+                full_name=f"User {user_id}",
+                email=f"user_{user_id}_{email}",
+                password_hash="hash",
+                auth_provider="email"
+            ))
+            db.commit()
     exp_delta = timedelta(hours=-1) if expired else timedelta(hours=1)
     token = oauth2_auth_service.create_access_token(
         user_data={"id": user_id, "email": email, "name": f"User {user_id}"},
@@ -288,22 +323,20 @@ def test_perception_routes_enforce_jwt_and_user_isolation():
     h_user_a = create_jwt_header(user_id=101, email="userA@sika.app")
     h_user_b = create_jwt_header(user_id=202, email="userB@sika.app")
 
-    # Enrôler un wallet Wave pour User A
-    wallet_router.CONNECTED_USER_WALLETS.append({
-        "id": "w_wave_101",
-        "user_id": "101",
-        "provider": "Wave",
-        "balance": 10000.0,
-        "is_active": True
-    })
-    # Enrôler un wallet Wave pour User B
-    wallet_router.CONNECTED_USER_WALLETS.append({
-        "id": "w_wave_202",
-        "user_id": "202",
-        "provider": "Wave",
-        "balance": 50000.0,
-        "is_active": True
-    })
+    with Session(engine) as db:
+        db.add(ConnectedWalletModel(
+            user_id=101,
+            provider="Wave",
+            external_wallet_id="0101010101",
+            connection_status="connected"
+        ))
+        db.add(ConnectedWalletModel(
+            user_id=202,
+            provider="Wave",
+            external_wallet_id="0202020202",
+            connection_status="connected"
+        ))
+        db.commit()
 
     # User A perçoit un SMS Wave indiquant un solde de 25 000 FCFA
     res_sms_a = client.post(
@@ -315,9 +348,10 @@ def test_perception_routes_enforce_jwt_and_user_isolation():
     assert res_sms_a.json()["updated_wallet"]["balance"] == 25000.0
     assert res_sms_a.json()["updated_wallet"]["user_id"] == "101"
 
-    # Vérifier que le wallet de User B n'a ABSOLUMENT PAS été modifié (toujours 50 000)
-    w_b = next(w for w in wallet_router.CONNECTED_USER_WALLETS if w["id"] == "w_wave_202")
-    assert w_b["balance"] == 50000.0
+    # Vérifier que le wallet de User B n'a ABSOLUMENT PAS été modifié
+    with Session(engine) as db:
+        w_b = db.query(ConnectedWalletModel).filter(ConnectedWalletModel.user_id == 202).first()
+        assert w_b.external_wallet_id == "0202020202"
 
     # Vérifier l'isolation des logs de perception
     logs_a = client.get("/api/v1/perception/logs", headers=h_user_a).json()

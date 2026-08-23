@@ -9,44 +9,72 @@ import base64
 import json
 import logging
 import os
+import hashlib
+import uuid
 from datetime import datetime, timedelta, timezone
+# pyrefly: ignore [missing-import]
+from fastapi import HTTPException
+# pyrefly: ignore [missing-import]
+import jwt
+# pyrefly: ignore [missing-import]
+from google.oauth2 import id_token as google_id_token
+# pyrefly: ignore [missing-import]
+from google.auth.transport import requests as google_requests
 
-
+from ..database import SessionLocal
+from ..models import UserModel
+from ..config import settings
+from .security_rate_limiter import security_rate_limiter
 
 logger = logging.getLogger("SikaAuthService")
 
-from fastapi import HTTPException
-from ..database import SessionLocal
-from ..models import UserModel
-import hashlib
-from .security_rate_limiter import security_rate_limiter
 
 def _hash_password(password: str) -> str:
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-import jwt
 
-import uuid
+def verify_google_id_token(token_str: str, client_id: Optional[str] = None) -> Dict[str, Any]:
+    """Vérifie cryptographiquement un Google ID Token avec les clés publiques officielles de Google."""
+    request = google_requests.Request()
+    try:
+        id_info = google_id_token.verify_oauth2_token(
+            token_str, request, audience=client_id
+        )
+        # Vérification stricte de l'émetteur
+        if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+            raise ValueError(f"Issuer Google invalide: {id_info.get('iss')}")
+
+        # Vérification email_verified
+        if not id_info.get("email_verified", False):
+            raise ValueError("L'adresse email Google n'a pas été vérifiée par Google.")
+
+        return id_info
+    except Exception as e:
+        logger.warning(f"[AUTH GOOGLE] Échec de vérification du jeton Google: {e}")
+        raise ValueError(f"Jeton Google ID Token invalide ou signature expirée: {e}")
+
 
 class OAuth2AuthService:
     """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT sécurisés via PyJWT (HS256)."""
 
     ALGORITHM = "HS256"
-    TOKEN_EXPIRE_HOURS = 24 * 30 # Validité 30 jours pour l'application mobile
+    TOKEN_EXPIRE_HOURS = 24 * 30  # Validité 30 jours pour l'application mobile
 
     @property
     def SECRET_KEY(self) -> str:
-        secret = os.getenv("JWT_SECRET_KEY")
-        env = os.getenv("ENV", "development").lower()
-        if not secret:
-            if env in ["production", "prod", "staging"]:
-                logger.critical("[AUTH OAUTH2] FATAL: JWT_SECRET_KEY is missing in production environment!")
-                raise RuntimeError("JWT_SECRET_KEY environment variable is required in production mode.")
-            # Fallback de développement uniquement si ENV != production
-            return "SIKA_SUPER_SECRET_JWT_KEY_2026_DEV_ONLY"
-        if env in ["production", "prod"] and (secret in ["secret", "changeme", "123456", "default"] or len(secret) < 32):
-            logger.critical("[AUTH OAUTH2] FATAL: Weak JWT_SECRET_KEY detected in production!")
-            raise RuntimeError("Weak JWT_SECRET_KEY in production mode.")
+        env = os.getenv("ENV", settings.ENV).lower()
+        secret = os.getenv("JWT_SECRET_KEY", settings.JWT_SECRET_KEY)
+        insecure_defaults = [
+            "sika_default_jwt_secret_dev_key_only_change_in_prod_32_chars",
+            "default_secret",
+            "secret",
+            "changeme",
+            "123456",
+            "12345678"
+        ]
+        if env in ["production", "prod"]:
+            if not secret or secret in insecure_defaults or len(secret) < 32:
+                raise RuntimeError("JWT_SECRET_KEY environment variable is required in production mode (weak or default key forbidden).")
         return secret
 
     def create_access_token(self, user_data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -58,7 +86,7 @@ class OAuth2AuthService:
         payload = {
             "sub": user_data.get("email", "anonymous@sika.app"),
             "user_id": int(u_id) if str(u_id).isdigit() else 1,
-            "name": user_data.get("name", "User"),
+            "name": user_data.get("name") or user_data.get("full_name") or "User",
             "is_premium": user_data.get("is_premium", True),
             "jti": jti_val,
             "iat": now,
@@ -100,76 +128,33 @@ class OAuth2AuthService:
             logger.error(f"[AUTH OAUTH2] Erreur inattendue de validation du jeton: {e}")
             return None
 
-
-    def require_authenticated_user_id(self, authorization_header: Optional[str] = None) -> int:
-        """Exige la présence d'un jeton Bearer JWT valide et non expiré.
-        Lève une HTTPException(401) si le jeton est manquant, invalide ou expiré.
-        AUCUN FALLBACK NI IDENTITY DEFAULT AUTORISÉ SUR LES ROUTÉS PROTÉGÉES.
-        """
-        if not authorization_header or not authorization_header.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Authentication required. Missing Bearer token.")
-
-        token = authorization_header.split(" ")[1]
+    def require_authenticated_user_id(self, authorization: Optional[str] = None, authorization_header: Optional[str] = None) -> Any:
+        """Extrait et valide le user_id à partir de l'en-tête Authorization Bearer ou lève une HTTPException 401."""
+        auth_val = authorization or authorization_header
+        if not auth_val or not auth_val.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Authentication required: En-tête Authorization Bearer manquant ou invalide.")
+        token = auth_val.split("Bearer ")[1].strip()
         payload = self.verify_token(token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Authentication failed. Invalid or expired Bearer token.")
-
-        u_id = payload.get("user_id")
-        if u_id is None:
-            raise HTTPException(status_code=401, detail="Authentication failed. Missing user_id claim in token.")
-
-        if isinstance(u_id, int):
-            return u_id
-        if isinstance(u_id, str) and u_id.isdigit():
-            return int(u_id)
-        raise HTTPException(status_code=401, detail="Authentication failed. Invalid user_id claim format.")
-
-    def get_authenticated_user_id(self, authorization_header: Optional[str] = None, client_body_user_id: Any = 1) -> int:
-        """Extrait l'ID de l'utilisateur authentifié depuis le jeton Bearer JWT avec fallback optionnel pour dev."""
-        if authorization_header and authorization_header.startswith("Bearer "):
-            token = authorization_header.split(" ")[1]
-            payload = self.verify_token(token)
-            if payload:
-                u_id = payload.get("user_id")
-                if u_id is not None:
-                    if isinstance(u_id, int):
-                        return u_id
-                    if isinstance(u_id, str) and u_id.isdigit():
-                        return int(u_id)
-        if isinstance(client_body_user_id, int):
-            return client_body_user_id
-        if isinstance(client_body_user_id, str) and client_body_user_id.isdigit():
-            return int(client_body_user_id)
-        return 1
-
-
+        if not payload or "user_id" not in payload:
+            raise HTTPException(status_code=401, detail="Authentication required: Jeton d'authentification invalide ou expiré.")
+        u_id = payload["user_id"]
+        return int(u_id) if str(u_id).isdigit() else u_id
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
-        """Authentification OAuth2 vérifiée en base de données SQLAlchemy avec protection brute-force."""
+        """Connexion utilisateur avec vérification en base de données."""
         clean_email = email.strip().lower()
         security_rate_limiter.check_login_rate_limit(clean_email)
 
         db = SessionLocal()
         try:
             user = db.query(UserModel).filter(UserModel.email == clean_email).first()
-
-            # Si l'utilisateur n'existe pas en BDD
-            if not user:
+            if not user or user.password_hash != _hash_password(password):
                 security_rate_limiter.record_login_failure(clean_email)
                 raise HTTPException(
-                    status_code=400,
-                    detail="Compte inexistant. Veuillez créer votre compte en cliquant sur 'Sign Up'."
+                    status_code=401,
+                    detail="Identifiants invalides. Vérifiez votre adresse email et votre mot de passe."
                 )
-            elif user.auth_provider == "email" and user.password_hash:
-                # Vérification du hash du mot de passe
-                if user.password_hash != _hash_password(password):
-                    security_rate_limiter.record_login_failure(clean_email)
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Mot de passe incorrect."
-                    )
 
-            # Connexion réussie -> réinitialisation du compteur d'échecs
             security_rate_limiter.reset_login_failures(clean_email)
 
             user_data = {
@@ -227,20 +212,41 @@ class OAuth2AuthService:
             db.close()
 
     def google_login(self, email: Optional[str] = None, name: str = "Utilisateur Google", id_token: Optional[str] = None) -> Dict[str, Any]:
-        """Authentification OAuth2 Google enregistrée / vérifiée en BDD."""
-        clean_email = (email or "").strip().lower()
-        if not clean_email:
-            raise HTTPException(status_code=400, detail="Adresse email Google invalide ou manquante.")
+        """Authentification OAuth2 Google enregistrée / vérifiée en BDD avec vérification cryptographique."""
+        verified_email = None
+        verified_name = name
+        google_sub_id = None
+
+        if id_token:
+            try:
+                id_info = verify_google_id_token(id_token, client_id=settings.GOOGLE_CLIENT_ID)
+                verified_email = id_info.get("email", "").strip().lower()
+                verified_name = id_info.get("name", name)
+                google_sub_id = id_info.get("sub")
+            except ValueError as e:
+                if settings.ENV == "production":
+                    raise HTTPException(status_code=401, detail=f"Validation cryptographique du jeton Google échouée: {str(e)}")
+                logger.warning(f"[AUTH GOOGLE DEV] Jeton Google invalide en DEV: {e}")
+                if email:
+                    verified_email = email.strip().lower()
+                else:
+                    raise HTTPException(status_code=401, detail=f"Jeton Google invalide: {str(e)}")
+        elif email:
+            if settings.ENV == "production":
+                raise HTTPException(status_code=401, detail="Le jeton id_token Google officiel est obligatoire en production.")
+            verified_email = email.strip().lower()
+        else:
+            raise HTTPException(status_code=400, detail="Adresse email ou jeton Google manquant.")
 
         db = SessionLocal()
         try:
-            user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+            user = db.query(UserModel).filter(UserModel.email == verified_email).first()
 
             if not user:
                 user = UserModel(
-                    full_name=name.strip() if name else "Utilisateur Google",
-                    email=clean_email,
-                    google_id=f"goog_{hashlib.md5(clean_email.encode()).hexdigest()[:12]}",
+                    full_name=verified_name.strip() if verified_name else "Utilisateur Google",
+                    email=verified_email,
+                    google_id=google_sub_id or f"goog_{hashlib.md5(verified_email.encode()).hexdigest()[:12]}",
                     auth_provider="google"
                 )
                 db.add(user)
@@ -263,6 +269,7 @@ class OAuth2AuthService:
             }
         finally:
             db.close()
+
 
 # Instance singleton
 oauth2_auth_service = OAuth2AuthService()

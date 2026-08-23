@@ -3,9 +3,10 @@ Modèle représentant la connexion entre un utilisateur SIKA
 et un portefeuille financier partenaire.
 """
 
-from datetime import datetime
-
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -15,6 +16,12 @@ class ConnectedWalletModel(Base):
     """Portefeuille partenaire connecté à un utilisateur SIKA."""
 
     __tablename__ = "connected_wallets"
+    __table_args__ = (
+        CheckConstraint(
+            "connection_status IN ('connected', 'disconnected', 'pending')",
+            name="chk_connected_wallet_status_valid"
+        ),
+    )
 
     id = Column(
         Integer,
@@ -25,8 +32,9 @@ class ConnectedWalletModel(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id"),
-        nullable=False
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
     provider = Column(
@@ -41,12 +49,14 @@ class ConnectedWalletModel(Base):
 
     connection_status = Column(
         String(20),
-        default="connected"
+        default="connected",
+        nullable=False
     )
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     user = relationship(

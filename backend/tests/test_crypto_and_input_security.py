@@ -18,7 +18,20 @@ from app.agent.tools.transaction_tools import prepare_transfer
 
 client = TestClient(app)
 
-from app.models.connected_wallet import ConnectedWalletModel
+from app.models import (
+    UserModel, ConnectedWalletModel, SikaActionModel,
+    SavingsGoalModel, AgentMemoryModel, UserPreferenceModel,
+    SikaActionEventModel, SikaSessionModel
+)
+
+def _reset_db_safely():
+    with Session(engine) as db:
+        for model in [SikaActionEventModel, SikaSessionModel, SikaActionModel, ConnectedWalletModel, SavingsGoalModel, AgentMemoryModel, UserPreferenceModel, UserModel]:
+            try:
+                db.query(model).delete(synchronize_session=False)
+                db.commit()
+            except Exception:
+                db.rollback()
 
 @pytest.fixture(autouse=True)
 def clean_security_environment():
@@ -30,17 +43,21 @@ def clean_security_environment():
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()
 
+    _reset_db_safely()
     with Session(engine) as db:
-        db.query(SikaActionModel).delete()
-        db.query(ConnectedWalletModel).delete()
+        for uid in [1, 101, 202, 303, 999]:
+            db.add(UserModel(
+                id=uid,
+                full_name=f"User {uid}",
+                email=f"user{uid}@sika.app",
+                password_hash="test_hash",
+                auth_provider="email"
+            ))
         db.commit()
 
     yield
 
-    with Session(engine) as db:
-        db.query(SikaActionModel).delete()
-        db.query(ConnectedWalletModel).delete()
-        db.commit()
+    _reset_db_safely()
     wallet_router.CONNECTED_USER_WALLETS.clear()
     wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()

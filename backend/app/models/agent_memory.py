@@ -4,9 +4,10 @@ Permet de conserver les habitudes, préférences et insights
 propres à chaque utilisateur.
 """
 
-from datetime import datetime
-
+from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -26,8 +27,9 @@ class AgentMemoryModel(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id"),
-        nullable=False
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
     memory_type = Column(
@@ -53,7 +55,8 @@ class AgentMemoryModel(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     user = relationship(

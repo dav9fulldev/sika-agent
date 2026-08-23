@@ -1,5 +1,9 @@
 # pyrefly: ignore [missing-import]
 import logging
+import json
+import redis
+from ..config import settings
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException, Query, Header
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
@@ -14,10 +18,14 @@ from ..services.security_rate_limiter import security_rate_limiter
 
 logger = logging.getLogger("WalletRouter")
 
+if settings.REDIS_URL:
+    redis_client = redis.from_url(settings.REDIS_URL, db=0, decode_responses=True)
+else:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
 router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 
-# Sessions d'OTP en attente de vérification
-PENDING_OTP_SESSIONS: Dict[str, Dict[str, Any]] = {}
+# Sessions d'OTP en attente de vérification stockées dans Redis
 
 # Compatibilité mémoire
 CONNECTED_USER_WALLETS: List[Dict[str, Any]] = []
@@ -186,16 +194,16 @@ def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str
     else:
         session_id = f"sess_{prov_lower.replace(' ', '')}_{int(datetime.utcnow().timestamp())}"
 
-    PENDING_OTP_SESSIONS[session_id] = {
+    session_data = {
         "session_id": session_id,
         "user_id": user_id,
         "provider": provider,
         "account_number": account_number,
         "auth_method": auth_method,
         "attempts": 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "created_at_dt": datetime.now(timezone.utc)
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
+    redis_client.setex(f"otp_session:{session_id}", 600, json.dumps(session_data))
 
     msg = f"🔑 Code OTP envoyé au {account_number} pour valider le raccordement de votre compte {provider} !"
     if "paymechap" in prov_lower:
@@ -222,15 +230,11 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
     if not session_id or not otp_code:
         raise HTTPException(status_code=400, detail="Champs 'session_id' et 'otp_code' obligatoires.")
 
-    session = PENDING_OTP_SESSIONS.get(session_id)
-    if not session:
+    session_raw = redis_client.get(f"otp_session:{session_id}")
+    if not session_raw:
         raise HTTPException(status_code=400, detail="Session OTP introuvable, expirée ou déjà consommée.")
-
-    # Vérification d'expiration de la session (TTL = 10 minutes)
-    created_dt = session.get("created_at_dt")
-    if created_dt and (datetime.now(timezone.utc) - created_dt) > timedelta(minutes=10):
-        PENDING_OTP_SESSIONS.pop(session_id, None)
-        raise HTTPException(status_code=400, detail="Session OTP expirée. Veuillez relancer la demande de connexion.")
+    
+    session = json.loads(session_raw)
 
     if session.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="Session OTP non autorisée pour cet utilisateur.")
@@ -240,11 +244,13 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
     session["attempts"] = attempts
 
     if attempts > 3:
-        PENDING_OTP_SESSIONS.pop(session_id, None)
+        redis_client.delete(f"otp_session:{session_id}")
         raise HTTPException(
             status_code=429,
             detail="Nombre maximal de tentatives OTP dépassé (3). La session a été invalidée."
         )
+
+    redis_client.setex(f"otp_session:{session_id}", 600, json.dumps(session))
 
     provider = session.get("provider", provider)
     account_number = session.get("account_number", account_number)
@@ -254,7 +260,7 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
         verify_res = paymechap_api_service.verify_otp_code(account_number, otp_code)
         if not verify_res.get("success"):
             if attempts >= 3:
-                PENDING_OTP_SESSIONS.pop(session_id, None)
+                redis_client.delete(f"otp_session:{session_id}")
                 raise HTTPException(status_code=429, detail="Code OTP incorrect. Nombre maximal de tentatives atteint (3). Session invalidée.")
             err_msg = verify_res.get("message") or f"Code OTP incorrect ({attempts}/3 tentatives)."
             raise HTTPException(status_code=400, detail=err_msg)
@@ -270,7 +276,7 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
         fetched = {"balance": 0.0, "currency": "XOF"}
 
     # Consommation immédiate de la session OTP (Anti-Replay)
-    PENDING_OTP_SESSIONS.pop(session_id, None)
+    redis_client.delete(f"otp_session:{session_id}")
 
     real_balance = float(fetched.get("balance", 0.0))
 

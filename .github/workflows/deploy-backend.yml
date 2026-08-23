@@ -1,0 +1,103 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+# Permet l'utilisation de l'OIDC pour Workload Identity Federation
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: sika-all-things-agentic
+  REGION: europe-west9
+  SERVICE_NAME: sika-backend
+  IMAGE_NAME: europe-west9-docker.pkg.dev/sika-all-things-agentic/sika-repo/sika-backend
+  SERVICE_ACCOUNT: sika-backend-sa@sika-all-things-agentic.iam.gserviceaccount.com
+  # Remplacer 'YOUR_WIF_PROVIDER_NAME' par la valeur générée lors de la configuration
+  WORKLOAD_IDENTITY_PROVIDER: 'projects/1064195418653/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: Installation des dépendances
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Exécution des tests backend
+        run: |
+          cd backend
+          pytest tests/
+        env:
+          # On peut définir des variables d'environnement bidon pour les tests si besoin
+          ENV: testing
+          DATABASE_URL: sqlite:///./test.db
+
+      - name: Authentification via Google Cloud Workload Identity
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.SERVICE_ACCOUNT }}
+
+      - name: Configuration de Docker pour Artifact Registry
+        run: |
+          gcloud auth configure-docker europe-west9-docker.pkg.dev --quiet
+
+      - name: Build et Push de l'image Docker
+        run: |
+          cd backend
+          # On tagge l'image avec le SHA du commit et avec 'latest'
+          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:latest .
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+      - name: Déploiement sur Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --service-account ${{ env.SERVICE_ACCOUNT }} \
+            --vpc-connector sika-vpc-connector \
+            --set-cloudsql-instances sika-all-things-agentic:europe-west9:sika-db-instance \
+            --set-env-vars ENV=production,USE_GCP_SECRET_MANAGER=true \
+            --allow-unauthenticated \
+            --platform managed
+
+      - name: Vérification Post-Déploiement (Healthcheck)
+        run: |
+          echo "Vérification de l'état du backend..."
+          # L'URL est prévisible d'après vos configurations actuelles
+          URL="https://sika-backend-1064195418653.europe-west9.run.app/health"
+          
+          # On fait 5 tentatives avec 10s d'attente entre chaque
+          for i in {1..5}; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL || echo "Failed")
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "✅ Déploiement réussi ! Le healthcheck a retourné HTTP 200."
+              exit 0
+            fi
+            echo "Tentative $i/5 - Statut: $HTTP_STATUS. Attente de 10s..."
+            sleep 10
+          done
+          
+          echo "❌ Échec de la vérification après déploiement. Le healthcheck n'a pas retourné 200."
+          exit 1

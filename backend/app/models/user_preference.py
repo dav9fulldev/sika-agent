@@ -2,9 +2,10 @@
 Modèle des préférences utilisateur pour SIKA.
 """
 
-from datetime import datetime
-
+from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -24,9 +25,10 @@ class UserPreferenceModel(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True
+        unique=True,
+        index=True
     )
 
     preferred_currency = Column(
@@ -52,7 +54,8 @@ class UserPreferenceModel(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     user = relationship(

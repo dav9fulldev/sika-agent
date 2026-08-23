@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/secure_storage_service.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -25,7 +26,7 @@ class UserProfileData {
 
 class AuthState {
   final bool isAuthenticated;
-  final bool hasSeenOnboarding; // Si l'onboarding a déjà été vu sur cet appareil
+  final bool hasSeenOnboarding;
   final bool isLoading;
   final String? accessToken;
   final UserProfileData? user;
@@ -61,9 +62,9 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   static const String _keyHasSeenOnboarding = 'sika_has_seen_onboarding';
-  static const String _keyAccessToken = 'sika_access_token';
 
   final ApiService _apiService = ApiService();
+  final SecureStorageService _secureStorage = SecureStorageService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
   );
@@ -72,33 +73,62 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _loadInitialPreferences();
   }
 
-  /// Charge les préférences locales et force l'arrivée sur l'écran de connexion / inscription
+  /// Charge les préférences et vérifie la session sécurisée
   Future<void> _loadInitialPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Effacement du jeton pour démarrer directement sur l'écran de connexion/inscription
-      await prefs.remove(_keyAccessToken);
+      final hasSeen = prefs.getBool(_keyHasSeenOnboarding) ?? false;
+      final token = await _secureStorage.getAccessToken();
+
+      if (token != null && token.isNotEmpty) {
+        try {
+          final res = await _apiService.getMe(token);
+          final uData = res["user"] as Map<String, dynamic>;
+          final displayName = (uData["full_name"] ?? uData["name"] ?? "Utilisateur SIKA").toString();
+
+          if (mounted) {
+            state = state.copyWith(
+              hasSeenOnboarding: hasSeen,
+              isAuthenticated: true,
+              accessToken: token,
+              user: UserProfileData(
+                id: (uData["id"] ?? '1').toString(),
+                name: displayName,
+                email: (uData["email"] ?? "").toString(),
+              ),
+            );
+            return;
+          }
+        } catch (_) {
+          await _secureStorage.clearAll();
+        }
+      }
+
       if (mounted) {
         state = state.copyWith(
-          hasSeenOnboarding: true,
+          hasSeenOnboarding: hasSeen,
           isAuthenticated: false,
           accessToken: null,
           user: null,
         );
       }
     } catch (e) {
-      debugPrint('[AUTH PREFS] Erreur chargement préférences: $e');
+      if (kDebugMode) {
+        debugPrint('[AUTH PREFS] Erreur chargement initial: $e');
+      }
     }
   }
 
-  /// Marque l'onboarding comme terminé définitivement pour cet appareil
+  /// Marque l'onboarding comme terminé
   Future<void> completeOnboarding() async {
     state = state.copyWith(hasSeenOnboarding: true);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyHasSeenOnboarding, true);
     } catch (e) {
-      debugPrint('[AUTH PREFS] Erreur sauvegarde Onboarding: $e');
+      if (kDebugMode) {
+        debugPrint('[AUTH PREFS] Erreur sauvegarde Onboarding: $e');
+      }
     }
   }
 
@@ -118,8 +148,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.login(email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      // P0.3: le backend renvoie 'full_name'
       final displayName = (uData["full_name"] ?? uData["name"] ?? email.trim()).toString();
+
+      await _secureStorage.saveAccessToken(token);
 
       state = state.copyWith(
         isAuthenticated: true,
@@ -127,7 +158,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: (uData["id"] ?? 'usr_1').toString(),
+          id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
         ),
@@ -135,10 +166,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyHasSeenOnboarding, true);
-      await prefs.setString(_keyAccessToken, token);
       return true;
     } catch (e) {
-      debugPrint('[AUTH ERROR] Erreur login API: $e');
+      if (kDebugMode) {
+        debugPrint('[AUTH ERROR] Erreur login API: $e');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString().replaceAll('Exception: ', ''),
@@ -163,8 +195,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.register(name.trim(), email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      // P0.3: le backend renvoie 'full_name'
       final displayName = (uData["full_name"] ?? uData["name"] ?? name.trim()).toString();
+
+      await _secureStorage.saveAccessToken(token);
 
       state = state.copyWith(
         isAuthenticated: true,
@@ -172,7 +205,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: (uData["id"] ?? 'usr_1').toString(),
+          id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
         ),
@@ -180,10 +213,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyHasSeenOnboarding, true);
-      await prefs.setString(_keyAccessToken, token);
       return true;
     } catch (e) {
-      debugPrint('[AUTH ERROR] Erreur register API: $e');
+      if (kDebugMode) {
+        debugPrint('[AUTH ERROR] Erreur register API: $e');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString().replaceAll('Exception: ', ''),
@@ -192,7 +226,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Connexion et inscription instantanée via le SDK officiel Google Sign-In (OAuth2 / OIDC)
+  /// Connexion et inscription via Google Sign-In (OAuth2 / OIDC)
   Future<bool> loginWithGoogle({String? customEmail, String? customName}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -203,15 +237,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String? idToken;
 
       if (customEmail != null && customEmail.trim().isNotEmpty) {
-        // Mode développement / Fallback direct
         email = customEmail.trim().toLowerCase();
         name = customName?.trim() ?? email.split('@').first;
       } else {
-        debugPrint('[GOOGLE AUTH] Lancement du flux natif Google Sign-In...');
         final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
         if (account == null) {
-          debugPrint('[GOOGLE AUTH] Authentification annulée par l\'utilisateur.');
           state = state.copyWith(isLoading: false);
           return false;
         }
@@ -222,8 +253,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         name = account.displayName ?? email.split('@').first;
         photoUrl = account.photoUrl;
       }
-
-      debugPrint('[GOOGLE AUTH] Compte Google: $email ($name)');
 
       final res = await _apiService.googleLogin(
         idToken: idToken,
@@ -236,13 +265,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final uData = res["user"] as Map<String, dynamic>;
       final displayName = (uData["full_name"] ?? uData["name"] ?? name).toString();
 
+      await _secureStorage.saveAccessToken(token);
+
       state = state.copyWith(
         isAuthenticated: true,
         hasSeenOnboarding: true,
         isLoading: false,
         accessToken: token,
         user: UserProfileData(
-          id: (uData["id"] ?? 'usr_google_1').toString(),
+          id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email).toString(),
           photoUrl: photoUrl,
@@ -252,13 +283,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyHasSeenOnboarding, true);
-      await prefs.setString(_keyAccessToken, token);
       return true;
     } catch (e) {
-      debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');
+      if (kDebugMode) {
+        debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');
+      }
       String msg = e.toString().replaceAll('Exception: ', '');
       if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
-        msg = "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez 'Sign Up' ci-dessous ou saisissez votre email.";
+        msg = "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.";
       }
       state = state.copyWith(
         isLoading: false,
@@ -270,23 +302,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Déconnexion sécurisée (Log Out)
   Future<void> logout() async {
-    debugPrint('[AUTH] User logged out');
     try {
       await _apiService.logout();
     } catch (_) {}
 
+    await _secureStorage.clearAll();
+
     state = AuthState(
       isAuthenticated: false,
-      hasSeenOnboarding: true, // Garde l'onboarding comme vu pour ne pas le ré-afficher !
+      hasSeenOnboarding: true,
       user: null,
       accessToken: null,
       isLoading: false,
     );
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keyAccessToken);
-    } catch (_) {}
   }
 }
 

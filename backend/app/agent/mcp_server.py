@@ -82,11 +82,11 @@ class PortfolioStrategistAgent:
 
     def strategize(self, user_id: str = "usr_default") -> Dict[str, Any]:
         wallets = MCPFinancialData.get_user_wallets(user_id)
-        total = sum(w["balance"] for w in wallets)
+        total = sum(w.get("balance", 0.0) for w in wallets)
         return {
             "agent": "PortfolioStrategist",
             "total_portfolio": total,
-            "rebalance_needed": any(w["balance"] < 10000 for w in wallets),
+            "rebalance_needed": any(w.get("balance", 0.0) < 10000 for w in wallets),
             "recommendation": "Maintenir au moins 30% du solde global sur le compte principal Wave pour les dépenses quotidiennes."
         }
 

@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.auth_service import oauth2_auth_service
@@ -6,16 +8,40 @@ from app.routes import wallet_router
 
 client = TestClient(app)
 
+# pyrefly: ignore [missing-import]
+from sqlalchemy.orm import Session
+from app.database import engine, Base
+from app.models import UserModel, ConnectedWalletModel
+
 @pytest.fixture(autouse=True)
 def clean_wallet_state():
-    """Nettoie l'état des wallets en mémoire avant chaque test."""
+    """Nettoie l'état des wallets en base et en mémoire avant chaque test."""
+    Base.metadata.create_all(bind=engine)
     wallet_router.CONNECTED_USER_WALLETS.clear()
     wallet_router.PENDING_OTP_SESSIONS.clear()
+    with Session(engine) as db:
+        db.query(ConnectedWalletModel).delete()
+        db.query(UserModel).delete()
+        db.commit()
     yield
+    with Session(engine) as db:
+        db.query(ConnectedWalletModel).delete()
+        db.query(UserModel).delete()
+        db.commit()
     wallet_router.CONNECTED_USER_WALLETS.clear()
     wallet_router.PENDING_OTP_SESSIONS.clear()
 
 def create_auth_header(user_id: int, email: str = "test@sika.app") -> dict:
+    with Session(engine) as db:
+        if not db.query(UserModel).filter(UserModel.id == user_id).first():
+            db.add(UserModel(
+                id=user_id,
+                full_name=f"User {user_id}",
+                email=f"user_{user_id}_{email}",
+                password_hash="hash",
+                auth_provider="email"
+            ))
+            db.commit()
     token = oauth2_auth_service.create_access_token({
         "id": user_id,
         "email": email,

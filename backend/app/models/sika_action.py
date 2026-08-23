@@ -3,8 +3,9 @@ Modèle de données SQLAlchemy pour la persistance des actions financières SIKA
 Garantit l'idempotence, la traçabilité et l'isolation utilisateur des actions.
 """
 
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, CheckConstraint, Index
 from ..database import Base
 
 
@@ -12,6 +13,14 @@ class SikaActionModel(Base):
     """Table de stockage persistant des actions financières de l'agent SIKA."""
 
     __tablename__ = "sika_actions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('WAITING_CONFIRMATION', 'EXECUTING', 'EXECUTED', 'CANCELLED', 'EXPIRED', 'FAILED', 'UNKNOWN_RESULT')",
+            name="chk_sika_action_status_valid"
+        ),
+        Index("ix_sika_actions_user_status", "user_id", "status"),
+        Index("ix_sika_actions_user_created", "user_id", "created_at"),
+    )
 
     action_id = Column(
         String(100),
@@ -27,6 +36,7 @@ class SikaActionModel(Base):
 
     user_id = Column(
         Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -60,7 +70,7 @@ class SikaActionModel(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
@@ -71,7 +81,7 @@ class SikaActionModel(Base):
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False
     )

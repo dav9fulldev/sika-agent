@@ -1,12 +1,38 @@
-class ApiConstants {
-  /// Base URL configurable via --dart-define=SIKA_API_URL=... avec fallback sur l'émulateur Android
-  static const String baseUrl = String.fromEnvironment(
-    'SIKA_API_URL',
-    defaultValue: 'http://10.0.2.2:8001',
-  );
+import '../config/app_config.dart';
 
-  static const String sikaHealth = '/api/v1/sika/health';
-  static const String sikaChat = '/api/v1/sika/chat';
-  static const String sikaAgentConfirm = '/api/v1/sika/agent/confirm';
+/// Centralization des chemins d'endpoints de l'API SIKA.
+/// L'URL de base est résolue par [AppConfig.baseUrl].
+class ApiConstants {
+  ApiConstants._();
+
+  /// URL de base résolue selon l'environnement (voir [AppConfig]).
+  static String get baseUrl => AppConfig.baseUrl;
+
+  // Auth
+  static const String authLogin    = '/api/v1/sika/auth/login';
+  static const String authRegister = '/api/v1/sika/auth/register';
+  static const String authGoogle   = '/api/v1/sika/auth/google';
+  static const String authMe       = '/api/v1/sika/auth/me';
+  static const String authLogout   = '/api/v1/sika/auth/logout';
+
+  // Agent SIKA
+  static const String sikaHealth       = '/api/v1/sika/health';
+  static const String sikaChat         = '/api/v1/sika/chat';
   static const String sikaAgentProcess = '/api/v1/sika/agent/process';
+  static const String sikaAgentConfirm = '/api/v1/sika/agent/confirm';
+  static const String sikaAgentCancel  = '/api/v1/sika/agent/cancel';
+  static const String sikaTts          = '/api/v1/sika/tts';
+
+  // Wallets
+  static const String walletsMe          = '/api/v1/wallets/me';
+  static const String walletsTxHistory   = '/api/v1/wallets/transactions/history';
+  static const String walletsCoffres     = '/api/v1/wallets/coffres';
+  static const String walletsConnect     = '/api/v1/wallets/connect';
+  static const String walletsVerifyOtp   = '/api/v1/wallets/verify-otp';
+  static const String walletsSync        = '/api/v1/wallets/sync';
+
+  // Perception SMS
+  static const String perceptionSms      = '/api/v1/perception/sms';
+  static const String perceptionSimulate = '/api/v1/perception/simulate';
 }
+

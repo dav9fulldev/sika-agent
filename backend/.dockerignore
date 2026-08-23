@@ -1,7 +1,8 @@
 .git
 .gitignore
 .env
-.env.example
+.env.*
+*.env
 __pycache__
 *.pyc
 *.pyo
@@ -9,3 +10,7 @@ __pycache__
 .pytest_cache
 venv/
 .DS_Store
+*.db
+*.sqlite
+*.sqlite3
+tests/
