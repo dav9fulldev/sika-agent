@@ -148,6 +148,32 @@ class ApiService {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.authForgotPassword}'),
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: jsonEncode({'email': email}),
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception(_extractErrorMessage(response, 'Erreur lors de la demande de réinitialisation'));
+  }
+
+  Future<Map<String, dynamic>> resetPassword(String email, String otp, String newPassword) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.authResetPassword}'),
+          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception(_extractErrorMessage(response, 'Erreur lors de la réinitialisation'));
+  }
+
   // ============================================================================
   // SIKA AI & AGENT CONVERSATION
   // ============================================================================

@@ -85,6 +85,24 @@ def auth_logout(authorization: Optional[str] = Header(None)):
         "message": "Déconnexion réussie et jeton révoqué côté serveur."
     }
 
+@router.post("/auth/forgot-password")
+def auth_forgot_password(data: Dict[str, Any]):
+    """Demande de réinitialisation de mot de passe (génère un OTP)."""
+    email = data.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="L'adresse email est requise.")
+    return oauth2_auth_service.generate_password_reset_otp(email)
+
+@router.post("/auth/reset-password")
+def auth_reset_password(data: Dict[str, Any]):
+    """Réinitialise le mot de passe avec un OTP valide."""
+    email = data.get("email", "")
+    otp = data.get("otp", "")
+    new_password = data.get("new_password", "")
+    if not email or not otp or not new_password:
+        raise HTTPException(status_code=400, detail="Tous les champs (email, otp, new_password) sont requis.")
+    return oauth2_auth_service.reset_password_with_otp(email, otp, new_password)
+
 # ============================================================================
 # ENDPOINTS SIKA CHAT & AGENT
 # ============================================================================

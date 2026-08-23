@@ -119,6 +119,19 @@ class SecurityRateLimiter:
                 detail="Trop de requêtes financières simultanées. Veuillez patienter un instant."
             )
 
+    # =========================================================================
+    # 5. GESTION DES OTP (MOT DE PASSE OUBLIÉ)
+    # =========================================================================
+
+    def store_otp(self, email: str, otp: str, expire_seconds: int = 900) -> None:
+        self.store.store_otp(email, otp, expire_seconds)
+
+    def verify_otp(self, email: str, otp: str) -> bool:
+        return self.store.verify_otp(email, otp)
+
+    def clear_otp(self, email: str) -> None:
+        self.store.clear_otp(email)
+
 
 # Singleton
 security_rate_limiter = SecurityRateLimiter()

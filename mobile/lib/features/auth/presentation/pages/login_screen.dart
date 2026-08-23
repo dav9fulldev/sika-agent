@@ -6,6 +6,7 @@ import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../ai_assistant/presentation/pages/sika_main_navigation_page.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -250,6 +251,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // MOT DE PASSE OUBLIÉ ?
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                      );
+                    },
+                    child: Text(
+                      langNotifier.tr('Mot de passe oublié ?', 'Forgot Password?'),
+                      style: const TextStyle(
+                        color: AppColors.cyan,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),

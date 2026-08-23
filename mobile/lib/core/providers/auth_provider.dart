@@ -226,6 +226,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<String?> forgotPassword(String email) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    if (email.trim().isEmpty) {
+      state = state.copyWith(isLoading: false, errorMessage: "Veuillez entrer votre adresse email.");
+      return null;
+    }
+    try {
+      final res = await _apiService.forgotPassword(email.trim());
+      state = state.copyWith(isLoading: false);
+      return res['otp']?.toString();
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return null;
+    }
+  }
+
+  Future<bool> resetPassword(String email, String otp, String newPassword) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    if (otp.trim().isEmpty || newPassword.trim().isEmpty) {
+      state = state.copyWith(isLoading: false, errorMessage: "Veuillez remplir tous les champs.");
+      return false;
+    }
+    try {
+      await _apiService.resetPassword(email.trim(), otp.trim(), newPassword.trim());
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
   /// Connexion et inscription via Google Sign-In (OAuth2 / OIDC)
   Future<bool> loginWithGoogle({String? customEmail, String? customName}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);

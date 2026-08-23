@@ -14,6 +14,8 @@ class ApiConstants {
   static const String authGoogle   = '/api/v1/sika/auth/google';
   static const String authMe       = '/api/v1/sika/auth/me';
   static const String authLogout   = '/api/v1/sika/auth/logout';
+  static const String authForgotPassword = '/api/v1/sika/auth/forgot-password';
+  static const String authResetPassword  = '/api/v1/sika/auth/reset-password';
 
   // Agent SIKA
   static const String sikaHealth       = '/api/v1/sika/health';

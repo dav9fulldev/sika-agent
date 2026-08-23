@@ -270,6 +270,51 @@ class OAuth2AuthService:
         finally:
             db.close()
 
+    def generate_password_reset_otp(self, email: str) -> Dict[str, Any]:
+        """Génère un OTP pour la réinitialisation de mot de passe."""
+        clean_email = email.strip().lower()
+        db = SessionLocal()
+        try:
+            user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+            if not user:
+                # Éviter le user enumeration en renvoyant toujours un message de succès
+                return {"success": True, "message": "Si cette adresse existe, un code de réinitialisation a été généré.", "otp": "000000"}
+
+            import random
+            otp = f"{random.randint(100000, 999999)}"
+            security_rate_limiter.store_otp(clean_email, otp, expire_seconds=900)
+            logger.info(f"[AUTH FORGOT PASSWORD] OTP généré pour {clean_email}")
+            
+            return {
+                "success": True, 
+                "message": "Code de réinitialisation généré avec succès.",
+                "otp": otp
+            }
+        finally:
+            db.close()
+
+    def reset_password_with_otp(self, email: str, otp: str, new_password: str) -> Dict[str, Any]:
+        """Réinitialise le mot de passe après vérification de l'OTP."""
+        clean_email = email.strip().lower()
+        if not security_rate_limiter.verify_otp(clean_email, otp):
+            raise HTTPException(status_code=400, detail="Code de vérification (OTP) invalide ou expiré.")
+
+        db = SessionLocal()
+        try:
+            user = db.query(UserModel).filter(UserModel.email == clean_email).first()
+            if not user:
+                raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+            user.password_hash = _hash_password(new_password)
+            db.commit()
+            
+            security_rate_limiter.clear_otp(clean_email)
+            logger.info(f"[AUTH RESET PASSWORD] Mot de passe réinitialisé pour {clean_email}")
+
+            return {"success": True, "message": "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter."}
+        finally:
+            db.close()
+
 
 # Instance singleton
 oauth2_auth_service = OAuth2AuthService()

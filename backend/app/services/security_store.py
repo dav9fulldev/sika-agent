@@ -45,6 +45,21 @@ class BaseSecurityStore(ABC):
         """Nettoie le magasin (utile pour les tests)."""
         pass
 
+    @abstractmethod
+    def store_otp(self, email: str, otp: str, expire_seconds: int = 900) -> None:
+        """Stocke un OTP temporaire."""
+        pass
+
+    @abstractmethod
+    def verify_otp(self, email: str, otp: str) -> bool:
+        """Vérifie si un OTP est valide."""
+        pass
+
+    @abstractmethod
+    def clear_otp(self, email: str) -> None:
+        """Supprime un OTP après usage."""
+        pass
+
 
 class InMemorySecurityStore(BaseSecurityStore):
     """Implémentation en mémoire pour le développement local et les tests."""
@@ -101,6 +116,28 @@ class InMemorySecurityStore(BaseSecurityStore):
         self._revoked_tokens.clear()
         self._failure_counts.clear()
         self._rate_limits.clear()
+        if hasattr(self, '_otps'):
+            self._otps.clear()
+
+    def store_otp(self, email: str, otp: str, expire_seconds: int = 900) -> None:
+        if not hasattr(self, '_otps'):
+            self._otps = {}
+        self._otps[email] = {"otp": otp, "expire_at": time.time() + expire_seconds}
+
+    def verify_otp(self, email: str, otp: str) -> bool:
+        if not hasattr(self, '_otps'):
+            return False
+        record = self._otps.get(email)
+        if not record:
+            return False
+        if time.time() > record["expire_at"]:
+            self.clear_otp(email)
+            return False
+        return record["otp"] == otp
+
+    def clear_otp(self, email: str) -> None:
+        if hasattr(self, '_otps'):
+            self._otps.pop(email, None)
 
     def _cleanup(self) -> None:
         now = time.time()
@@ -176,6 +213,26 @@ class RedisSecurityStore(BaseSecurityStore):
                 self._redis.delete(*keys)
         except Exception as e:
             logger.warning(f"[REDIS WARN] Erreur lors du nettoyage Redis: {e}")
+
+    def store_otp(self, email: str, otp: str, expire_seconds: int = 900) -> None:
+        try:
+            self._redis.setex(f"sika:otp:{email}", expire_seconds, otp)
+        except Exception as e:
+            logger.warning(f"[REDIS WARN] Erreur lors de l'ajout de l'OTP: {e}")
+
+    def verify_otp(self, email: str, otp: str) -> bool:
+        try:
+            val = self._redis.get(f"sika:otp:{email}")
+            return val == otp
+        except Exception as e:
+            logger.warning(f"[REDIS WARN] Erreur de vérification OTP: {e}")
+            return False
+
+    def clear_otp(self, email: str) -> None:
+        try:
+            self._redis.delete(f"sika:otp:{email}")
+        except Exception as e:
+            logger.warning(f"[REDIS WARN] Erreur lors de la suppression de l'OTP: {e}")
 
 
 def create_security_store(env: Optional[str] = None, redis_url: Optional[str] = None) -> BaseSecurityStore:
