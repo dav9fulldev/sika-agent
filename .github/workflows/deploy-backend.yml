@@ -45,7 +45,7 @@ jobs:
       - name: Exécution des tests backend
         run: |
           cd backend
-          pytest tests/
+          PYTHONPATH=. pytest tests/
         env:
           # On peut définir des variables d'environnement bidon pour les tests si besoin
           ENV: testing
