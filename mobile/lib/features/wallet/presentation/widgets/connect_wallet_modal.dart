@@ -482,6 +482,30 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                       ),
               ),
             ),
+
+            const SizedBox(height: 16),
+            
+            // BOUTON RENVOYER OTP
+            Center(
+              child: TextButton(
+                onPressed: _isSubmitting ? null : () async {
+                  _otpController.clear();
+                  await _handleInitiateOtp();
+                  if (mounted && _localErrorMessage == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: AppColors.cyan,
+                        content: Text(langNotifier.tr('Un nouveau code a été envoyé.', 'A new code has been sent.')),
+                      ),
+                    );
+                  }
+                },
+                child: Text(
+                  langNotifier.tr('Renvoyer le code OTP', 'Resend OTP Code'),
+                  style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
           ],
         ],
       ),
