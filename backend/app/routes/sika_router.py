@@ -8,7 +8,21 @@ from ..services.user_learning_service import user_learning_service
 from ..services.backup_service import backup_service
 from ..services.auth_service import oauth2_auth_service
 from ..services.security_rate_limiter import security_rate_limiter
+import re
 from ..agent.orchestrator import sika_orchestrator
+
+def strip_markdown(text: str) -> str:
+    if not text:
+        return text
+    # Remove markdown bold/italic
+    text = re.sub(r'[*_]{1,3}([^*_]+)[*_]{1,3}', r'\1', text)
+    # Remove markdown headers
+    text = re.sub(r'#+\s?', '', text)
+    # Remove markdown links
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    # Remove markdown bullet points
+    text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
+    return text.strip()
 
 router = APIRouter(prefix="/api/v1/sika", tags=["sika"])
 sika_ai = SikaAI()
@@ -133,7 +147,7 @@ async def sika_chat(data: SikaQueryDTO):
         requires_biometric=result.get("requires_biometric", False),
         requires_security_validation=result.get("requires_security_validation", result.get("requires_biometric", False)),
         should_speak=result.get("should_speak", True),
-        speech_text=result.get("speech_text", result.get("response", "")),
+        speech_text=strip_markdown(result.get("speech_text", result.get("response", ""))),
         action_data=result.get("action_data")
     )
 

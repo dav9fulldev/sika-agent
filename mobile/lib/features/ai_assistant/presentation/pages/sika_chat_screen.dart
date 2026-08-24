@@ -43,6 +43,18 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<SikaData>(sikaProvider, (previous, next) {
+      if (next.state == SikaState.listening && next.currentText != null && next.currentText!.isNotEmpty) {
+        if (previous?.currentText != next.currentText) {
+          _textController.text = next.currentText!;
+        }
+      } else if (previous?.state == SikaState.listening && next.state != SikaState.listening) {
+        if (next.currentText == null || next.currentText!.isEmpty) {
+          _textController.clear();
+        }
+      }
+    });
+
     final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
 
