@@ -59,8 +59,13 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
     },
   ];
 
+  String? _localErrorMessage;
+
   Future<void> _handleInitiateOtp() async {
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _localErrorMessage = null;
+    });
     final phone = _phoneController.text.trim();
 
     final sessId = await ref.read(walletProvider.notifier).initiateWalletConnection(
@@ -77,23 +82,18 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           _currentStep = 2;
         });
       } else {
-        final err = ref.read(walletProvider).errorMessage ?? 'Numéro introuvable ou erreur de connexion.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.rose,
-            duration: const Duration(seconds: 4),
-            content: Text(
-              err.replaceAll('Exception: ', ''),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-          ),
-        );
+        setState(() {
+          _localErrorMessage = ref.read(walletProvider).errorMessage?.replaceAll('Exception: ', '') ?? 'Numéro introuvable ou erreur de connexion.';
+        });
       }
     }
   }
 
   Future<void> _handleVerifyOtp() async {
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _localErrorMessage = null;
+    });
     final otp = _otpController.text.trim();
     final phone = _phoneController.text.trim();
 
@@ -115,17 +115,9 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           ),
         );
       } else {
-        final err = ref.read(walletProvider).errorMessage ?? 'Code OTP incorrect ou expiré.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.rose,
-            duration: const Duration(seconds: 4),
-            content: Text(
-              err.replaceAll('Exception: ', ''),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-          ),
-        );
+        setState(() {
+          _localErrorMessage = ref.read(walletProvider).errorMessage?.replaceAll('Exception: ', '') ?? 'Code OTP incorrect ou expiré.';
+        });
       }
     }
   }
@@ -186,6 +178,30 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
               style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
+
+            if (_localErrorMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.rose.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.rose.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.rose, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _localErrorMessage!,
+                        style: const TextStyle(color: AppColors.rose, fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
 
@@ -374,6 +390,30 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
               style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
+
+            if (_localErrorMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.rose.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.rose.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.rose, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _localErrorMessage!,
+                        style: const TextStyle(color: AppColors.rose, fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 24),
 
