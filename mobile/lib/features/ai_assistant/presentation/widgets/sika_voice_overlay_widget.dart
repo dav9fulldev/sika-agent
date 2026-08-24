@@ -56,8 +56,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     final langNotifier = ref.read(languageProvider.notifier);
 
     final bool isActive = sikaData.state == SikaState.listening ||
-        sikaData.state == SikaState.processing ||
-        sikaData.state == SikaState.speaking;
+        sikaData.state == SikaState.processing;
         
     final bool isListening = sikaData.state == SikaState.listening;
     final String recognizedText = sikaData.currentText ?? '';
@@ -148,7 +147,13 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                   const Spacer(),
 
                   // 3. SPHÈRE / ORBE ANIMÉE STYLE SIRI (NEON SPHERE)
-                  AnimatedBuilder(
+                  GestureDetector(
+                    onTap: () async {
+                      if (sikaData.state == SikaState.listening) {
+                        await sikaNotifier.stopListening();
+                      }
+                    },
+                    child: AnimatedBuilder(
                     animation: _orbPulseAnimation,
                     builder: (context, child) {
                       return Transform.scale(
@@ -200,6 +205,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                         ),
                       );
                     },
+                  ),
                   ),
 
                   const Spacer(),

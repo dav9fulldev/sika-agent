@@ -276,12 +276,20 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
         children: [
           IconButton(
             icon: Icon(
-              data.state == SikaState.listening ? Icons.mic_off : Icons.mic,
-              color: data.state == SikaState.listening
+              data.state == SikaState.listening
+                  ? Icons.mic_off
+                  : (data.state == SikaState.speaking ? Icons.stop_circle_outlined : Icons.mic),
+              color: (data.state == SikaState.listening || data.state == SikaState.speaking)
                   ? const Color(0xFFEF4444)
                   : const Color(0xFF10B981),
             ),
-            onPressed: () => notifier.toggleListening(),
+            onPressed: () {
+              if (data.state == SikaState.speaking) {
+                notifier.stopSpeaking();
+              } else {
+                notifier.toggleListening();
+              }
+            },
           ),
           Expanded(
             child: TextField(
