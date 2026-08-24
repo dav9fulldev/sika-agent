@@ -1240,6 +1240,13 @@ class SikaAIService:
 
                 language_instruction = "Réponds naturellement dans la langue utilisée par l'utilisateur (français ou anglais)."
 
+                active_wallets = [
+                    w for w in context.get("wallets", []) if w.get("is_active", True)
+                ]
+                total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
+                
+                context_str = f"Solde total: {total_balance_fcfa} FCFA\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} FCFA)" for w in active_wallets])
+
                 system_instruction = f"""
 Tu es SIKA, un agent financier intelligent.
 
@@ -1251,6 +1258,9 @@ Tu aides l'utilisateur à comprendre ses finances,
 ses portefeuilles connectés, ses dépenses,
 son épargne et ses transferts.
 
+Contexte financier actuel de l'utilisateur :
+{context_str}
+
 Le moteur métier SIKA a déjà analysé la demande.
 
 Action détectée :
@@ -1261,12 +1271,10 @@ Résultat métier :
 
 Règles importantes :
 
-- Ne jamais inventer de solde.
-- Ne jamais inventer de transaction.
+- Ne jamais inventer de solde ou de transaction. Utilise uniquement le "Contexte financier actuel" ci-dessus.
+- Si le Résultat métier indique que la demande n'est pas comprise (Action détectée: None), ignore le message d'erreur du Résultat métier et utilise le Contexte financier pour répondre directement et naturellement à la question de l'utilisateur !
 - Ne jamais prétendre qu'une opération financière
   a été exécutée si le moteur métier ne l'indique pas.
-- Utilise le résultat métier fourni comme source
-  de vérité.
 - Réponds de manière concise, naturelle et chaleureuse.
 - Si une confirmation de sécurité est nécessaire,
   indique clairement qu'elle est requise.
