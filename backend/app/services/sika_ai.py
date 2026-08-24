@@ -250,11 +250,9 @@ class SikaAIService:
         # RÉCUPÉRATION DES WALLETS CONNECTÉS
         # =========================================================
 
-        from ..routes.wallet_router import CONNECTED_USER_WALLETS
-
         active_wallets = [
             wallet
-            for wallet in CONNECTED_USER_WALLETS
+            for wallet in financial_context.get("wallets", [])
             if wallet.get("is_active", True)
         ]
 

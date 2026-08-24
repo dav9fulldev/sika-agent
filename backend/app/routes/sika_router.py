@@ -122,10 +122,22 @@ def auth_reset_password(data: Dict[str, Any]):
 # ============================================================================
 
 @router.post("/chat", response_model=SikaResponseDTO)
-async def sika_chat(data: SikaQueryDTO):
+async def sika_chat(data: SikaQueryDTO, authorization: Optional[str] = Header(None)):
     """Endpoint principal SIKA AI."""
     ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
     firstname = ctx_dict.get("user_firstname", "David")
+
+    # Fetch user wallets to provide context to the AI
+    from .wallet_router import get_my_wallets
+    active_wallets = []
+    if authorization:
+        try:
+            wallets_res = get_my_wallets(authorization=authorization)
+            active_wallets = wallets_res.get("wallets", [])
+        except Exception:
+            pass
+            
+    ctx_dict["wallets"] = active_wallets
 
     result = await sika_ai.chat(
         user_message=data.query,
