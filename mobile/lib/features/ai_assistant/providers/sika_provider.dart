@@ -198,6 +198,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         localeId: activeSttLocale,
         cancelOnError: false,
         partialResults: true,
+        pauseFor: const Duration(seconds: 5),
+        listenFor: const Duration(seconds: 30),
       );
     } catch (e) {
       debugPrint('[SIKA VOICE] Error starting STT: $e');
