@@ -118,7 +118,7 @@ class PayMeChapAPIService:
         try:
             resp = requests.post(
                 endpoint,
-                json={"telephone": clean_phone, "otp": otp_code},
+                json={"telephone": clean_phone, "otp": otp_code, "code": otp_code, "otpCode": otp_code},
                 headers={"Content-Type": "application/json"},
                 timeout=150,
             )
@@ -165,7 +165,7 @@ class PayMeChapAPIService:
             "Authorization": f"Bearer {token}" if token else "",
             "Content-Type": "application/json",
         }
-        payload = {"pin": str(pin_code)}
+        payload = {"pin": str(pin_code), "pinCode": str(pin_code), "code": str(pin_code)}
         logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint}")
 
         try:

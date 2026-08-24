@@ -185,13 +185,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
           debugPrint('[SIKA STT] Recognized text: ${result.recognizedWords}');
           state = state.copyWith(currentText: result.recognizedWords);
         },
-        listenOptions: SpeechListenOptions(
-          localeId: activeSttLocale,
-          listenFor: const Duration(seconds: 15),
-          pauseFor: const Duration(seconds: 3),
-          cancelOnError: true,
-          partialResults: true,
-        ),
+        localeId: activeSttLocale,
+        cancelOnError: false,
+        partialResults: true,
       );
     } catch (e) {
       debugPrint('[SIKA VOICE] Error starting STT: $e');

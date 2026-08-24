@@ -61,7 +61,7 @@ class AppConfig {
   // ---------------------------------------------------------------------------
 
   /// Timeout standard pour les requêtes API (chat, wallet, auth).
-  static const Duration defaultTimeout = Duration(seconds: 30);
+  static const Duration defaultTimeout = Duration(seconds: 180);
 
   /// Timeout étendu pour les opérations agent IA (traitement LLM/TTS).
   static const Duration agentTimeout = Duration(seconds: 60);
