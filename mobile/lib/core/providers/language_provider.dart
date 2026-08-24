@@ -5,7 +5,7 @@ enum AppLanguage { english, french }
 extension AppLanguageExtension on AppLanguage {
   String get displayName => this == AppLanguage.english ? 'English' : 'Français';
   String get code => this == AppLanguage.english ? 'en' : 'fr';
-  String get sttLocale => this == AppLanguage.english ? 'en_US' : 'fr_FR';
+  String get sttLocale => this == AppLanguage.english ? 'en-US' : 'fr-FR';
   String get ttsLanguage => this == AppLanguage.english ? 'en-US' : 'fr-FR';
 }
 

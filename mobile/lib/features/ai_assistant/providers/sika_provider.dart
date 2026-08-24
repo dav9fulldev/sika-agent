@@ -200,6 +200,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
         partialResults: true,
         pauseFor: const Duration(seconds: 5),
         listenFor: const Duration(seconds: 30),
+        listenMode: ListenMode.dictation,
       );
     } catch (e) {
       debugPrint('[SIKA VOICE] Error starting STT: $e');
