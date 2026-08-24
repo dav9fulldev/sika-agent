@@ -134,10 +134,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
       },
       onStatus: (status) {
         debugPrint('[SIKA STT] Speech status changed to: $status');
-        // Visually show status in UI for debugging
-        if (state.state == SikaState.listening) {
-           state = state.copyWith(currentText: "Status: $status...");
-        }
         if (status == 'done' || status == 'notListening') {
           if (state.state == SikaState.listening) {
             debugPrint('[SIKA STT] Triggering _onSpeechComplete because status is $status');
@@ -197,7 +193,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     try {
       state = state.copyWith(
         state: SikaState.listening,
-        currentText: "[Debug] STT Engine starting...",
+        currentText: null,
         errorMessage: null,
         isVoiceMode: true,
       );
