@@ -55,10 +55,34 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     final sikaNotifier = ref.read(sikaProvider.notifier);
     final langNotifier = ref.read(languageProvider.notifier);
 
+    final bool isActive = sikaData.state == SikaState.listening ||
+        sikaData.state == SikaState.processing ||
+        sikaData.state == SikaState.speaking;
+        
     final bool isListening = sikaData.state == SikaState.listening;
     final String recognizedText = sikaData.currentText ?? '';
 
-    if (!isListening) return const SizedBox.shrink();
+    if (!isActive) return const SizedBox.shrink();
+    
+    String titleText = '';
+    String subText = '';
+    bool hasSubText = false;
+
+    if (sikaData.state == SikaState.listening) {
+      titleText = langNotifier.tr('Sika écoute...', 'Sika listening...');
+      subText = recognizedText.isNotEmpty
+          ? recognizedText
+          : langNotifier.tr('Parlez maintenant', 'Speak now');
+      hasSubText = recognizedText.isNotEmpty;
+    } else if (sikaData.state == SikaState.processing) {
+      titleText = langNotifier.tr('Sika réfléchit...', 'Sika is thinking...');
+      subText = recognizedText.isNotEmpty ? recognizedText : '';
+      hasSubText = true;
+    } else if (sikaData.state == SikaState.speaking) {
+      titleText = langNotifier.tr('Sika répond...', 'Sika is answering...');
+      subText = '';
+      hasSubText = false;
+    }
 
     return Positioned.fill(
       child: Material(
@@ -75,10 +99,11 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                         IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
                           onPressed: () async {
                             await sikaNotifier.stopListening();
+                            sikaNotifier.clearConversation();
                           },
                         ),
                       ],
@@ -89,7 +114,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
 
                   // 2. TITRE DE L'ÉCROUTE SIKA
                   Text(
-                    langNotifier.tr('Sika écoute...', 'Sika listening...'),
+                    titleText,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
@@ -103,18 +128,16 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Text(
-                      recognizedText.isNotEmpty
-                          ? recognizedText
-                          : langNotifier.tr('Parlez maintenant', 'Speak now'),
+                      subText,
                       textAlign: TextAlign.center,
-                      maxLines: 3,
+                      maxLines: 5,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: recognizedText.isNotEmpty
+                        color: hasSubText
                             ? Colors.white
                             : const Color(0xFF94A3B8),
-                        fontSize: recognizedText.isNotEmpty ? 17 : 14,
-                        fontWeight: recognizedText.isNotEmpty
+                        fontSize: hasSubText ? 17 : 14,
+                        fontWeight: hasSubText
                             ? FontWeight.w600
                             : FontWeight.normal,
                       ),

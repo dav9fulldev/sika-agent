@@ -45,6 +45,7 @@ class SikaData {
   final String? currentText;
   final String? errorMessage;
   final bool isInitialized;
+  final bool isVoiceMode;
   final SikaState? pendingNextState;
   final String? pendingActionId;
   final Map<String, dynamic>? pendingActionData;
@@ -55,6 +56,7 @@ class SikaData {
     this.currentText,
     this.errorMessage,
     this.isInitialized = false,
+    this.isVoiceMode = false,
     this.pendingNextState,
     this.pendingActionId,
     this.pendingActionData,
@@ -66,6 +68,7 @@ class SikaData {
     String? currentText,
     String? errorMessage,
     bool? isInitialized,
+    bool? isVoiceMode,
     SikaState? pendingNextState,
     String? pendingActionId,
     Map<String, dynamic>? pendingActionData,
@@ -77,6 +80,7 @@ class SikaData {
       currentText: currentText ?? this.currentText,
       errorMessage: errorMessage ?? this.errorMessage,
       isInitialized: isInitialized ?? this.isInitialized,
+      isVoiceMode: isVoiceMode ?? this.isVoiceMode,
       pendingNextState: pendingNextState ?? this.pendingNextState,
       pendingActionId: clearActionData ? null : (pendingActionId ?? this.pendingActionId),
       pendingActionData: clearActionData ? null : (pendingActionData ?? this.pendingActionData),
@@ -165,6 +169,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   /// Déclenche l'écoute avec la locale STT active (en_US ou fr_FR)
   Future<void> startListening({String? sttLocale}) async {
+    // INTERRUPTION DE LA VOIX (Comme Gemini Live) : Si Sika parlait, on l'arrête immédiatement
+    if (state.state == SikaState.speaking) {
+      await stopSpeaking(resetState: false);
+    }
+
     if (!_speechEnabled) {
       debugPrint('[SIKA VOICE] Cannot listen: STT not enabled');
       await _initializeSika();
@@ -237,6 +246,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       currentText: null,
       errorMessage: null,
       isInitialized: state.isInitialized,
+      isVoiceMode: false,
     );
   }
 
@@ -319,51 +329,37 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final bool requiresSecurity = response['requires_security_validation'] == true || response['requires_biometric'] == true;
       final actionData = response['action_data'] != null ? Map<String, dynamic>.from(response['action_data']) : null;
 
-      // P1.6: Traitement complet de tous les états backend SIKA
+      final bool shouldSpeak = (response['should_speak'] == true) || state.isVoiceMode;
+
+      debugPrint('[SIKA API] Action detected: $action | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
+
       SikaState pendingNextState = SikaState.idle;
+
       if (requiresSecurity && actionId != null) {
         pendingNextState = SikaState.securityValidation;
-      } else if (status == 'WAITING_VOICE_CONFIRMATION' || status == 'WAITING_CONFIRMATION') {
+      } else if (action == 'ask_ambiguity' || status == 'NEEDS_CLARIFICATION' || response['requires_confirmation'] == true) {
         pendingNextState = SikaState.waitingVoiceConfirmation;
-      } else if (status == 'PREPARED') {
-        pendingNextState = (requiresSecurity && actionId != null) 
-            ? SikaState.securityValidation 
-            : SikaState.waitingVoiceConfirmation;
-      } else if (status == 'AMBIGUITY_ASKED') {
-        pendingNextState = SikaState.ambiguityAsked;
-      } else if (status == 'CANCELLED') {
-        pendingNextState = SikaState.cancelled;
-      } else if (status == 'EXECUTED') {
-        pendingNextState = SikaState.completed;
-      } else if (status == 'REQUIRES_RECONCILIATION' || status == 'UNKNOWN_RESULT' || status == 'FAILED' || status == 'EXPIRED') {
-        pendingNextState = SikaState.error;
-      }
-
-      Map<String, dynamic>? suggestedTx;
-      bool canAddTx = false;
-      if (action == 'add_transaction' && response['action_data'] != null) {
-        suggestedTx = Map<String, dynamic>.from(response['action_data']);
-        canAddTx = true;
       }
 
       final sikaMessage = SikaMessage(
-        text: sikaText,
+        text: response['message'] as String? ?? response['response'] as String? ?? sikaText,
         isUser: false,
-        suggestedTransaction: suggestedTx,
-        canAddTransaction: canAddTx,
+        suggestedTransaction: actionData,
+        canAddTransaction: (action == 'add_expense' || action == 'add_income' || action == 'transfer') && !requiresSecurity && (status == 'PROCESSED' || status == 'CONFIRMED'),
       );
-
       final finalMessages = List<SikaMessage>.from(state.messages)..add(sikaMessage);
 
       state = state.copyWith(
-        state: SikaState.speaking,
+        state: shouldSpeak ? SikaState.speaking : (pendingNextState != SikaState.idle ? pendingNextState : SikaState.idle),
         messages: finalMessages,
         pendingNextState: pendingNextState,
         pendingActionId: actionId,
         pendingActionData: actionData,
       );
 
-      await _speak(sikaText, ttsLocale: activeTtsLocale);
+      if (shouldSpeak) {
+        await _speak(sikaText, ttsLocale: activeTtsLocale);
+      }
     } catch (e) {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
@@ -388,6 +384,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   Future<void> sendTextMessage(String text, {String? ttsLocale}) async {
+    state = state.copyWith(isVoiceMode: false);
     await processUserQuery(text, ttsLocale: ttsLocale);
   }
 
