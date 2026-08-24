@@ -69,7 +69,7 @@ class _SikaMainNavigationPageState
 
       // 3. BOUTON CENTRAL VOCAL INTERACTIF SURÉLEVÉ (HOLD-TO-TALK & INTERACTIF)
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: GestureDetector(
+      floatingActionButton: _currentIndex == 2 ? null : GestureDetector(
         onLongPressStart: (_) async {
           debugPrint('[VOICE NAV] Hold-to-Talk STARTED');
           await sikaNotifier.startListening(sttLocale: currentAppLang.sttLocale);

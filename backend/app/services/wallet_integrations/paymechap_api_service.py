@@ -72,7 +72,7 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone},
                 headers={"Content-Type": "application/json"},
-                timeout=10,
+                timeout=40,
             )
             if resp.status_code in [200, 201]:
                 data = {}
@@ -120,7 +120,7 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone, "otp": otp_code},
                 headers={"Content-Type": "application/json"},
-                timeout=10,
+                timeout=40,
             )
             if resp.status_code in [200, 201]:
                 data = {}
@@ -169,7 +169,7 @@ class PayMeChapAPIService:
         logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint}")
 
         try:
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=8)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
             if resp.status_code in [200, 201]:
                 res_data = resp.json()
                 stat = str(res_data.get("status", "")).upper()
