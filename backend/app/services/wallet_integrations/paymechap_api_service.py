@@ -45,7 +45,7 @@ class PayMeChapAPIService:
                     endpoint,
                     data=payload,
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    timeout=20,
+                    timeout=150,
                 )
                 if resp.status_code in [200, 201]:
                     data = resp.json()
@@ -72,7 +72,7 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone},
                 headers={"Content-Type": "application/json"},
-                timeout=40,
+                timeout=150,
             )
             if resp.status_code in [200, 201]:
                 data = {}
@@ -120,7 +120,7 @@ class PayMeChapAPIService:
                 endpoint,
                 json={"telephone": clean_phone, "otp": otp_code},
                 headers={"Content-Type": "application/json"},
-                timeout=40,
+                timeout=150,
             )
             if resp.status_code in [200, 201]:
                 data = {}
@@ -169,7 +169,7 @@ class PayMeChapAPIService:
         logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint}")
 
         try:
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=150)
             if resp.status_code in [200, 201]:
                 res_data = resp.json()
                 stat = str(res_data.get("status", "")).upper()
@@ -216,7 +216,7 @@ class PayMeChapAPIService:
                 partner_balance_ep = f"{self.base_url}/api/v1/partners/wallets/{clean_phone}/balance"
                 try:
                     logger.info(f"[PayMeChap Partner API] GET {partner_balance_ep}")
-                    resp = requests.get(partner_balance_ep, headers=headers, timeout=8)
+                    resp = requests.get(partner_balance_ep, headers=headers, timeout=150)
                     logger.info(f"[PayMeChap Partner API] Balance status: {resp.status_code}, text: {resp.text}")
                     if resp.status_code == 200:
                         try:
@@ -255,7 +255,7 @@ class PayMeChapAPIService:
                 partner_info_ep = f"{self.base_url}/api/v1/partners/wallets/{clean_phone}"
                 try:
                     logger.info(f"[PayMeChap Partner API] GET {partner_info_ep}")
-                    resp = requests.get(partner_info_ep, headers=headers, timeout=8)
+                    resp = requests.get(partner_info_ep, headers=headers, timeout=150)
                     logger.info(f"[PayMeChap Partner API] Info status: {resp.status_code}, text: {resp.text}")
                     if resp.status_code == 200:
                         data = resp.json()
@@ -280,7 +280,7 @@ class PayMeChapAPIService:
             headers = {"Authorization": f"Bearer {tok}"}
             for ep in endpoints:
                 try:
-                    resp = requests.get(ep, headers=headers, timeout=8)
+                    resp = requests.get(ep, headers=headers, timeout=150)
                     if resp.status_code == 200:
                         data = resp.json()
                         w_data = data.get("data") if isinstance(data.get("data"), dict) else data
@@ -326,7 +326,7 @@ class PayMeChapAPIService:
             headers = {"Authorization": f"Bearer {tok}"}
             for ep in endpoints:
                 try:
-                    resp = requests.get(ep, headers=headers, timeout=8)
+                    resp = requests.get(ep, headers=headers, timeout=150)
                     if resp.status_code == 200:
                         data = resp.json()
                         coffre_list = []
@@ -353,7 +353,7 @@ class PayMeChapAPIService:
             "objectif": objectif
         }
         try:
-            resp = requests.post(ep, json=payload, headers=headers, timeout=8)
+            resp = requests.post(ep, json=payload, headers=headers, timeout=150)
             if resp.status_code in [200, 201]:
                 return resp.json()
         except Exception as e:
@@ -374,7 +374,7 @@ class PayMeChapAPIService:
         payload = {"montant": montant}
         for ep in endpoints:
             try:
-                resp = requests.post(ep, json=payload, headers=headers, timeout=8)
+                resp = requests.post(ep, json=payload, headers=headers, timeout=150)
                 if resp.status_code in [200, 201]:
                     return resp.json()
             except Exception as e:
@@ -429,7 +429,7 @@ class PayMeChapAPIService:
             headers = {"Authorization": f"Bearer {tok}"}
             for ep in endpoints:
                 try:
-                    resp = requests.get(ep, headers=headers, timeout=8)
+                    resp = requests.get(ep, headers=headers, timeout=150)
                     if resp.status_code == 200:
                         data = resp.json()
                         raw_list = []
@@ -499,7 +499,7 @@ class PayMeChapAPIService:
                 headers["X-Idempotency-Key"] = action_id
 
             logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient} (action_id={action_id})")
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=20)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=150)
             if resp.status_code in [200, 201]:
                 data = resp.json()
                 res_data = data.get("data") or data
