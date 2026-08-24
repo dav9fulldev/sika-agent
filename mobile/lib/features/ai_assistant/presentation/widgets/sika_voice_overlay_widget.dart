@@ -56,7 +56,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     final langNotifier = ref.read(languageProvider.notifier);
 
     final bool isActive = sikaData.state == SikaState.listening ||
-        sikaData.state == SikaState.processing;
+        sikaData.state == SikaState.processing ||
+        sikaData.state == SikaState.speaking;
         
     final bool isListening = sikaData.state == SikaState.listening;
     final String recognizedText = sikaData.currentText ?? '';
@@ -79,7 +80,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
       subText = recognizedText.isNotEmpty ? recognizedText : '';
       hasSubText = true;
     } else if (sikaData.state == SikaState.speaking) {
-      titleText = langNotifier.tr('Sika répond...', 'Sika is answering...');
+      titleText = ''; // L'utilisateur ne veut voir AUCUN texte, juste l'animation vocale.
       subText = '';
       hasSubText = false;
     }
@@ -151,6 +152,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                     onTap: () async {
                       if (sikaData.state == SikaState.listening) {
                         await sikaNotifier.stopListening();
+                      } else if (sikaData.state == SikaState.speaking) {
+                        sikaNotifier.stopSpeaking();
                       }
                     },
                     child: AnimatedBuilder(
