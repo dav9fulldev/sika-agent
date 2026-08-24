@@ -146,6 +146,10 @@ async def sika_chat(data: SikaQueryDTO, authorization: Optional[str] = Header(No
         user_firstname=firstname
     )
 
+    raw_speech = strip_markdown(result.get("speech_text", result.get("response", "")))
+    # Transformation des nombres avec espaces (ex: "1 800 000" -> "1800000") pour un rendu vocal fluide
+    cleaned_speech = re.sub(r'(\d)\s+(?=\d)', r'\1', raw_speech)
+
     return SikaResponseDTO(
         query=data.query,
         message=result.get("response", result.get("message", "")),
@@ -159,7 +163,7 @@ async def sika_chat(data: SikaQueryDTO, authorization: Optional[str] = Header(No
         requires_biometric=result.get("requires_biometric", False),
         requires_security_validation=result.get("requires_security_validation", result.get("requires_biometric", False)),
         should_speak=result.get("should_speak", True),
-        speech_text=strip_markdown(result.get("speech_text", result.get("response", ""))),
+        speech_text=cleaned_speech,
         action_data=result.get("action_data")
     )
 
