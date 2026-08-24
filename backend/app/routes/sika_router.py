@@ -149,6 +149,7 @@ async def sika_chat(data: SikaQueryDTO, authorization: Optional[str] = Header(No
     raw_speech = strip_markdown(result.get("speech_text", result.get("response", "")))
     # Transformation des nombres avec espaces (ex: "1 800 000" -> "1800000") pour un rendu vocal fluide
     cleaned_speech = re.sub(r'(\d)\s+(?=\d)', r'\1', raw_speech)
+    cleaned_speech = cleaned_speech.replace("FCFA", "francs CFA")
 
     return SikaResponseDTO(
         query=data.query,
