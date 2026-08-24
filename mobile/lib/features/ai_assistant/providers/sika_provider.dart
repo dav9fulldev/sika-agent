@@ -133,14 +133,16 @@ class SikaNotifier extends StateNotifier<SikaData> {
         );
       },
       onStatus: (status) {
-        debugPrint('[SIKA STT] Speech status: $status');
+        debugPrint('[SIKA STT] Speech status changed to: $status');
         if (status == 'done' || status == 'notListening') {
           if (state.state == SikaState.listening) {
+            debugPrint('[SIKA STT] Triggering _onSpeechComplete because status is $status');
             _onSpeechComplete();
           }
         }
       },
     );
+    debugPrint('[SIKA STT] Initialization finished. _speechEnabled = $_speechEnabled');
 
     if (!_speechEnabled) {
       debugPrint('[SIKA STT] Speech recognition not available');
@@ -169,18 +171,24 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   /// Déclenche l'écoute avec la locale STT active (en_US ou fr_FR)
   Future<void> startListening({String? sttLocale}) async {
+    debugPrint('[SIKA VOICE] startListening called. Current state: ${state.state}');
     // INTERRUPTION DE LA VOIX (Comme Gemini Live) : Si Sika parlait, on l'arrête immédiatement
     if (state.state == SikaState.speaking) {
+      debugPrint('[SIKA VOICE] Interrupting Sika speech...');
       await stopSpeaking(resetState: false);
     }
 
     if (!_speechEnabled) {
-      debugPrint('[SIKA VOICE] Cannot listen: STT not enabled');
+      debugPrint('[SIKA VOICE] Cannot listen: STT not enabled. Re-initializing...');
       await _initializeSika();
-      if (!_speechEnabled) return;
+      if (!_speechEnabled) {
+         debugPrint('[SIKA VOICE] Initialization failed again, aborting.');
+         return;
+      }
     }
 
     final activeSttLocale = sttLocale ?? _ref.read(languageProvider).sttLocale;
+    debugPrint('[SIKA VOICE] Using locale: $activeSttLocale');
 
     try {
       state = state.copyWith(
@@ -192,18 +200,21 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
       await _speechToText.listen(
         onResult: (result) {
-          debugPrint('[SIKA STT] Recognized text: ${result.recognizedWords}');
+          debugPrint('[SIKA STT RESULT] isFinal: ${result.finalResult}, recognizedWords: "${result.recognizedWords}"');
           state = state.copyWith(currentText: result.recognizedWords);
         },
-        localeId: activeSttLocale,
-        cancelOnError: false,
-        partialResults: true,
-        pauseFor: const Duration(seconds: 5),
-        listenFor: const Duration(seconds: 30),
-        listenMode: ListenMode.dictation,
+        listenOptions: SpeechListenOptions(
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 5),
+          localeId: activeSttLocale,
+          cancelOnError: false,
+          partialResults: true,
+          listenMode: ListenMode.dictation,
+        ),
       );
+      debugPrint('[SIKA VOICE] _speechToText.listen() executed successfully.');
     } catch (e) {
-      debugPrint('[SIKA VOICE] Error starting STT: $e');
+      debugPrint('[SIKA VOICE EXCEPTION] Error starting STT: $e');
       state = state.copyWith(
         state: SikaState.error,
         errorMessage: 'Error starting STT: $e',
