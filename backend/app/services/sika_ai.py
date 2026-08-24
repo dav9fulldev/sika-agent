@@ -1238,11 +1238,7 @@ class SikaAIService:
 
             try:
 
-                language_instruction = (
-                    "Réponds en anglais."
-                    if is_english
-                    else "Réponds en français."
-                )
+                language_instruction = "Réponds naturellement dans la langue utilisée par l'utilisateur (français ou anglais)."
 
                 system_instruction = f"""
 Tu es SIKA, un agent financier intelligent.
