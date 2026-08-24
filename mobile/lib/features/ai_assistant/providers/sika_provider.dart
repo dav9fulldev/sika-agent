@@ -187,6 +187,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
         state: SikaState.listening,
         currentText: null,
         errorMessage: null,
+        isVoiceMode: true,
       );
 
       await _speechToText.listen(

@@ -62,7 +62,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     final bool isListening = sikaData.state == SikaState.listening;
     final String recognizedText = sikaData.currentText ?? '';
 
-    if (!isActive) return const SizedBox.shrink();
+    // L'overlay vocal ne doit s'afficher que si on est en mode vocal !
+    if (!sikaData.isVoiceMode || !isActive) return const SizedBox.shrink();
     
     String titleText = '';
     String subText = '';
