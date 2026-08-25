@@ -216,7 +216,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
           localeId: activeSttLocale,
           cancelOnError: false,
           partialResults: true,
-          listenMode: ListenMode.dictation,
         ),
       );
       debugPrint('[SIKA VOICE] _speechToText.listen() executed successfully.');
