@@ -135,10 +135,13 @@ class SikaNotifier extends StateNotifier<SikaData> {
       onStatus: (status) {
         debugPrint('[SIKA STT] Speech status changed to: $status');
         if (status == 'done' || status == 'notListening') {
-          if (state.state == SikaState.listening) {
-            debugPrint('[SIKA STT] Triggering _onSpeechComplete because status is $status');
-            _onSpeechComplete();
-          }
+          // Délai pour éviter de couper onResult si le résultat final arrive en même temps que le statut
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (state.state == SikaState.listening) {
+              debugPrint('[SIKA STT] Triggering _onSpeechComplete as fallback because status is $status');
+              _onSpeechComplete();
+            }
+          });
         }
       },
     );
@@ -202,6 +205,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
         onResult: (result) {
           debugPrint('[SIKA STT RESULT] isFinal: ${result.finalResult}, recognizedWords: "${result.recognizedWords}"');
           state = state.copyWith(currentText: result.recognizedWords);
+          if (result.finalResult) {
+            debugPrint('[SIKA STT] Triggering _onSpeechComplete because isFinal is true');
+            _onSpeechComplete();
+          }
         },
         listenOptions: SpeechListenOptions(
           listenFor: const Duration(seconds: 30),
