@@ -10,6 +10,7 @@ import '../../../wallet/providers/wallet_provider.dart';
 import '../../../wallet/presentation/widgets/my_wallets_modal.dart';
 import 'personal_information_screen.dart';
 import 'payment_methods_screen.dart';
+import 'kyc_verification_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -279,6 +280,7 @@ class ProfileScreen extends ConsumerWidget {
     final userName = user?.name ?? 'Utilisateur';
     final userEmail = user?.email ?? '';
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+    final isKycVerified = user?.isKycVerified ?? false;
 
     final walletState = ref.watch(walletProvider);
     final connectedCount = walletState.wallets.length;
@@ -382,14 +384,24 @@ class ProfileScreen extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        userEmail,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              userEmail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          if (isKycVerified) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.verified, color: AppColors.emerald, size: 16),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -408,6 +420,19 @@ class ProfileScreen extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PersonalInformationScreen()),
+              );
+            },
+          ),
+          _buildMenuItem(
+            icon: Icons.verified_user_outlined,
+            title: langNotifier.tr('Vérification d\'Identité (KYC)', 'Identity Verification (KYC)'),
+            trailingText: isKycVerified 
+                ? langNotifier.tr('Vérifié', 'Verified') 
+                : langNotifier.tr('Non vérifié', 'Unverified'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const KycVerificationScreen()),
               );
             },
           ),

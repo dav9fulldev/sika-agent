@@ -23,7 +23,7 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
     final user = ref.read(authProvider).user;
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
-    _phoneController = TextEditingController(text: '+225 0102030405'); // Mocked phone
+    _phoneController = TextEditingController(text: user?.phone ?? '+225 0102030405');
   }
 
   @override
@@ -38,6 +38,13 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
     setState(() => _isSaving = true);
     // Simulate network delay
     await Future.delayed(const Duration(seconds: 1));
+    
+    // Save locally to the state
+    ref.read(authProvider.notifier).updateUserInfo(
+      _nameController.text,
+      _phoneController.text,
+    );
+    
     setState(() => _isSaving = false);
     
     if (mounted) {

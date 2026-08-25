@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/payment_provider.dart';
+import '../widgets/add_payment_method_modal.dart';
 
 class PaymentMethodsScreen extends ConsumerWidget {
   const PaymentMethodsScreen({super.key});
@@ -12,6 +14,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
     final langNotifier = ref.watch(languageProvider.notifier);
     final user = ref.watch(authProvider).user;
     final isPremium = user?.isPremium ?? false;
+    final paymentState = ref.watch(paymentProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDarker,
@@ -42,10 +45,24 @@ class PaymentMethodsScreen extends ConsumerWidget {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.amber.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.star_rounded, color: Colors.white, size: 40),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.star_rounded, color: Colors.white, size: 32),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -94,20 +111,42 @@ class PaymentMethodsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // Mocked Payment Methods
-            _buildPaymentMethodTile(
-              icon: Icons.credit_card_rounded,
-              title: 'Visa terminant par 4242',
-              subtitle: 'Expire 12/28',
-              isDefault: true,
-            ),
-            const SizedBox(height: 12),
-            _buildPaymentMethodTile(
-              icon: Icons.phone_android_rounded,
-              title: 'Mobile Money',
-              subtitle: '+225 0102030405',
-              isDefault: false,
-            ),
+            if (paymentState.methods.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.credit_card_off_rounded, color: AppColors.textMuted, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        langNotifier.tr('Aucune méthode de paiement', 'No payment method'),
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        langNotifier.tr(
+                          'Ajoutez une carte ou un compte Mobile Money pour commencer.',
+                          'Add a card or Mobile Money account to get started.'
+                        ),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ...paymentState.methods.map((method) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildPaymentMethodTile(method, ref, langNotifier),
+              )),
+              
             const SizedBox(height: 24),
 
             // Add Payment Method Button
@@ -116,13 +155,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
               height: 56,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(langNotifier.tr('Bientôt disponible', 'Coming soon')),
-                      backgroundColor: AppColors.surface,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  AddPaymentMethodModal.show(context);
                 },
                 icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.cyan),
                 label: Text(
@@ -143,20 +176,15 @@ class PaymentMethodsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentMethodTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isDefault,
-  }) {
+  Widget _buildPaymentMethodTile(PaymentMethod method, WidgetRef ref, LanguageNotifier langNotifier) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDefault ? AppColors.emerald.withValues(alpha: 0.5) : AppColors.border,
-          width: isDefault ? 2 : 1,
+          color: method.isDefault ? AppColors.emerald.withValues(alpha: 0.5) : AppColors.border,
+          width: method.isDefault ? 2 : 1,
         ),
       ),
       child: Row(
@@ -167,7 +195,11 @@ class PaymentMethodsScreen extends ConsumerWidget {
               color: AppColors.surfaceDarker,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: AppColors.textPrimary, size: 24),
+            child: Icon(
+              method.type == 'card' ? Icons.credit_card_rounded : Icons.phone_android_rounded,
+              color: AppColors.textPrimary, 
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -177,14 +209,14 @@ class PaymentMethodsScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Text(
-                      title,
+                      method.title,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (isDefault) ...[
+                    if (method.isDefault) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -206,7 +238,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  subtitle,
+                  method.subtitle,
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 13,
@@ -215,9 +247,32 @@ class PaymentMethodsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted),
-            onPressed: () {},
+            color: AppColors.surfaceDarker,
+            onSelected: (value) {
+              if (value == 'default') {
+                ref.read(paymentProvider.notifier).setDefault(method.id);
+              } else if (value == 'delete') {
+                ref.read(paymentProvider.notifier).removePaymentMethod(method.id);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'default',
+                child: Text(
+                  langNotifier.tr('Définir par défaut', 'Set as default'),
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Text(
+                  langNotifier.tr('Supprimer', 'Delete'),
+                  style: const TextStyle(color: AppColors.rose),
+                ),
+              ),
+            ],
           ),
         ],
       ),

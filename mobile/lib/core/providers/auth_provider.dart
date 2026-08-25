@@ -10,18 +10,44 @@ class UserProfileData {
   final String id;
   final String name;
   final String email;
+  final String? phone;
   final String? photoUrl;
   final bool isPremium;
   final bool isGoogleAuth;
+  final bool isKycVerified;
 
   UserProfileData({
     required this.id,
     required this.name,
     required this.email,
+    this.phone,
     this.photoUrl,
     this.isPremium = true,
     this.isGoogleAuth = false,
+    this.isKycVerified = false,
   });
+
+  UserProfileData copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? phone,
+    String? photoUrl,
+    bool? isPremium,
+    bool? isGoogleAuth,
+    bool? isKycVerified,
+  }) {
+    return UserProfileData(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      photoUrl: photoUrl ?? this.photoUrl,
+      isPremium: isPremium ?? this.isPremium,
+      isGoogleAuth: isGoogleAuth ?? this.isGoogleAuth,
+      isKycVerified: isKycVerified ?? this.isKycVerified,
+    );
+  }
 }
 
 class AuthState {
@@ -335,6 +361,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage: msg,
       );
       return false;
+    }
+  }
+
+  Future<void> updateUserInfo(String name, String phone) async {
+    if (state.user != null) {
+      state = state.copyWith(
+        user: state.user!.copyWith(name: name, phone: phone),
+      );
+    }
+  }
+
+  Future<void> updateKycStatus(bool isVerified) async {
+    if (state.user != null) {
+      state = state.copyWith(
+        user: state.user!.copyWith(isKycVerified: isVerified),
+      );
     }
   }
 
