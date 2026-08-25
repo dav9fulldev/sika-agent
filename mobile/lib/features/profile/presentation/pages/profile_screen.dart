@@ -8,6 +8,8 @@ import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
 import '../../../wallet/providers/wallet_provider.dart';
 import '../../../wallet/presentation/widgets/my_wallets_modal.dart';
+import 'personal_information_screen.dart';
+import 'payment_methods_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -402,7 +404,12 @@ class ProfileScreen extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.person_outline,
             title: langNotifier.tr('Informations personnelles', 'Personal Information'),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PersonalInformationScreen()),
+              );
+            },
           ),
           _buildMenuItem(
             icon: Icons.account_balance_wallet_outlined,
@@ -415,7 +422,12 @@ class ProfileScreen extends ConsumerWidget {
           _buildMenuItem(
             icon: Icons.credit_card_outlined,
             title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
+              );
+            },
           ),
           _buildMenuItem(
             icon: Icons.history,
