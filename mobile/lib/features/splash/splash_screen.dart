@@ -11,7 +11,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
   late AnimationController _contentController;
   late AnimationController _progressController;
   late AnimationController _waveController;
@@ -86,7 +87,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    const Color backgroundWaveColor = Color(0xff020614); // Identique au fond de wave.png
+    const Color backgroundWaveColor =
+        Color(0xff020614); // Identique au fond de wave.png
 
     return Scaffold(
       backgroundColor: backgroundWaveColor,
@@ -125,21 +127,25 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         children: [
                           Text(
                             "Sika",
-                            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.8,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .displayLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.8,
+                                ),
                           ),
                           const SizedBox(height: 12),
                           Text(
                             "Your Autonomous\nFinancial Agent",
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppColors.brandPrimary,
-                              fontWeight: FontWeight.w600,
-                              height: 1.4,
-                              letterSpacing: 0.6,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      color: AppColors.brandPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.4,
+                                      letterSpacing: 0.6,
+                                    ),
                           ),
                         ],
                       ),
@@ -185,8 +191,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   builder: (context, child) {
                     return LinearProgressIndicator(
                       value: _progressController.value,
-                      backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                      valueColor: AlwaysStoppedAnimation<Color>(
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.08),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
                         AppColors.success,
                       ),
                     );

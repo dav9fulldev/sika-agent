@@ -33,7 +33,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     final List<Map<String, dynamic>> onboardingSteps = [
       {
-        'title': langNotifier.tr('Bienvenue chez Sika 👋', 'Welcome to Sika 👋'),
+        'title':
+            langNotifier.tr('Bienvenue chez Sika 👋', 'Welcome to Sika 👋'),
         'subtitle': langNotifier.tr(
           'Votre agent financier autonome qui vous accompagne au quotidien.',
           'Your autonomous financial agent accompanying you daily.',
@@ -41,7 +42,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         'widget': const SikaRobotAnimation(),
       },
       {
-        'title': langNotifier.tr('Sika comprend vos finances', 'Sika understands your finances'),
+        'title': langNotifier.tr(
+            'Sika comprend vos finances', 'Sika understands your finances'),
         'subtitle': langNotifier.tr(
           'Il analyse vos transactions, comprend votre contexte et anticipe les risques.',
           'It analyzes your transactions, understands your context, and anticipates risks.',
@@ -49,7 +51,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         'widget': const FinancialAnimation(),
       },
       {
-        'title': langNotifier.tr('Toujours sous votre contrôle', 'Always under your control'),
+        'title': langNotifier.tr(
+            'Toujours sous votre contrôle', 'Always under your control'),
         'subtitle': langNotifier.tr(
           'Sika agit avec votre autorisation pour toutes les actions sensibles.',
           'Sika acts with your permission for all sensitive actions.',
@@ -115,10 +118,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   Text(
                                     step['title'] as String,
                                     textAlign: TextAlign.center,
-                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
                                   ),
 
                                   const SizedBox(height: 14),
@@ -127,10 +133,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   Text(
                                     step['subtitle'] as String,
                                     textAlign: TextAlign.center,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: const Color(0xff94a3b8),
-                                      height: 1.45,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: const Color(0xff94a3b8),
+                                          height: 1.45,
+                                        ),
                                   ),
 
                                   const Spacer(),
@@ -173,7 +182,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
                 // 4. MAIN ACTION BUTTON (SUIVANT / COMMENCER)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   child: GestureDetector(
                     onTap: () {
                       if (_currentPage < onboardingSteps.length - 1) {
@@ -200,7 +210,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                            color:
+                                AppColors.brandPrimary.withValues(alpha: 0.3),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -211,11 +222,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           _currentPage == onboardingSteps.length - 1
                               ? langNotifier.tr('Commencer', 'Get Started')
                               : langNotifier.tr('Suivant', 'Next'),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
                         ),
                       ),
                     ),

@@ -12,7 +12,8 @@ final apiServiceProvider = Provider<ApiService>((ref) {
   // Callback centralisé sur HTTP 401 : déconnexion immédiate et sécurisée
   apiService.onUnauthorized = () {
     if (ref.read(authProvider).isAuthenticated) {
-      debugPrint('[AUTH 401] Réception HTTP 401 sur requête authentifiée — déconnexion automatique.');
+      debugPrint(
+          '[AUTH 401] Réception HTTP 401 sur requête authentifiée — déconnexion automatique.');
       ref.read(authProvider.notifier).logout();
     }
   };

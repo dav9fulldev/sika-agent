@@ -28,7 +28,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _onLoginPressed(AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
+  void _onLoginPressed(
+      AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
     final success = await authNotifier.loginWithEmail(
       _emailController.text,
       _passwordController.text,
@@ -52,7 +53,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
     } else if (mounted) {
       final authState = ref.read(authProvider);
-      if (authState.errorMessage != null && authState.errorMessage!.contains('SHA-1')) {
+      if (authState.errorMessage != null &&
+          authState.errorMessage!.contains('SHA-1')) {
         _showManualGoogleEmailDialog(authNotifier);
       }
     }
@@ -69,11 +71,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.onSurface),
-              child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 16, fontWeight: FontWeight.bold)),
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Theme.of(context).colorScheme.onSurface),
+              child: const Text('G',
+                  style: TextStyle(
+                      color: Color(0xFF4285F4),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
-            Text('Connexion Google', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 17)),
+            Text('Connexion Google',
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 17)),
           ],
         ),
         content: Column(
@@ -94,7 +105,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 hintStyle: const TextStyle(color: Color(0xFF64748B)),
                 filled: true,
                 fillColor: Theme.of(context).cardColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
               ),
             ),
           ],
@@ -102,7 +115,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dlgCtx),
-            child: const Text('Annuler', style: TextStyle(color: Color(0xFF94A3B8))),
+            child: const Text('Annuler',
+                style: TextStyle(color: Color(0xFF94A3B8))),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -113,14 +127,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 if (s && mounted) {
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
+                    MaterialPageRoute(
+                        builder: (context) => const SikaMainNavigationPage()),
                     (route) => false,
                   );
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-            child: Text('Se connecter', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981)),
+            child: Text('Se connecter',
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onSurface)),
           ),
         ],
       ),
@@ -159,19 +177,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     AppImages.logo,
                     width: 110,
                   ),
-                ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
+                )
+                    .animate()
+                    .fade(duration: 600.ms)
+                    .scale(delay: 200.ms, duration: 400.ms),
                 const SizedBox(height: 32),
 
                 Text(
                   langNotifier.tr('Connexion SIKA', 'SIKA Login'),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                 ).animate().fade(delay: 300.ms).slideY(begin: 0.2, end: 0),
-                
+
                 const SizedBox(height: 8),
-                
+
                 Text(
                   langNotifier.tr(
                     'Accédez à votre assistant financier autonome',
@@ -179,10 +200,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
                 ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
-                
+
                 const SizedBox(height: 40),
 
                 // ERREUR SI PRÉSENTE
@@ -194,16 +218,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             authState.errorMessage!,
-                            style: const TextStyle(color: AppColors.error, fontSize: 14),
+                            style: const TextStyle(
+                                color: AppColors.error, fontSize: 14),
                           ),
                         ),
                       ],
@@ -213,28 +240,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // 2. CHAMP EMAIL
                 TextField(
                   controller: _emailController,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined, color: AppColors.brandSecondary),
+                    prefixIcon: Icon(Icons.email_outlined,
+                        color: AppColors.brandSecondary),
                   ),
                 ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
-                
+
                 const SizedBox(height: 16),
 
                 // 3. CHAMP MOT DE PASSE
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: langNotifier.tr('Mot de passe', 'Password'),
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.brandSecondary),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded,
+                        color: AppColors.brandSecondary),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                         size: 20,
                       ),
                       onPressed: () {
@@ -243,7 +279,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ).animate().fade(delay: 600.ms).slideY(begin: 0.1, end: 0),
-                
+
                 const SizedBox(height: 16),
 
                 // MOT DE PASSE OUBLIÉ ?
@@ -253,11 +289,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const ForgotPasswordScreen()),
                       );
                     },
                     child: Text(
-                      langNotifier.tr('Mot de passe oublié ?', 'Forgot Password?'),
+                      langNotifier.tr(
+                          'Mot de passe oublié ?', 'Forgot Password?'),
                       style: const TextStyle(
                         color: AppColors.brandSecondary,
                         fontSize: 14,
@@ -266,7 +304,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                 ).animate().fade(delay: 700.ms),
-                
+
                 const SizedBox(height: 32),
 
                 // 4. BOUTON SE CONNECTER
@@ -281,33 +319,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5),
                           )
                         : Text(langNotifier.tr('Se connecter', 'Log In')),
                   ),
-                ).animate().fade(delay: 800.ms).scale(delay: 800.ms, duration: 200.ms),
-                
+                )
+                    .animate()
+                    .fade(delay: 800.ms)
+                    .scale(delay: 800.ms, duration: 200.ms),
+
                 const SizedBox(height: 24),
 
                 // SÉPARATEUR "OU"
                 Row(
                   children: [
-                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.2))),
+                    Expanded(
+                        child: Divider(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.2))),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         langNotifier.tr('OU', 'OR'),
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), 
-                          fontSize: 12, 
-                          fontWeight: FontWeight.bold
-                        ),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.4),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
-                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.2))),
+                    Expanded(
+                        child: Divider(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.2))),
                   ],
                 ).animate().fade(delay: 900.ms),
-                
+
                 const SizedBox(height: 24),
 
                 // 5. BOUTON DE CONNEXION AVEC GOOGLE
@@ -315,18 +367,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: double.infinity,
                   height: 56,
                   child: OutlinedButton.icon(
-                    onPressed: authState.isLoading ? null : () => _onGoogleLoginPressed(authNotifier),
+                    onPressed: authState.isLoading
+                        ? null
+                        : () => _onGoogleLoginPressed(authNotifier),
                     icon: Image.network(
                       'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
                       width: 24,
                       errorBuilder: (context, error, stackTrace) => Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-                        child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.bold)),
+                        decoration: const BoxDecoration(
+                            shape: BoxShape.circle, color: Colors.white),
+                        child: const Text('G',
+                            style: TextStyle(
+                                color: Color(0xFF4285F4),
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                     label: Text(
-                      langNotifier.tr('Continuer avec Google', 'Continue with Google'),
+                      langNotifier.tr(
+                          'Continuer avec Google', 'Continue with Google'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 16,
@@ -335,12 +394,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.surface,
-                      side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      side: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.1)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
                 ).animate().fade(delay: 1000.ms).slideY(begin: 0.1, end: 0),
-                
+
                 const SizedBox(height: 32),
 
                 // 6. LIEN VERS INSCRIPTION
@@ -348,14 +412,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      langNotifier.tr('Pas encore de compte ? ', 'Don\'t have an account? '),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 14),
+                      langNotifier.tr('Pas encore de compte ? ',
+                          'Don\'t have an account? '),
+                      style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6),
+                          fontSize: 14),
                     ),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const RegisterScreen()),
                         );
                       },
                       child: Text(

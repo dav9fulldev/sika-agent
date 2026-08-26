@@ -42,9 +42,11 @@ class AppTheme {
           backgroundColor: AppColors.brandPrimary,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+          textStyle: const TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -61,9 +63,11 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.brandPrimary, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.brandPrimary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
     );
   }
@@ -107,9 +111,11 @@ class AppTheme {
           backgroundColor: AppColors.brandPrimary,
           foregroundColor: Colors.white,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+          textStyle: const TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.2),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -126,9 +132,11 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.brandPrimary, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.brandPrimary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
     );
   }

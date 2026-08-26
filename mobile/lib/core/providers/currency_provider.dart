@@ -95,6 +95,7 @@ class CurrencyNotifier extends StateNotifier<AppCurrency> {
   }
 }
 
-final currencyProvider = StateNotifierProvider<CurrencyNotifier, AppCurrency>((ref) {
+final currencyProvider =
+    StateNotifierProvider<CurrencyNotifier, AppCurrency>((ref) {
   return CurrencyNotifier();
 });

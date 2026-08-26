@@ -57,16 +57,16 @@ class InsightCardWidget extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       description,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF94A3B8),
-                        height: 1.3,
-                      ),
+                            color: const Color(0xFF94A3B8),
+                            height: 1.3,
+                          ),
                     ),
                   ],
                 ),

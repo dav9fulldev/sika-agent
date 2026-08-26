@@ -45,9 +45,10 @@ class ProactiveAnalysisSheet extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor, // Dark slate surface
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(
-          top: BorderSide(color: Color(0xFFF59E0B), width: 2), // Amber accent top border
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: const Border(
+          top: BorderSide(
+              color: Color(0xFFF59E0B), width: 2), // Amber accent top border
         ),
       ),
       child: Column(
@@ -90,15 +91,15 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                     Text(
                       'SIKA Analysis',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     Text(
                       'Proactive SIKA Intervention',
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: const Color(0xFFF59E0B),
-                        fontWeight: FontWeight.bold,
-                      ),
+                            color: const Color(0xFFF59E0B),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                   ],
                 ),
@@ -122,11 +123,13 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildMetricRow(context, '💰 Expense Detected', '30 000 FCFA', isHighlight: true),
+                _buildMetricRow(context, '💰 Expense Detected', '30 000 FCFA',
+                    isHighlight: true),
                 const SizedBox(height: 6),
                 _buildMetricRow(context, 'Category', 'Dining / Restaurant'),
                 const SizedBox(height: 6),
-                _buildMetricRow(context, 'Similar spending this week', '12 500 FCFA'),
+                _buildMetricRow(
+                    context, 'Similar spending this week', '12 500 FCFA'),
                 const SizedBox(height: 6),
                 _buildMetricRow(context, 'Remaining budget', '45 000 FCFA'),
                 const SizedBox(height: 6),
@@ -141,8 +144,8 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           Text(
             'Why am I alerting you?',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 6),
           Container(
@@ -150,14 +153,15 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+              border: Border.all(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
             ),
             child: Text(
               'This single expense consumes about two-thirds of your remaining budget (45,000 FCFA) and threatens your 50,000 FCFA savings target.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFFE2E8F0),
-                height: 1.4,
-              ),
+                    color: const Color(0xFFE2E8F0),
+                    height: 1.4,
+                  ),
             ),
           ),
 
@@ -167,9 +171,9 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           Text(
             'What would you like to do?',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF94A3B8),
-              fontWeight: FontWeight.w600,
-            ),
+                  color: const Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
           const SizedBox(height: 12),
 
@@ -201,7 +205,8 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('View Spending', style: TextStyle(fontSize: 11)),
+                  child: const Text('View Spending',
+                      style: TextStyle(fontSize: 11)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -216,7 +221,9 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Définir une limite', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: const Text('Définir une limite',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -227,21 +234,26 @@ class ProactiveAnalysisSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricRow(BuildContext context, String label, String value, {bool isHighlight = false}) {
+  Widget _buildMetricRow(BuildContext context, String label, String value,
+      {bool isHighlight = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: isHighlight ? Theme.of(context).colorScheme.onSurface : const Color(0xFF94A3B8),
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
-          ),
+                color: isHighlight
+                    ? Theme.of(context).colorScheme.onSurface
+                    : const Color(0xFF94A3B8),
+                fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              ),
         ),
         Text(
           value,
           style: TextStyle(
-            color: isHighlight ? Color(0xFFF59E0B) : Theme.of(context).colorScheme.onSurface,
+            color: isHighlight
+                ? const Color(0xFFF59E0B)
+                : Theme.of(context).colorScheme.onSurface,
             fontSize: isHighlight ? 15 : 12.5,
             fontWeight: FontWeight.bold,
           ),

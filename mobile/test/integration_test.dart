@@ -25,11 +25,13 @@ void main() {
       container.read(authProvider.notifier).state = AuthState(
         isAuthenticated: true,
         accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test_token',
-        user: UserProfileData(id: '1', name: 'David YAO', email: 'david@sika.app'),
+        user: UserProfileData(
+            id: '1', name: 'David YAO', email: 'david@sika.app'),
       );
 
       // Le token doit être automatiquement synchronisé sur l'ApiService partagé
-      expect(apiService.token, equals('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test_token'));
+      expect(apiService.token,
+          equals('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test_token'));
       expect(apiService.hasToken, isTrue);
     });
 
@@ -41,7 +43,8 @@ void main() {
       container.read(authProvider.notifier).state = AuthState(
         isAuthenticated: true,
         accessToken: 'test_token',
-        user: UserProfileData(id: '1', name: 'David YAO', email: 'david@sika.app'),
+        user: UserProfileData(
+            id: '1', name: 'David YAO', email: 'david@sika.app'),
       );
       expect(container.read(authProvider).isAuthenticated, isTrue);
 
@@ -61,7 +64,8 @@ void main() {
       authNotifier.state = AuthState(
         isAuthenticated: true,
         accessToken: 'test_active_jwt_token',
-        user: UserProfileData(id: '1', name: 'David YAO', email: 'david@sika.app'),
+        user: UserProfileData(
+            id: '1', name: 'David YAO', email: 'david@sika.app'),
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -75,7 +79,8 @@ void main() {
       expect(prefs.getString('sika_access_token'), isNull);
     });
 
-    test('WalletNotifier.clearData resets all wallet balances and movements', () {
+    test('WalletNotifier.clearData resets all wallet balances and movements',
+        () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -120,7 +125,8 @@ void main() {
       expect(container.read(walletProvider).totalBalanceFcfa, equals(0.0));
     });
 
-    test('SikaNotifier.clearConversation resets pending action and messages', () {
+    test('SikaNotifier.clearConversation resets pending action and messages',
+        () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -132,7 +138,8 @@ void main() {
         pendingActionData: {'amount': 10000.0, 'recipient': 'Kouamé'},
       );
 
-      expect(container.read(sikaProvider).pendingActionId, equals('act_123456'));
+      expect(
+          container.read(sikaProvider).pendingActionId, equals('act_123456'));
 
       sikaNotifier.clearConversation();
 

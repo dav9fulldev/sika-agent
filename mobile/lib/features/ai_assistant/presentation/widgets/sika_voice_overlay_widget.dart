@@ -12,7 +12,8 @@ class SikaVoiceOverlayWidget extends ConsumerStatefulWidget {
   const SikaVoiceOverlayWidget({super.key});
 
   @override
-  ConsumerState<SikaVoiceOverlayWidget> createState() => _SikaVoiceOverlayWidgetState();
+  ConsumerState<SikaVoiceOverlayWidget> createState() =>
+      _SikaVoiceOverlayWidgetState();
 }
 
 class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
@@ -59,12 +60,12 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     final bool isActive = sikaData.state == SikaState.listening ||
         sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.speaking;
-        
+
     final String recognizedText = sikaData.currentText ?? '';
 
     // L'overlay vocal ne doit s'afficher que si on est en mode vocal !
     if (!sikaData.isVoiceMode || !isActive) return const SizedBox.shrink();
-    
+
     String titleText = '';
     String subText = '';
     bool hasSubText = false;
@@ -80,7 +81,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
       subText = recognizedText.isNotEmpty ? recognizedText : '';
       hasSubText = true;
     } else if (sikaData.state == SikaState.speaking) {
-      titleText = ''; // L'utilisateur ne veut voir AUCUN texte, juste l'animation vocale.
+      titleText =
+          ''; // L'utilisateur ne veut voir AUCUN texte, juste l'animation vocale.
       subText = '';
       hasSubText = false;
     }
@@ -91,17 +93,22 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.90),
+            color: Theme.of(context)
+                .scaffoldBackgroundColor
+                .withValues(alpha: 0.90),
             child: SafeArea(
               child: Column(
                 children: [
                   // 1. BARRE SUPÉRIEURE (BOUTON RETOUR)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
-                         IconButton(
-                          icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface, size: 28),
+                        IconButton(
+                          icon: Icon(Icons.close_rounded,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              size: 28),
                           onPressed: () async {
                             await sikaNotifier.stopListening();
                             sikaNotifier.clearConversation();
@@ -117,9 +124,9 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                   Text(
                     titleText,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                   ).animate().fade().slideY(begin: 0.2, end: 0),
                   const SizedBox(height: 10),
 
@@ -132,13 +139,16 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       maxLines: 5,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: hasSubText
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                        fontWeight: hasSubText
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
+                            color: hasSubText
+                                ? Theme.of(context).colorScheme.onSurface
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.5),
+                            fontWeight: hasSubText
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
                     ),
                   ).animate().fade(delay: 200.ms),
 
@@ -154,59 +164,67 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       }
                     },
                     child: AnimatedBuilder(
-                    animation: _orbPulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _orbPulseAnimation.value,
-                        child: Container(
-                          width: 170,
-                          height: 170,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const RadialGradient(
-                              colors: [
-                                Color(0xFF38BDF8),
-                                Color(0xFF635BFF),
-                                Color(0xFFA855F7),
-                                Colors.transparent,
-                              ],
-                              stops: [0.1, 0.45, 0.8, 1.0],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
-                                blurRadius: 45,
-                                spreadRadius: 10,
-                              ),
-                              BoxShadow(
-                                color: const Color(0xFF635BFF).withValues(alpha: 0.6),
-                                blurRadius: 60,
-                                spreadRadius: 20,
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    blurRadius: 16,
-                                    spreadRadius: 4,
-                                  ),
+                      animation: _orbPulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _orbPulseAnimation.value,
+                          child: Container(
+                            width: 170,
+                            height: 170,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const RadialGradient(
+                                colors: [
+                                  Color(0xFF38BDF8),
+                                  Color(0xFF635BFF),
+                                  Color(0xFFA855F7),
+                                  Colors.transparent,
                                 ],
+                                stops: [0.1, 0.45, 0.8, 1.0],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF38BDF8)
+                                      .withValues(alpha: 0.5),
+                                  blurRadius: 45,
+                                  spreadRadius: 10,
+                                ),
+                                BoxShadow(
+                                  color: const Color(0xFF635BFF)
+                                      .withValues(alpha: 0.6),
+                                  blurRadius: 60,
+                                  spreadRadius: 20,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      blurRadius: 16,
+                                      spreadRadius: 4,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                  ).animate().fade(duration: 800.ms).scale(delay: 100.ms, duration: 400.ms),
+                        );
+                      },
+                    ),
+                  )
+                      .animate()
+                      .fade(duration: 800.ms)
+                      .scale(delay: 100.ms, duration: 400.ms),
 
                   const Spacer(),
 
@@ -218,7 +236,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       animation: _waveController,
                       builder: (context, child) {
                         return CustomPaint(
-                          painter: _SiriWavePainter(progress: _waveController.value),
+                          painter:
+                              _SiriWavePainter(progress: _waveController.value),
                         );
                       },
                     ),

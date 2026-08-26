@@ -24,9 +24,13 @@ class SavingsBoosterCard extends ConsumerWidget {
     final sikaNotifier = ref.read(sikaProvider.notifier);
 
     final walletState = ref.watch(walletProvider);
-    final firstCoffre = walletState.coffres.isNotEmpty ? walletState.coffres.first : null;
-    final double targetAmount = firstCoffre != null && firstCoffre.objectif > 0 ? firstCoffre.objectif : 500000.0;
-    final String coffreName = firstCoffre?.nom ?? langNotifier.tr('Épargne', 'Savings');
+    final firstCoffre =
+        walletState.coffres.isNotEmpty ? walletState.coffres.first : null;
+    final double targetAmount = firstCoffre != null && firstCoffre.objectif > 0
+        ? firstCoffre.objectif
+        : 500000.0;
+    final String coffreName =
+        firstCoffre?.nom ?? langNotifier.tr('Épargne', 'Savings');
 
     return Container(
       width: double.infinity,
@@ -34,7 +38,8 @@ class SavingsBoosterCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
+        border: Border.all(
+            color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF10B981).withValues(alpha: 0.15),
@@ -54,33 +59,33 @@ class SavingsBoosterCard extends ConsumerWidget {
                   color: const Color(0xFF10B981).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.trending_up_rounded, color: Color(0xFF10B981), size: 18),
+                child: const Icon(Icons.trending_up_rounded,
+                    color: Color(0xFF10B981), size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  langNotifier.tr('Booster d\'Épargne Autonome', 'Autonomous Savings Booster'),
+                  langNotifier.tr('Booster d\'Épargne Autonome',
+                      'Autonomous Savings Booster'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
           Text(
             langNotifier.tr(
               'En mettant de côté ${currNotifier.format(500)} aujourd\'hui, vous atteindrez votre coffre "$coffreName" (${currNotifier.format(targetAmount)}) avec 5 jours d\'avance !',
               'By putting aside ${currNotifier.format(500)} today, you will reach your "$coffreName" target (${currNotifier.format(targetAmount)}) 5 days earlier!',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF94A3B8),
-              height: 1.4,
-            ),
+                  color: const Color(0xFF94A3B8),
+                  height: 1.4,
+                ),
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Expanded(
@@ -94,12 +99,15 @@ class SavingsBoosterCard extends ConsumerWidget {
                     );
                     if (onBoostConfirmed != null) onBoostConfirmed!();
                   },
-                  icon: Icon(Icons.savings_outlined, color: Theme.of(context).colorScheme.onSurface, size: 18),
+                  icon: Icon(Icons.savings_outlined,
+                      color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
-                    langNotifier.tr('Épargner ${currNotifier.format(500)} maintenant', 'Boost ${currNotifier.format(500)} now'),
+                    langNotifier.tr(
+                        'Épargner ${currNotifier.format(500)} maintenant',
+                        'Boost ${currNotifier.format(500)} now'),
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),

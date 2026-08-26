@@ -31,7 +31,7 @@ class PaymentMethod {
       isDefault: isDefault ?? this.isDefault,
     );
   }
-  
+
   factory PaymentMethod.fromJson(Map<String, dynamic> json) {
     return PaymentMethod(
       id: json['id'],
@@ -69,7 +69,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
   PaymentNotifier(this._apiService) : super(PaymentState()) {
     loadMethods();
   }
-  
+
   Future<void> loadMethods() async {
     state = state.copyWith(isLoading: true);
     try {
@@ -90,11 +90,12 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         'is_default': method.isDefault,
       });
       final newMethod = PaymentMethod.fromJson(res);
-      
+
       // If new method is default, unset default on others
       List<PaymentMethod> currentMethods = state.methods;
       if (newMethod.isDefault) {
-        currentMethods = currentMethods.map((m) => m.copyWith(isDefault: false)).toList();
+        currentMethods =
+            currentMethods.map((m) => m.copyWith(isDefault: false)).toList();
       }
 
       state = state.copyWith(
@@ -115,7 +116,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       // Error handling
     }
   }
-  
+
   Future<void> setDefault(String id) async {
     try {
       await _apiService.setDefaultPaymentMethod(id);
@@ -130,7 +131,8 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
   }
 }
 
-final paymentProvider = StateNotifierProvider<PaymentNotifier, PaymentState>((ref) {
+final paymentProvider =
+    StateNotifierProvider<PaymentNotifier, PaymentState>((ref) {
   // In a real app we'd get the auth token via a provider if ApiService didn't pull it from a static config or local storage.
   // Assuming ApiService handles tokens via secureStorage.
   return PaymentNotifier(ApiService());

@@ -48,9 +48,11 @@ class _SikaAppState extends ConsumerState<SikaApp> {
 
       if (microStatus.isGranted && notificationStatus.isGranted) {
         await SikaNativeService.startSikaService();
-        debugPrint('[SikaMain] ✅ Service Sika natif démarré avec succès au premier plan');
+        debugPrint(
+            '[SikaMain] ✅ Service Sika natif démarré avec succès au premier plan');
       } else {
-        debugPrint('[SikaMain] ⚠️ Permissions refusées. Impossible de lancer le service d\'écoute.');
+        debugPrint(
+            '[SikaMain] ⚠️ Permissions refusées. Impossible de lancer le service d\'écoute.');
       }
     } catch (e) {
       debugPrint('[SikaMain] ⚠️ Erreur lors du démarrage du service Sika: $e');
@@ -71,7 +73,8 @@ class _SikaAppState extends ConsumerState<SikaApp> {
         // pour empêcher toute fuite de données entre sessions utilisateur.
         ref.listen<AuthState>(authProvider, (previous, next) {
           if ((previous?.isAuthenticated ?? false) && !next.isAuthenticated) {
-            debugPrint('[AUTH] Déconnexion détectée — vidage du wallet et de SIKA.');
+            debugPrint(
+                '[AUTH] Déconnexion détectée — vidage du wallet et de SIKA.');
             ref.read(walletProvider.notifier).clearData();
             ref.read(sikaProvider.notifier).clearConversation();
           }
@@ -100,7 +103,8 @@ class _SikaAppState extends ConsumerState<SikaApp> {
           currentScreen = const LoginScreen(key: ValueKey('login'));
         } else {
           // 4. HUB AGENT SIKA (Utilisateur authentifié)
-          currentScreen = const SikaMainNavigationPage(key: ValueKey('main_hub'));
+          currentScreen =
+              const SikaMainNavigationPage(key: ValueKey('main_hub'));
         }
 
         return MaterialApp(

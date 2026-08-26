@@ -190,8 +190,8 @@ class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
         ],
       ),

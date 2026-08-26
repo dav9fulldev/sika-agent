@@ -8,10 +8,12 @@ class PersonalInformationScreen extends ConsumerStatefulWidget {
   const PersonalInformationScreen({super.key});
 
   @override
-  ConsumerState<PersonalInformationScreen> createState() => _PersonalInformationScreenState();
+  ConsumerState<PersonalInformationScreen> createState() =>
+      _PersonalInformationScreenState();
 }
 
-class _PersonalInformationScreenState extends ConsumerState<PersonalInformationScreen> {
+class _PersonalInformationScreenState
+    extends ConsumerState<PersonalInformationScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
@@ -23,7 +25,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
     final user = ref.read(authProvider).user;
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
-    _phoneController = TextEditingController(text: user?.phone ?? '+225 0102030405');
+    _phoneController =
+        TextEditingController(text: user?.phone ?? '+225 0102030405');
   }
 
   @override
@@ -37,18 +40,19 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
   void _handleSave() async {
     setState(() => _isSaving = true);
     final langNotifier = ref.read(languageProvider.notifier);
-    
+
     try {
       await ref.read(authProvider.notifier).updateUserInfo(
-        _nameController.text,
-        _phoneController.text,
-      );
-      
+            _nameController.text,
+            _phoneController.text,
+          );
+
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(langNotifier.tr('Informations mises à jour !', 'Information updated!')),
+            content: Text(langNotifier.tr(
+                'Informations mises à jour !', 'Information updated!')),
             backgroundColor: AppColors.emerald,
             behavior: SnackBarBehavior.floating,
           ),
@@ -60,7 +64,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(langNotifier.tr('Erreur lors de la mise à jour', 'Error during update')),
+            content: Text(langNotifier.tr(
+                'Erreur lors de la mise à jour', 'Error during update')),
             backgroundColor: AppColors.rose,
             behavior: SnackBarBehavior.floating,
           ),
@@ -82,12 +87,16 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
         backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           langNotifier.tr('Informations personnelles', 'Personal Information'),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -119,9 +128,13 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
+                        border: Border.all(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 3),
                       ),
-                      child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+                      child: Icon(Icons.camera_alt_rounded,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          size: 20),
                     ),
                   ),
                 ],
@@ -166,11 +179,16 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
                     ? SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            strokeWidth: 2),
                       )
                     : Text(
                         langNotifier.tr('Enregistrer', 'Save Changes'),
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
                       ),
               ),
             ),
@@ -192,7 +210,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
         Text(
           label,
           style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -202,11 +221,18 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
           controller: controller,
           readOnly: readOnly,
           style: TextStyle(
-            color: readOnly ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6) : Theme.of(context).colorScheme.onSurface,
+            color: readOnly
+                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                : Theme.of(context).colorScheme.onSurface,
             fontSize: 15,
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 22),
+            prefixIcon: Icon(icon,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
+                size: 22),
             filled: true,
             fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(
@@ -219,7 +245,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         ),

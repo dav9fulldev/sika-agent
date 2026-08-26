@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 enum AppLanguage { english, french }
 
 extension AppLanguageExtension on AppLanguage {
-  String get displayName => this == AppLanguage.english ? 'English' : 'Français';
+  String get displayName =>
+      this == AppLanguage.english ? 'English' : 'Français';
   String get code => this == AppLanguage.english ? 'en' : 'fr';
   String get sttLocale => this == AppLanguage.english ? 'en-US' : 'fr-FR';
   String get ttsLanguage => this == AppLanguage.english ? 'en-US' : 'fr-FR';
@@ -32,6 +33,7 @@ class LanguageNotifier extends StateNotifier<AppLanguage> {
   }
 }
 
-final languageProvider = StateNotifierProvider<LanguageNotifier, AppLanguage>((ref) {
+final languageProvider =
+    StateNotifierProvider<LanguageNotifier, AppLanguage>((ref) {
   return LanguageNotifier();
 });

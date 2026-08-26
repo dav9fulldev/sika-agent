@@ -32,7 +32,9 @@ class SecureStorageService {
 
       // 2. Migration depuis SharedPreferences (Legacy)
       final prefs = await SharedPreferences.getInstance();
-      final legacyToken = prefs.getString('auth_token') ?? prefs.getString('jwt_token') ?? prefs.getString(_keyAccessToken);
+      final legacyToken = prefs.getString('auth_token') ??
+          prefs.getString('jwt_token') ??
+          prefs.getString(_keyAccessToken);
 
       if (legacyToken != null && legacyToken.isNotEmpty) {
         // Enregistrer dans le stockage sécurisé

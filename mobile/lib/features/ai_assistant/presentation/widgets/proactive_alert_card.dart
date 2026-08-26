@@ -65,22 +65,25 @@ class ProactiveAlertCard extends StatelessWidget {
                       children: [
                         Text(
                           '⚠️ $title',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: const Color(0xFFF59E0B),
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: const Color(0xFFF59E0B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
                         Text(
                           'Proactive SIKA Intervention',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: const Color(0xFF94A3B8),
-                          ),
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: const Color(0xFF94A3B8),
+                                  ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFF334155),
                       borderRadius: BorderRadius.circular(12),
@@ -88,8 +91,8 @@ class ProactiveAlertCard extends StatelessWidget {
                     child: Text(
                       amountText,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                   ),
                 ],
@@ -98,9 +101,9 @@ class ProactiveAlertCard extends StatelessWidget {
               Text(
                 message,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFFE2E8F0),
-                  height: 1.4,
-                ),
+                      color: const Color(0xFFE2E8F0),
+                      height: 1.4,
+                    ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -125,7 +128,8 @@ class ProactiveAlertCard extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                     ),
                   ),
                 ],

@@ -31,7 +31,8 @@ class AppConfig {
   // ---------------------------------------------------------------------------
 
   /// Émulateur Android : URL du cloud run
-  static const String _emulatorUrl = 'https://sika-backend-1064195418653.europe-west9.run.app';
+  static const String _emulatorUrl =
+      'https://sika-backend-1064195418653.europe-west9.run.app';
 
   // ---------------------------------------------------------------------------
   // Résolution de l'URL effective

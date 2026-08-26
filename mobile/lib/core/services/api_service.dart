@@ -72,7 +72,10 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.authLogin}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: jsonEncode({'email': email, 'password': password}),
         )
         .timeout(AppConfig.defaultTimeout);
@@ -86,8 +89,12 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.authRegister}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          body: jsonEncode({'name': name, 'email': email, 'password': password}),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body:
+              jsonEncode({'name': name, 'email': email, 'password': password}),
         )
         .timeout(AppConfig.defaultTimeout);
 
@@ -104,7 +111,10 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.authGoogle}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: jsonEncode({
             if (idToken != null) 'id_token': idToken,
             if (email != null) 'email': email,
@@ -119,16 +129,14 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getMe(String bearerToken) async {
-    final response = await http
-        .get(
-          Uri.parse('$safeBaseUrl${ApiConstants.authMe}'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $bearerToken',
-          },
-        )
-        .timeout(AppConfig.defaultTimeout);
+    final response = await http.get(
+      Uri.parse('$safeBaseUrl${ApiConstants.authMe}'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $bearerToken',
+      },
+    ).timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
@@ -152,26 +160,36 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.authForgotPassword}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: jsonEncode({'email': email}),
         )
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception(_extractErrorMessage(response, 'Erreur lors de la demande de réinitialisation'));
+    throw Exception(_extractErrorMessage(
+        response, 'Erreur lors de la demande de réinitialisation'));
   }
 
-  Future<Map<String, dynamic>> resetPassword(String email, String otp, String newPassword) async {
+  Future<Map<String, dynamic>> resetPassword(
+      String email, String otp, String newPassword) async {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.authResetPassword}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: jsonEncode(
+              {'email': email, 'otp': otp, 'new_password': newPassword}),
         )
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception(_extractErrorMessage(response, 'Erreur lors de la réinitialisation'));
+    throw Exception(
+        _extractErrorMessage(response, 'Erreur lors de la réinitialisation'));
   }
 
   // ============================================================================
@@ -220,10 +238,12 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     }
-    throw Exception(_extractErrorMessage(response, 'Erreur récupération des cartes'));
+    throw Exception(
+        _extractErrorMessage(response, 'Erreur récupération des cartes'));
   }
 
-  Future<Map<String, dynamic>> addPaymentMethod(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> addPaymentMethod(
+      Map<String, dynamic> data) async {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}'),
@@ -254,13 +274,15 @@ class ApiService {
   Future<void> setDefaultPaymentMethod(String id) async {
     final response = await http
         .put(
-          Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}/$id/default'),
+          Uri.parse(
+              '$safeBaseUrl${ApiConstants.usersPaymentMethods}/$id/default'),
           headers: _headers,
         )
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode != 200) {
-      throw Exception(_extractErrorMessage(response, 'Erreur mise à jour défaut'));
+      throw Exception(
+          _extractErrorMessage(response, 'Erreur mise à jour défaut'));
     }
   }
 
@@ -291,7 +313,8 @@ class ApiService {
 
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
-    throw Exception('Failed to communicate with SIKA AI: ${response.statusCode}');
+    throw Exception(
+        'Failed to communicate with SIKA AI: ${response.statusCode}');
   }
 
   // ============================================================================
@@ -472,8 +495,7 @@ class ApiService {
 
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
-    throw Exception(
-        'Failed to confirm agent action: ${response.statusCode}');
+    throw Exception('Failed to confirm agent action: ${response.statusCode}');
   }
 
   Future<Map<String, dynamic>> sikaReconcileAction(String actionId) async {
@@ -486,8 +508,7 @@ class ApiService {
 
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
-    throw Exception(
-        'Failed to reconcile agent action: ${response.statusCode}');
+    throw Exception('Failed to reconcile agent action: ${response.statusCode}');
   }
 
   // ============================================================================
@@ -501,7 +522,10 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.sikaTts}'),
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: jsonEncode({
             'text': text,
             'voice_name': voiceName,
@@ -511,7 +535,6 @@ class ApiService {
         .timeout(AppConfig.agentTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception(
-        'Failed to generate GCP TTS audio: ${response.statusCode}');
+    throw Exception('Failed to generate GCP TTS audio: ${response.statusCode}');
   }
 }

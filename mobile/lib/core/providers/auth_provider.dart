@@ -95,7 +95,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     scopes: ['email', 'profile'],
   );
 
-  AuthNotifier() : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false)) {
+  AuthNotifier()
+      : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false)) {
     _loadInitialPreferences();
   }
 
@@ -110,7 +111,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         try {
           final res = await _apiService.getMe(token);
           final uData = res["user"] as Map<String, dynamic>;
-          final displayName = (uData["full_name"] ?? uData["name"] ?? "Utilisateur SIKA").toString();
+          final displayName =
+              (uData["full_name"] ?? uData["name"] ?? "Utilisateur SIKA")
+                  .toString();
 
           if (mounted) {
             state = state.copyWith(
@@ -122,7 +125,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 name: displayName,
                 email: (uData["email"] ?? "").toString(),
                 phone: uData["phone"]?.toString(),
-                isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
+                isKycVerified: uData["is_kyc_verified"] == 1 ||
+                    uData["is_kyc_verified"] == true,
               ),
             );
             return;
@@ -176,7 +180,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await _apiService.login(email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      final displayName = (uData["full_name"] ?? uData["name"] ?? email.trim()).toString();
+      final displayName =
+          (uData["full_name"] ?? uData["name"] ?? email.trim()).toString();
 
       await _secureStorage.saveAccessToken(token);
 
@@ -190,7 +195,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
           phone: uData["phone"]?.toString(),
-          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
+          isKycVerified:
+              uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
         ),
       );
 
@@ -201,12 +207,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur login API: $e');
       }
-      
+
       String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+      if (msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused')) {
         msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
-      
+
       state = state.copyWith(
         isLoading: false,
         errorMessage: msg,
@@ -216,10 +224,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Inscription d'un nouvel utilisateur avec jeton OAuth2
-  Future<bool> registerWithEmail(String name, String email, String password) async {
+  Future<bool> registerWithEmail(
+      String name, String email, String password) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    if (name.trim().isEmpty || email.trim().isEmpty || password.trim().isEmpty) {
+    if (name.trim().isEmpty ||
+        email.trim().isEmpty ||
+        password.trim().isEmpty) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: "Veuillez remplir tous les champs d'inscription.",
@@ -228,10 +239,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
 
     try {
-      final res = await _apiService.register(name.trim(), email.trim(), password.trim());
+      final res = await _apiService.register(
+          name.trim(), email.trim(), password.trim());
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      final displayName = (uData["full_name"] ?? uData["name"] ?? name.trim()).toString();
+      final displayName =
+          (uData["full_name"] ?? uData["name"] ?? name.trim()).toString();
 
       await _secureStorage.saveAccessToken(token);
 
@@ -245,7 +258,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
           phone: uData["phone"]?.toString(),
-          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
+          isKycVerified:
+              uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
         ),
       );
 
@@ -256,12 +270,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur register API: $e');
       }
-      
+
       String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+      if (msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused')) {
         msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
-      
+
       state = state.copyWith(
         isLoading: false,
         errorMessage: msg,
@@ -273,7 +289,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<String?> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     if (email.trim().isEmpty) {
-      state = state.copyWith(isLoading: false, errorMessage: "Veuillez entrer votre adresse email.");
+      state = state.copyWith(
+          isLoading: false,
+          errorMessage: "Veuillez entrer votre adresse email.");
       return null;
     }
     try {
@@ -282,7 +300,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return res['otp']?.toString();
     } catch (e) {
       String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+      if (msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused')) {
         msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
       state = state.copyWith(isLoading: false, errorMessage: msg);
@@ -290,19 +310,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> resetPassword(String email, String otp, String newPassword) async {
+  Future<bool> resetPassword(
+      String email, String otp, String newPassword) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     if (otp.trim().isEmpty || newPassword.trim().isEmpty) {
-      state = state.copyWith(isLoading: false, errorMessage: "Veuillez remplir tous les champs.");
+      state = state.copyWith(
+          isLoading: false, errorMessage: "Veuillez remplir tous les champs.");
       return false;
     }
     try {
-      await _apiService.resetPassword(email.trim(), otp.trim(), newPassword.trim());
+      await _apiService.resetPassword(
+          email.trim(), otp.trim(), newPassword.trim());
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
       String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+      if (msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused')) {
         msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
       state = state.copyWith(isLoading: false, errorMessage: msg);
@@ -311,7 +336,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Connexion et inscription via Google Sign-In (OAuth2 / OIDC)
-  Future<bool> loginWithGoogle({String? customEmail, String? customName}) async {
+  Future<bool> loginWithGoogle(
+      {String? customEmail, String? customName}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
@@ -347,7 +373,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final token = res["access_token"] as String;
       final uData = res["user"] as Map<String, dynamic>;
-      final displayName = (uData["full_name"] ?? uData["name"] ?? name).toString();
+      final displayName =
+          (uData["full_name"] ?? uData["name"] ?? name).toString();
 
       await _secureStorage.saveAccessToken(token);
 
@@ -361,7 +388,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           name: displayName,
           email: (uData["email"] ?? email).toString(),
           phone: uData["phone"]?.toString(),
-          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
+          isKycVerified:
+              uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
           photoUrl: photoUrl,
           isGoogleAuth: true,
         ),
@@ -376,8 +404,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       String msg = e.toString().replaceAll('Exception: ', '');
       if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
-        msg = "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.";
-      } else if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg =
+            "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.";
+      } else if (msg.contains('SocketException') ||
+          msg.contains('Failed host lookup') ||
+          msg.contains('Connection refused')) {
         msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
       state = state.copyWith(

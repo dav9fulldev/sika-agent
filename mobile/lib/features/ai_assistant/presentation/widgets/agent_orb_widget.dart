@@ -66,7 +66,9 @@ class AgentOrbWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final orbColor = _getOrbColor();
-    final isGlowing = state == SikaState.listening || state == SikaState.processing || state == SikaState.speaking;
+    final isGlowing = state == SikaState.listening ||
+        state == SikaState.processing ||
+        state == SikaState.speaking;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -104,7 +106,10 @@ class AgentOrbWidget extends StatelessWidget {
                     ),
                   ],
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.2),
                     width: 2,
                   ),
                 ),
@@ -113,7 +118,10 @@ class AgentOrbWidget extends StatelessWidget {
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -140,10 +148,10 @@ class AgentOrbWidget extends StatelessWidget {
             _getStatusText(),
             key: ValueKey(state),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: orbColor,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.3,
-            ),
+                  color: orbColor,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
+                ),
           ),
         ),
       ],

@@ -9,11 +9,12 @@ class AppColors {
   static const Color brandAccent = Color(0xFF10B981); // Pour l'IA, le succès
 
   // Dark Mode Colors
-  static const Color darkBackground = Color(0xFF020614); // Ultra deep blue/black
+  static const Color darkBackground =
+      Color(0xFF020614); // Ultra deep blue/black
   static const Color darkSurface = Color(0xFF0F172A); // Slate 900
   static const Color darkSurfaceHighlight = Color(0xFF1E293B); // Slate 800
   static const Color darkBorder = Color(0xFF1E293B);
-  
+
   static const Color darkTextPrimary = Color(0xFFF8FAFC); // Slate 50
   static const Color darkTextSecondary = Color(0xFF94A3B8); // Slate 400
   static const Color darkTextMuted = Color(0xFF64748B); // Slate 500
@@ -34,7 +35,7 @@ class AppColors {
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
   static const Color info = Color(0xFF3B82F6);
-  
+
   // Aliases (Keeping old ones temporarily for backward compatibility)
   static const Color background = darkBackground;
   static const Color surface = darkSurface;

@@ -15,7 +15,8 @@ import 'kyc_verification_screen.dart';
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  void _showLogoutDialog(BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
+  void _showLogoutDialog(
+      BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -23,21 +24,31 @@ class ProfileScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           langNotifier.tr('Déconnexion', 'Log Out'),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold),
         ),
         content: Text(
           langNotifier.tr(
             'Êtes-vous sûr de vouloir vous déconnecter de votre compte SIKA ?',
             'Are you sure you want to log out of your SIKA account?',
           ),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
+          style: TextStyle(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.7)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               langNotifier.tr('Annuler', 'Cancel'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+              style: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
             ),
           ),
           ElevatedButton(
@@ -52,11 +63,14 @@ class ProfileScreen extends ConsumerWidget {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.rose,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
               langNotifier.tr('Déconnexion', 'Log Out'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -64,7 +78,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showMovementsModal(BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
+  void _showMovementsModal(
+      BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
     String selectedProviderFilter = 'ALL';
 
     showModalBottomSheet(
@@ -81,13 +96,14 @@ class ProfileScreen extends ConsumerWidget {
           final movements = walletState.movements;
           final connectedWallets = walletState.wallets;
 
-          final List<WalletMovementItem> filteredMovements = selectedProviderFilter == 'ALL'
-              ? movements
-              : movements.where((m) {
-                  final p = m.walletProvider.toLowerCase();
-                  final target = selectedProviderFilter.toLowerCase();
-                  return p.contains(target) || target.contains(p);
-                }).toList();
+          final List<WalletMovementItem> filteredMovements =
+              selectedProviderFilter == 'ALL'
+                  ? movements
+                  : movements.where((m) {
+                      final p = m.walletProvider.toLowerCase();
+                      final target = selectedProviderFilter.toLowerCase();
+                      return p.contains(target) || target.contains(p);
+                    }).toList();
 
           return Container(
             height: MediaQuery.of(context).size.height * 0.75,
@@ -100,7 +116,10 @@ class ProfileScreen extends ConsumerWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.24),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -110,7 +129,8 @@ class ProfileScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      langNotifier.tr('Historique des Mouvements', 'Transactions & History'),
+                      langNotifier.tr('Historique des Mouvements',
+                          'Transactions & History'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 18,
@@ -120,7 +140,9 @@ class ProfileScreen extends ConsumerWidget {
                     IconButton(
                       icon: const Icon(Icons.refresh, color: AppColors.cyan),
                       onPressed: () async {
-                        await ref.read(walletProvider.notifier).fetchMovements();
+                        await ref
+                            .read(walletProvider.notifier)
+                            .fetchMovements();
                         setModalState(() {});
                       },
                     ),
@@ -132,31 +154,47 @@ class ProfileScreen extends ConsumerWidget {
                     'Synchronisation automatique en temps réel de vos portefeuilles connectés.',
                     'Real-time automated sync across your connected wallets.',
                   ),
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                  style: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.7),
+                      fontSize: 12),
                 ),
                 const SizedBox(height: 16),
 
                 // DROPDOWN FILTER BY WALLET
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)),
+                    border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.08)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: selectedProviderFilter,
                       isExpanded: true,
                       dropdownColor: Theme.of(context).cardColor,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyan),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.w600),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.cyan),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
                       items: [
                         DropdownMenuItem<String>(
                           value: 'ALL',
                           child: Text(
                             '${langNotifier.tr('Tous les comptes', 'All Accounts')} (${movements.length})',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                         ...connectedWallets.map((w) {
@@ -165,7 +203,9 @@ class ProfileScreen extends ConsumerWidget {
                             value: w.provider,
                             child: Text(
                               label,
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                              style: TextStyle(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface),
                             ),
                           );
                         }),
@@ -187,17 +227,25 @@ class ProfileScreen extends ConsumerWidget {
                   child: filteredMovements.isEmpty
                       ? Center(
                           child: Text(
-                            langNotifier.tr('Aucun mouvement trouvé', 'No movements found'),
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54)),
+                            langNotifier.tr(
+                                'Aucun mouvement trouvé', 'No movements found'),
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.54)),
                           ),
                         )
                       : ListView.separated(
                           itemCount: filteredMovements.length,
-                          separatorBuilder: (ctx, i) => const Divider(color: AppColors.border),
+                          separatorBuilder: (ctx, i) =>
+                              const Divider(color: AppColors.border),
                           itemBuilder: (ctx, index) {
                             final item = filteredMovements[index];
                             final isDeposit = item.type == 'deposit';
-                            final amountVal = (item.amount * currency.rateFromFcfa).toStringAsFixed(
+                            final amountVal =
+                                (item.amount * currency.rateFromFcfa)
+                                    .toStringAsFixed(
                               currency == AppCurrency.fcfa ? 0 : 2,
                             );
 
@@ -208,15 +256,22 @@ class ProfileScreen extends ConsumerWidget {
                                     ? AppColors.emerald.withValues(alpha: 0.15)
                                     : AppColors.rose.withValues(alpha: 0.15),
                                 child: Icon(
-                                  isDeposit ? Icons.arrow_downward : Icons.arrow_upward,
-                                  color: isDeposit ? AppColors.emerald : AppColors.rose,
+                                  isDeposit
+                                      ? Icons.arrow_downward
+                                      : Icons.arrow_upward,
+                                  color: isDeposit
+                                      ? AppColors.emerald
+                                      : AppColors.rose,
                                   size: 18,
                                 ),
                               ),
                               title: Text(
-                                item.recipient.isNotEmpty ? item.recipient : item.description,
+                                item.recipient.isNotEmpty
+                                    ? item.recipient
+                                    : item.description,
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
@@ -224,7 +279,10 @@ class ProfileScreen extends ConsumerWidget {
                               subtitle: Text(
                                 '${item.walletProvider} • ${item.category}',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.7),
                                   fontSize: 12,
                                 ),
                               ),
@@ -235,21 +293,26 @@ class ProfileScreen extends ConsumerWidget {
                                   Text(
                                     '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
                                     style: TextStyle(
-                                      color: isDeposit ? AppColors.emerald : Theme.of(context).colorScheme.onSurface,
+                                      color: isDeposit
+                                          ? AppColors.emerald
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       item.status,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         color: AppColors.cyan,
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
@@ -337,7 +400,8 @@ class ProfileScreen extends ConsumerWidget {
                 Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 3),
+                    border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2), width: 3),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -371,10 +435,13 @@ class ProfileScreen extends ConsumerWidget {
                               userName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -386,11 +453,14 @@ class ProfileScreen extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: AppColors.warning.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.warning.withValues(alpha: 0.5)),
+                              border: Border.all(
+                                  color:
+                                      AppColors.warning.withValues(alpha: 0.5)),
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.star_rounded, size: 12, color: AppColors.warning),
+                                Icon(Icons.star_rounded,
+                                    size: 12, color: AppColors.warning),
                                 SizedBox(width: 4),
                                 Text(
                                   'Premium',
@@ -413,9 +483,12 @@ class ProfileScreen extends ConsumerWidget {
                               userEmail,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.8),
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                  ),
                             ),
                           ),
                           if (isKycVerified) ...[
@@ -426,7 +499,8 @@ class ProfileScreen extends ConsumerWidget {
                                 color: AppColors.success.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.verified_rounded, color: AppColors.success, size: 14),
+                              child: const Icon(Icons.verified_rounded,
+                                  color: AppColors.success, size: 14),
                             ),
                           ],
                         ],
@@ -441,27 +515,33 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // MENU OPTIONS (LISTE ÉPURÉE ET INTERACTIVE)
-          _buildMenuItem(context,
+          _buildMenuItem(
+            context,
             icon: Icons.person_outline,
-            title: langNotifier.tr('Informations personnelles', 'Personal Information'),
+            title: langNotifier.tr(
+                'Informations personnelles', 'Personal Information'),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const PersonalInformationScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const PersonalInformationScreen()),
               );
             },
           ),
-          _buildMenuItem(context,
+          _buildMenuItem(
+            context,
             icon: Icons.verified_user_outlined,
-            title: langNotifier.tr('Vérification d\'Identité (KYC)', 'Identity Verification (KYC)'),
-            trailingText: isKycVerified 
-                ? langNotifier.tr('Vérifié', 'Verified') 
+            title: langNotifier.tr('Vérification d\'Identité (KYC)',
+                'Identity Verification (KYC)'),
+            trailingText: isKycVerified
+                ? langNotifier.tr('Vérifié', 'Verified')
                 : langNotifier.tr('Non vérifié', 'Unverified'),
             onTap: () {
               if (isKycVerified) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(langNotifier.tr('Identité déjà vérifiée.', 'Identity already verified.')),
+                    content: Text(langNotifier.tr('Identité déjà vérifiée.',
+                        'Identity already verified.')),
                     backgroundColor: AppColors.emerald,
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -470,32 +550,40 @@ class ProfileScreen extends ConsumerWidget {
               }
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const KycVerificationScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const KycVerificationScreen()),
               );
             },
           ),
-          _buildMenuItem(context,
+          _buildMenuItem(
+            context,
             icon: Icons.account_balance_wallet_outlined,
             title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-            trailingText: '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
+            trailingText:
+                '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
             onTap: () {
               MyWalletsModal.show(context);
             },
           ),
-          _buildMenuItem(context,
+          _buildMenuItem(
+            context,
             icon: Icons.credit_card_outlined,
             title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const PaymentMethodsScreen()),
               );
             },
           ),
-          _buildMenuItem(context,
+          _buildMenuItem(
+            context,
             icon: Icons.history,
-            title: langNotifier.tr('Historique des transactions', 'Transaction History'),
-            trailingText: '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
+            title: langNotifier.tr(
+                'Historique des transactions', 'Transaction History'),
+            trailingText:
+                '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
             onTap: () {
               _showMovementsModal(context, ref, langNotifier);
             },
@@ -512,7 +600,8 @@ class ProfileScreen extends ConsumerWidget {
               icon: const Icon(Icons.logout, color: AppColors.rose),
               label: Text(
                 langNotifier.tr('Déconnexion', 'Log Out'),
-                style: const TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: AppColors.rose, fontWeight: FontWeight.bold),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.rose),
@@ -527,7 +616,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, {
+  Widget _buildMenuItem(
+    BuildContext context, {
     required IconData icon,
     required String title,
     String? trailingText,
@@ -538,7 +628,11 @@ class ProfileScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+        border: Border.all(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -570,8 +664,8 @@ class ProfileScreen extends ConsumerWidget {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
                 if (trailingText != null) ...[
@@ -579,14 +673,20 @@ class ProfileScreen extends ConsumerWidget {
                   Text(
                     trailingText,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.5),
+                        ),
                   ),
                 ],
                 const SizedBox(width: 8),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.3),
                   size: 24,
                 ),
               ],

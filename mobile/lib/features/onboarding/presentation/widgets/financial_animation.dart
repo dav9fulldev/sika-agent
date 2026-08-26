@@ -12,7 +12,8 @@ class FinancialAnimation extends ConsumerStatefulWidget {
   ConsumerState<FinancialAnimation> createState() => _FinancialAnimationState();
 }
 
-class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with TickerProviderStateMixin {
+class _FinancialAnimationState extends ConsumerState<FinancialAnimation>
+    with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -116,30 +117,35 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
     );
   }
 
-  List<Widget> _buildOrbitingNodesWithMessages(double currentGlobalAngle, LanguageNotifier langNotifier) {
+  List<Widget> _buildOrbitingNodesWithMessages(
+      double currentGlobalAngle, LanguageNotifier langNotifier) {
     final List<Map<String, dynamic>> nodes = [
       {
         'icon': Icons.insights_rounded,
         'color': AppColors.emerald,
-        'message': langNotifier.tr('Analyses prédictives de vos dépenses', 'Predictive spending analysis'),
+        'message': langNotifier.tr('Analyses prédictives de vos dépenses',
+            'Predictive spending analysis'),
         'offsetAngle': 0.0,
       },
       {
         'icon': Icons.account_balance_wallet_rounded,
         'color': AppColors.cyan,
-        'message': langNotifier.tr('Gestion multi-portefeuilles Wave & OM', 'Multi-wallet Wave & OM management'),
+        'message': langNotifier.tr('Gestion multi-portefeuilles Wave & OM',
+            'Multi-wallet Wave & OM management'),
         'offsetAngle': math.pi / 2,
       },
       {
         'icon': Icons.notifications_active_rounded,
         'color': AppColors.rose,
-        'message': langNotifier.tr('Alertes instantanées en cas d\'anomalie', 'Instant anomaly alerts'),
+        'message': langNotifier.tr('Alertes instantanées en cas d\'anomalie',
+            'Instant anomaly alerts'),
         'offsetAngle': math.pi,
       },
       {
         'icon': Icons.savings_rounded,
         'color': AppColors.amber,
-        'message': langNotifier.tr('Optimisation automatique de l\'épargne', 'Autonomous savings booster'),
+        'message': langNotifier.tr('Optimisation automatique de l\'épargne',
+            'Autonomous savings booster'),
         'offsetAngle': (3 * math.pi) / 2,
       },
     ];
@@ -147,7 +153,8 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
     const double radius = 110.0;
 
     return nodes.map((node) {
-      final double totalAngle = currentGlobalAngle + (node['offsetAngle'] as double);
+      final double totalAngle =
+          currentGlobalAngle + (node['offsetAngle'] as double);
 
       final double dx = radius * math.cos(totalAngle);
       final double dy = radius * math.sin(totalAngle);
@@ -175,11 +182,13 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
                 child: Transform.scale(
                   scale: scaleValue,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xff1e293b).withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+                      border: Border.all(
+                          color: color.withValues(alpha: 0.4), width: 1),
                       boxShadow: [
                         BoxShadow(
                           color: color.withValues(alpha: 0.15),
@@ -191,14 +200,13 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
                     child: Text(
                       message,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                   ),
                 ),
               ),
             ),
-
           Transform.translate(
             offset: Offset(dx, dy),
             child: Container(

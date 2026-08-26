@@ -25,7 +25,8 @@ class SikaServiceState {
     return SikaServiceState(
       isServiceRunning: isServiceRunning ?? this.isServiceRunning,
       hasOverlayPermission: hasOverlayPermission ?? this.hasOverlayPermission,
-      hasMicrophonePermission: hasMicrophonePermission ?? this.hasMicrophonePermission,
+      hasMicrophonePermission:
+          hasMicrophonePermission ?? this.hasMicrophonePermission,
       error: error,
     );
   }
@@ -41,9 +42,12 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
   /// Verifier le status du service et des permissions
   Future<void> _checkStatus() async {
     try {
-      final isRunning = await _channel.invokeMethod<bool>('isSikaServiceRunning') ?? false;
-      final hasMic = await _channel.invokeMethod<bool>('checkMicrophonePermission') ?? false;
-      
+      final isRunning =
+          await _channel.invokeMethod<bool>('isSikaServiceRunning') ?? false;
+      final hasMic =
+          await _channel.invokeMethod<bool>('checkMicrophonePermission') ??
+              false;
+
       state = state.copyWith(
         isServiceRunning: isRunning,
         hasMicrophonePermission: hasMic,
@@ -120,6 +124,7 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
 }
 
 /// Provider pour le service Sika en arriere-plan
-final sikaServiceProvider = StateNotifierProvider<SikaServiceNotifier, SikaServiceState>((ref) {
+final sikaServiceProvider =
+    StateNotifierProvider<SikaServiceNotifier, SikaServiceState>((ref) {
   return SikaServiceNotifier();
 });

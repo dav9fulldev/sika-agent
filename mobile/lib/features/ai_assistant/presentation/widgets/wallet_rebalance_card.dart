@@ -28,7 +28,8 @@ class WalletRebalanceCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF635BFF).withValues(alpha: 0.4), width: 1.2),
+        border: Border.all(
+            color: const Color(0xFF635BFF).withValues(alpha: 0.4), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF635BFF).withValues(alpha: 0.15),
@@ -48,33 +49,33 @@ class WalletRebalanceCard extends ConsumerWidget {
                   color: const Color(0xFF635BFF).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF635BFF), size: 18),
+                child: const Icon(Icons.swap_horiz_rounded,
+                    color: Color(0xFF635BFF), size: 18),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  langNotifier.tr('Équilibrage Multi-Portefeuilles', 'Smart Wallet Auto-Balancer'),
+                  langNotifier.tr('Équilibrage Multi-Portefeuilles',
+                      'Smart Wallet Auto-Balancer'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
           Text(
             langNotifier.tr(
               'Votre compte Wave (${currNotifier.format(15000)}) risque d\'être insuffisant pour vos dépenses de fin de semaine. SIKA suggère de transférer ${currNotifier.format(7000)} depuis Orange Money.',
               'Your Wave account (${currNotifier.format(15000)}) might fall short for weekend bills. SIKA suggests transferring ${currNotifier.format(7000)} from Orange Money.',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF94A3B8),
-              height: 1.4,
-            ),
+                  color: const Color(0xFF94A3B8),
+                  height: 1.4,
+                ),
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Expanded(
@@ -88,12 +89,14 @@ class WalletRebalanceCard extends ConsumerWidget {
                     );
                     if (onRebalanceConfirmed != null) onRebalanceConfirmed!();
                   },
-                  icon: Icon(Icons.bolt_rounded, color: Theme.of(context).colorScheme.onSurface, size: 18),
+                  icon: Icon(Icons.bolt_rounded,
+                      color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
-                    langNotifier.tr('Rééquilibrer en 1 Clic', 'Auto-Rebalance in 1 Tap'),
+                    langNotifier.tr(
+                        'Rééquilibrer en 1 Clic', 'Auto-Rebalance in 1 Tap'),
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF635BFF),

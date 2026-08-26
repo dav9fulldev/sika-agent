@@ -9,11 +9,12 @@ import 'login_screen.dart';
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String email;
-  
+
   const ResetPasswordScreen({super.key, required this.email});
 
   @override
-  ConsumerState<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
@@ -28,21 +29,24 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     super.dispose();
   }
 
-  void _onResetPressed(AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
+  void _onResetPressed(
+      AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
     final success = await authNotifier.resetPassword(
       widget.email,
       _otpController.text,
       _passwordController.text,
     );
-    
+
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(langNotifier.tr('Mot de passe réinitialisé avec succès !', 'Password reset successful!')),
+          content: Text(langNotifier.tr(
+              'Mot de passe réinitialisé avec succès !',
+              'Password reset successful!')),
           backgroundColor: AppColors.brandPrimary,
         ),
       );
-      
+
       // Retour à la page de connexion
       Navigator.pushAndRemoveUntil(
         context,
@@ -63,7 +67,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -89,15 +94,17 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     AppImages.logo,
                     width: 90,
                   ),
-                ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
+                )
+                    .animate()
+                    .fade(duration: 600.ms)
+                    .scale(delay: 200.ms, duration: 400.ms),
                 const SizedBox(height: 32),
-                
                 Text(
                   langNotifier.tr('Nouveau mot de passe', 'New Password'),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                 ).animate().fade(delay: 300.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 8),
                 Text(
@@ -107,11 +114,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
                 ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 40),
-
                 if (authState.errorMessage != null)
                   Container(
                     width: double.infinity,
@@ -120,44 +129,56 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             authState.errorMessage!,
-                            style: const TextStyle(color: AppColors.error, fontSize: 14),
+                            style: const TextStyle(
+                                color: AppColors.error, fontSize: 14),
                           ),
                         ),
                       ],
                     ),
                   ).animate().fade().slideY(begin: -0.1, end: 0),
-
                 TextField(
                   controller: _otpController,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    hintText: langNotifier.tr('Code de vérification', 'Verification code'),
-                    prefixIcon: const Icon(Icons.password_outlined, color: AppColors.brandSecondary),
+                    hintText: langNotifier.tr(
+                        'Code de vérification', 'Verification code'),
+                    prefixIcon: const Icon(Icons.password_outlined,
+                        color: AppColors.brandSecondary),
                   ),
                 ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 16),
-
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   decoration: InputDecoration(
-                    hintText: langNotifier.tr('Nouveau mot de passe', 'New password'),
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.brandSecondary),
+                    hintText:
+                        langNotifier.tr('Nouveau mot de passe', 'New password'),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded,
+                        color: AppColors.brandSecondary),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                         size: 20,
                       ),
                       onPressed: () {
@@ -167,7 +188,6 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   ),
                 ).animate().fade(delay: 600.ms).slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 32),
-
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -179,11 +199,16 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5),
                           )
-                        : Text(langNotifier.tr('Réinitialiser', 'Reset Password')),
+                        : Text(
+                            langNotifier.tr('Réinitialiser', 'Reset Password')),
                   ),
-                ).animate().fade(delay: 700.ms).scale(delay: 700.ms, duration: 200.ms),
+                )
+                    .animate()
+                    .fade(delay: 700.ms)
+                    .scale(delay: 700.ms, duration: 200.ms),
               ],
             ),
           ),

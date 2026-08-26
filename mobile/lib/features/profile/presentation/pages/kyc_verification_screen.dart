@@ -13,18 +13,18 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
   const KycVerificationScreen({super.key});
 
   @override
-  ConsumerState<KycVerificationScreen> createState() => _KycVerificationScreenState();
+  ConsumerState<KycVerificationScreen> createState() =>
+      _KycVerificationScreenState();
 }
 
 class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   int _currentStep = 0; // 0: ID Front, 1: ID Back, 2: Selfie
   bool _isProcessing = false;
-  
+
   bool _isTargetDetected = false;
   DateTime? _targetDetectionTime;
   String _feedbackMessage = '';
-  File? _idCardFront;
-  File? _idCardBack;
+
   File? _selfieImage;
 
   List<CameraDescription> _cameras = [];
@@ -49,7 +49,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       ),
     );
     _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-    
+
     _initCamera();
   }
 
@@ -66,7 +66,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
   Future<void> _startCamera(int cameraIndex) async {
     if (_cameras.isEmpty) return;
-    
+
     _currentCameraIndex = cameraIndex;
     if (_cameraController != null) {
       await _cameraController!.dispose();
@@ -76,7 +76,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       _cameras[cameraIndex],
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
     );
 
     try {
@@ -85,7 +87,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         setState(() {
           _isCameraInitialized = true;
         });
-        
+
         // Start processing images for auto-scan
         _cameraController!.startImageStream(_processCameraFrame);
       }
@@ -98,8 +100,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
     if (_cameras.isEmpty) return null;
     final camera = _cameras[_currentCameraIndex];
     final sensorOrientation = camera.sensorOrientation;
-    
-    InputImageRotation? rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+
+    InputImageRotation? rotation =
+        InputImageRotationValue.fromRawValue(sensorOrientation);
     if (rotation == null) return null;
 
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
@@ -140,8 +143,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
       if (_currentStep < 2) {
         // ID Card Auto-Scan logic
-        final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-        if (recognizedText.text.length > 50) { 
+        final RecognizedText recognizedText =
+            await _textRecognizer.processImage(inputImage);
+        if (recognizedText.text.length > 50) {
           targetFound = true;
           feedback = 'Carte détectée. Maintenez...';
         } else {
@@ -152,11 +156,12 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         final List<Face> faces = await _faceDetector.processImage(inputImage);
         if (faces.length == 1) {
           final face = faces.first;
-          if (face.headEulerAngleY != null && face.headEulerAngleY!.abs() > 15) {
-             feedback = 'Regardez droit devant vous.';
+          if (face.headEulerAngleY != null &&
+              face.headEulerAngleY!.abs() > 15) {
+            feedback = 'Regardez droit devant vous.';
           } else {
-             targetFound = true;
-             feedback = 'Visage détecté. Ne bougez pas...';
+            targetFound = true;
+            feedback = 'Visage détecté. Ne bougez pas...';
           }
         } else if (faces.isEmpty) {
           feedback = 'Aucun visage détecté ou espace sombre.';
@@ -175,8 +180,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
             });
           }
           _isDetecting = false;
-        } else if (_targetDetectionTime != null && 
-                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 3)) {
+        } else if (_targetDetectionTime != null &&
+            DateTime.now().difference(_targetDetectionTime!) >
+                const Duration(seconds: 3)) {
           await _triggerAutoCapture();
         } else {
           if (mounted && _feedbackMessage != feedback) {
@@ -198,7 +204,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         } else if (_feedbackMessage != feedback) {
           if (mounted) {
             setState(() {
-               _feedbackMessage = feedback;
+              _feedbackMessage = feedback;
             });
           }
         }
@@ -211,8 +217,10 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   }
 
   Future<void> _triggerAutoCapture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
-    
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
     // Stop the image stream before taking a picture
     try {
       await _cameraController!.stopImageStream();
@@ -222,40 +230,38 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
     try {
       final XFile picture = await _cameraController!.takePicture();
-      
+
       setState(() {
         _isTargetDetected = false;
         _targetDetectionTime = null;
         _feedbackMessage = '';
         if (_currentStep == 0) {
-          _idCardFront = File(picture.path);
           _currentStep = 1;
         } else if (_currentStep == 1) {
-          _idCardBack = File(picture.path);
           _currentStep = 2;
         } else if (_currentStep == 2) {
           _selfieImage = File(picture.path);
         }
       });
-      
-      _isDetecting = false;
-      
-      if (_currentStep == 2 && _selfieImage == null) {
-         // We just moved to step 2
-         int frontIndex = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
-         if (frontIndex != -1) {
-           _isCameraInitialized = false;
-           await _startCamera(frontIndex);
-         } else {
-           await _startCamera(0); // Fallback
-         }
-      } else if (_selfieImage != null) {
-         _submitKyc();
-      } else {
-         // Restart stream for next step
-         await _startCamera(_currentCameraIndex);
-      }
 
+      _isDetecting = false;
+
+      if (_currentStep == 2 && _selfieImage == null) {
+        // We just moved to step 2
+        int frontIndex = _cameras
+            .indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+        if (frontIndex != -1) {
+          _isCameraInitialized = false;
+          await _startCamera(frontIndex);
+        } else {
+          await _startCamera(0); // Fallback
+        }
+      } else if (_selfieImage != null) {
+        _submitKyc();
+      } else {
+        // Restart stream for next step
+        await _startCamera(_currentCameraIndex);
+      }
     } catch (e) {
       debugPrint("Error taking auto picture: $e");
       _isDetecting = false;
@@ -264,17 +270,19 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
   Future<void> _submitKyc() async {
     setState(() => _isProcessing = true);
-    
+
     // Simulate API verification
     await Future.delayed(const Duration(seconds: 2));
-    
+
     ref.read(authProvider.notifier).updateKycStatus(true);
-    
+
     if (mounted) {
       final langNotifier = ref.read(languageProvider.notifier);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(langNotifier.tr('Identité vérifiée par IA avec succès !', 'Identity verified by AI successfully!')),
+          content: Text(langNotifier.tr(
+              'Identité vérifiée par IA avec succès !',
+              'Identity verified by AI successfully!')),
           backgroundColor: AppColors.emerald,
           behavior: SnackBarBehavior.floating,
         ),
@@ -294,7 +302,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final langNotifier = ref.watch(languageProvider.notifier);
-    
+
     return Scaffold(
       backgroundColor: Colors.black, // Camera screen is dark
       appBar: AppBar(
@@ -305,120 +313,147 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          _currentStep == 0 ? langNotifier.tr('Scanner Recto (Auto)', 'Scan Front (Auto)')
-          : _currentStep == 1 ? langNotifier.tr('Scanner Verso (Auto)', 'Scan Back (Auto)')
-          : langNotifier.tr('Selfie (Auto)', 'Selfie (Auto)'),
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          _currentStep == 0
+              ? langNotifier.tr('Scanner Recto (Auto)', 'Scan Front (Auto)')
+              : _currentStep == 1
+                  ? langNotifier.tr('Scanner Verso (Auto)', 'Scan Back (Auto)')
+                  : langNotifier.tr('Selfie (Auto)', 'Selfie (Auto)'),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
-        child: _isProcessing 
+        child: _isProcessing
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                  const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary)),
                   const SizedBox(height: 24),
                   Text(
-                    langNotifier.tr('Vérification IA en cours...', 'AI Verifying...'),
+                    langNotifier.tr(
+                        'Vérification IA en cours...', 'AI Verifying...'),
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ],
               )
             : Column(
-          children: [
-            // Progress Indicator
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
                 children: [
-                  Expanded(
-                    child: Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: _currentStep >= 0 ? AppColors.primary : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: _currentStep >= 1 ? AppColors.primary : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: _currentStep >= 2 ? AppColors.primary : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Instructions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Text(
-                _currentStep == 0 ? langNotifier.tr('Placez l\'avant de votre carte dans le cadre. L\'IA scannera automatiquement.', 'Place the front of your ID in the frame. AI will scan automatically.')
-                : _currentStep == 1 ? langNotifier.tr('Placez l\'arrière de votre carte. Le scan est automatique.', 'Place the back of your ID. Scan is automatic.')
-                : langNotifier.tr('Placez votre visage dans le cercle. La photo se prendra toute seule.', 'Place your face in the circle. It will capture automatically.'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            ),
-            
-            // Camera Preview with Overlay
-            Expanded(
-              child: _isCameraInitialized && _cameraController != null
-                  ? Stack(
-                      alignment: Alignment.center,
-                      fit: StackFit.expand,
+                  // Progress Indicator
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Row(
                       children: [
-                        CameraPreview(_cameraController!),
-                        CustomPaint(
-                          painter: ScannerOverlayPainter(
-                            isCircle: _currentStep == 2,
-                            isTargetDetected: _isTargetDetected,
-                          ),
-                          child: Container(),
-                        ),
-                        if (_feedbackMessage.isNotEmpty)
-                          Positioned(
-                            bottom: 60,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _feedbackMessage,
-                                style: TextStyle(
-                                  color: _isTargetDetected ? AppColors.emerald : Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold
-                                ),
-                              ),
+                        Expanded(
+                          child: Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: _currentStep >= 0
+                                  ? AppColors.primary
+                                  : Colors.grey[800],
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: _currentStep >= 1
+                                  ? AppColors.primary
+                                  : Colors.grey[800],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: _currentStep >= 2
+                                  ? AppColors.primary
+                                  : Colors.grey[800],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
                       ],
-                    )
-                  : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-            ),
-            
-            // The capture button is hidden since we are using Auto-Scan!
-            const SizedBox(height: 50),
-          ],
-        ),
+                    ),
+                  ),
+
+                  // Instructions
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    child: Text(
+                      _currentStep == 0
+                          ? langNotifier.tr(
+                              'Placez l\'avant de votre carte dans le cadre. L\'IA scannera automatiquement.',
+                              'Place the front of your ID in the frame. AI will scan automatically.')
+                          : _currentStep == 1
+                              ? langNotifier.tr(
+                                  'Placez l\'arrière de votre carte. Le scan est automatique.',
+                                  'Place the back of your ID. Scan is automatic.')
+                              : langNotifier.tr(
+                                  'Placez votre visage dans le cercle. La photo se prendra toute seule.',
+                                  'Place your face in the circle. It will capture automatically.'),
+                      textAlign: TextAlign.center,
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                  ),
+
+                  // Camera Preview with Overlay
+                  Expanded(
+                    child: _isCameraInitialized && _cameraController != null
+                        ? Stack(
+                            alignment: Alignment.center,
+                            fit: StackFit.expand,
+                            children: [
+                              CameraPreview(_cameraController!),
+                              CustomPaint(
+                                painter: ScannerOverlayPainter(
+                                  isCircle: _currentStep == 2,
+                                  isTargetDetected: _isTargetDetected,
+                                ),
+                                child: Container(),
+                              ),
+                              if (_feedbackMessage.isNotEmpty)
+                                Positioned(
+                                  bottom: 60,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.7),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      _feedbackMessage,
+                                      style: TextStyle(
+                                          color: _isTargetDetected
+                                              ? AppColors.emerald
+                                              : Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
+                        : const Center(
+                            child: CircularProgressIndicator(
+                                color: AppColors.primary)),
+                  ),
+
+                  // The capture button is hidden since we are using Auto-Scan!
+                  const SizedBox(height: 50),
+                ],
+              ),
       ),
     );
   }
@@ -427,33 +462,37 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 class ScannerOverlayPainter extends CustomPainter {
   final bool isCircle;
   final bool isTargetDetected;
-  ScannerOverlayPainter({required this.isCircle, this.isTargetDetected = false});
+  ScannerOverlayPainter(
+      {required this.isCircle, this.isTargetDetected = false});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.7);
-    
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.7);
+
     // Create the cutout path
-    Path overlayPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    Path overlayPath = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
     Path cutoutPath = Path();
 
     if (isCircle) {
       cutoutPath.addOval(Rect.fromCenter(
-        center: Offset(size.width / 2, size.height / 2), 
-        width: 300, 
-        height: 300
-      ));
+          center: Offset(size.width / 2, size.height / 2),
+          width: 300,
+          height: 300));
     } else {
       double w = size.width * 0.85;
       double h = w * 0.63; // ID card aspect ratio
       cutoutPath.addRRect(RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: w, height: h),
-        const Radius.circular(16)
-      ));
+          Rect.fromCenter(
+              center: Offset(size.width / 2, size.height / 2),
+              width: w,
+              height: h),
+          const Radius.circular(16)));
     }
 
     // Combine paths to create the hole
-    final finalPath = Path.combine(PathOperation.difference, overlayPath, cutoutPath);
+    final finalPath =
+        Path.combine(PathOperation.difference, overlayPath, cutoutPath);
     canvas.drawPath(finalPath, paint);
 
     // Draw a border around the cutout
@@ -466,6 +505,7 @@ class ScannerOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ScannerOverlayPainter oldDelegate) {
-    return oldDelegate.isCircle != isCircle || oldDelegate.isTargetDetected != isTargetDetected;
+    return oldDelegate.isCircle != isCircle ||
+        oldDelegate.isTargetDetected != isTargetDetected;
   }
 }

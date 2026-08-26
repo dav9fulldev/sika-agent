@@ -44,8 +44,8 @@ class MyWalletsModal extends ConsumerWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: const Border(
           top: BorderSide(color: AppColors.border),
         ),
       ),
@@ -57,34 +57,44 @@ class MyWalletsModal extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 16),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 langNotifier.tr('Mes portefeuilles', 'My Wallets'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), size: 24),
-                    tooltip: langNotifier.tr('Actualiser les soldes', 'Refresh Balances'),
+                    icon: Icon(Icons.refresh,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.70),
+                        size: 24),
+                    tooltip: langNotifier.tr(
+                        'Actualiser les soldes', 'Refresh Balances'),
                     onPressed: () {
                       ref.read(walletProvider.notifier).syncAllWallets();
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.add_circle, color: AppColors.cyan, size: 28),
-                    tooltip: langNotifier.tr('Connecter un portefeuille', 'Connect Wallet'),
+                    icon: const Icon(Icons.add_circle,
+                        color: AppColors.cyan, size: 28),
+                    tooltip: langNotifier.tr(
+                        'Connecter un portefeuille', 'Connect Wallet'),
                     onPressed: () {
                       Navigator.pop(context);
                       ConnectWalletModal.show(context);
@@ -101,25 +111,33 @@ class MyWalletsModal extends ConsumerWidget {
               'View and manage your connected Mobile Money accounts.',
             ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF94A3B8),
-            ),
+                  color: const Color(0xFF94A3B8),
+                ),
           ),
-
           const SizedBox(height: 20),
-
           Expanded(
             child: wallets.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.account_balance_wallet_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38), size: 48),
+                        Icon(Icons.account_balance_wallet_outlined,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.38),
+                            size: 48),
                         const SizedBox(height: 12),
                         Text(
-                          langNotifier.tr('Aucun portefeuille connecté', 'No wallet connected'),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70),
-                          ),
+                          langNotifier.tr('Aucun portefeuille connecté',
+                              'No wallet connected'),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.70),
+                                  ),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -127,12 +145,17 @@ class MyWalletsModal extends ConsumerWidget {
                             Navigator.pop(context);
                             ConnectWalletModal.show(context);
                           },
-                          icon: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface),
+                          icon: Icon(Icons.add,
+                              color: Theme.of(context).colorScheme.onSurface),
                           label: Text(
-                            langNotifier.tr('Connecter un compte', 'Connect Account'),
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
+                            langNotifier.tr(
+                                'Connecter un compte', 'Connect Account'),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold),
                           ),
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.cyan),
                         ),
                       ],
                     ),
@@ -174,16 +197,22 @@ class MyWalletsModal extends ConsumerWidget {
                                 children: [
                                   Text(
                                     item.provider,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     item.accountNumber,
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: const Color(0xFF64748B),
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: const Color(0xFF64748B),
+                                        ),
                                   ),
                                 ],
                               ),
@@ -193,15 +222,20 @@ class MyWalletsModal extends ConsumerWidget {
                               children: [
                                 Text(
                                   currNotifier.format(item.balance),
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                 ),
                                 const SizedBox(height: 4),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppColors.emerald.withValues(alpha: 0.15),
+                                    color: AppColors.emerald
+                                        .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(

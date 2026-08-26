@@ -157,7 +157,8 @@ class WalletState {
       movements: movements ?? this.movements,
       coffres: coffres ?? this.coffres,
       pendingOtpSessionId: pendingOtpSessionId ?? this.pendingOtpSessionId,
-      lastPerceptionMessage: lastPerceptionMessage ?? this.lastPerceptionMessage,
+      lastPerceptionMessage:
+          lastPerceptionMessage ?? this.lastPerceptionMessage,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
@@ -192,7 +193,8 @@ class WalletNotifier extends StateNotifier<WalletState> {
             decoded.map((e) => ConnectedWalletItem.fromJson(e)).toList();
         if (cachedItems.isNotEmpty && mounted) {
           state = state.copyWith(wallets: cachedItems);
-          debugPrint('[WALLET CACHE] Loaded ${cachedItems.length} wallet(s) from device storage.');
+          debugPrint(
+              '[WALLET CACHE] Loaded ${cachedItems.length} wallet(s) from device storage.');
         }
       }
     } catch (e) {
@@ -205,7 +207,8 @@ class WalletNotifier extends StateNotifier<WalletState> {
       final prefs = await SharedPreferences.getInstance();
       final String jsonStr = jsonEncode(items.map((e) => e.toJson()).toList());
       await prefs.setString(_cachedWalletsKey, jsonStr);
-      debugPrint('[WALLET CACHE] Saved ${items.length} wallet(s) to device storage.');
+      debugPrint(
+          '[WALLET CACHE] Saved ${items.length} wallet(s) to device storage.');
     } catch (e) {
       debugPrint('[WALLET CACHE] Error saving cached wallets: $e');
     }
@@ -302,12 +305,16 @@ class WalletNotifier extends StateNotifier<WalletState> {
       );
 
       if (res['wallet'] != null && res['wallet'] is Map) {
-        final newWallet = ConnectedWalletItem.fromJson(Map<String, dynamic>.from(res['wallet']));
+        final newWallet = ConnectedWalletItem.fromJson(
+            Map<String, dynamic>.from(res['wallet']));
         final List<ConnectedWalletItem> updatedList = state.wallets
-            .where((w) => w.accountNumber != newWallet.accountNumber || w.provider != newWallet.provider)
+            .where((w) =>
+                w.accountNumber != newWallet.accountNumber ||
+                w.provider != newWallet.provider)
             .toList();
         updatedList.add(newWallet);
-        state = state.copyWith(wallets: updatedList, isLoading: false, pendingOtpSessionId: null);
+        state = state.copyWith(
+            wallets: updatedList, isLoading: false, pendingOtpSessionId: null);
         await saveCachedWallets(updatedList);
       } else {
         state = state.copyWith(isLoading: false, pendingOtpSessionId: null);
@@ -324,10 +331,12 @@ class WalletNotifier extends StateNotifier<WalletState> {
     }
   }
 
-  Future<bool> perceiveSmsNotification(String rawSmsText, {String sender = 'WAVE'}) async {
+  Future<bool> perceiveSmsNotification(String rawSmsText,
+      {String sender = 'WAVE'}) async {
     state = state.copyWith(isLoading: true);
     try {
-      final res = await _apiService.perceiveSms(text: rawSmsText, sender: sender);
+      final res =
+          await _apiService.perceiveSms(text: rawSmsText, sender: sender);
       final msg = res['message'] ?? 'SMS intercepté avec succès !';
       state = state.copyWith(isLoading: false, lastPerceptionMessage: msg);
       await fetchWallets();
@@ -385,7 +394,8 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }
 }
 
-final walletProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
+final walletProvider =
+    StateNotifierProvider<WalletNotifier, WalletState>((ref) {
   // Utilise l'instance partagée dont le token JWT est synchronisé
   // automatiquement depuis authProvider.
   final apiService = ref.watch(apiServiceProvider);

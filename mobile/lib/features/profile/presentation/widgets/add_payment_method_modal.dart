@@ -25,7 +25,8 @@ class AddPaymentMethodModal extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<AddPaymentMethodModal> createState() => _AddPaymentMethodModalState();
+  ConsumerState<AddPaymentMethodModal> createState() =>
+      _AddPaymentMethodModalState();
 }
 
 class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
@@ -46,32 +47,36 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
   void _handleSave() async {
     setState(() => _isSaving = true);
     await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-    
+
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     PaymentMethod newMethod;
-    
+
     if (_selectedType == 0) {
-      final last4 = _cardNumberController.text.length >= 4 
-          ? _cardNumberController.text.substring(_cardNumberController.text.length - 4) 
+      final last4 = _cardNumberController.text.length >= 4
+          ? _cardNumberController.text
+              .substring(_cardNumberController.text.length - 4)
           : 'XXXX';
       newMethod = PaymentMethod(
         id: id,
         type: 'card',
         title: 'Visa terminant par $last4',
-        subtitle: 'Expire ${_expiryController.text.isEmpty ? '12/28' : _expiryController.text}',
+        subtitle:
+            'Expire ${_expiryController.text.isEmpty ? '12/28' : _expiryController.text}',
       );
     } else {
       newMethod = PaymentMethod(
         id: id,
         type: 'mobile_money',
         title: 'Mobile Money',
-        subtitle: _phoneController.text.isEmpty ? '+225 0102030405' : _phoneController.text,
+        subtitle: _phoneController.text.isEmpty
+            ? '+225 0102030405'
+            : _phoneController.text,
       );
     }
 
     ref.read(paymentProvider.notifier).addPaymentMethod(newMethod);
     setState(() => _isSaving = false);
-    
+
     if (mounted) {
       Navigator.pop(context);
     }
@@ -93,17 +98,17 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
               Text(
                 langNotifier.tr('Ajouter un moyen', 'Add a method'),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               IconButton(
-                icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
+                icon:
+                    const Icon(Icons.close_rounded, color: AppColors.textMuted),
                 onPressed: () => Navigator.pop(context),
               )
             ],
           ),
           const SizedBox(height: 16),
-          
           Row(
             children: [
               Expanded(
@@ -124,7 +129,6 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             ],
           ),
           const SizedBox(height: 24),
-          
           if (_selectedType == 0) ...[
             _buildTextField(
               label: 'Numéro de carte',
@@ -167,9 +171,7 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
               keyboardType: TextInputType.phone,
             ),
           ],
-          
           const SizedBox(height: 32),
-          
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -177,16 +179,22 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
               onPressed: _isSaving ? null : _handleSave,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: _isSaving
-                  ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2))
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          strokeWidth: 2))
                   : Text(
                       langNotifier.tr('Ajouter', 'Add'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
             ),
           ),
@@ -195,14 +203,17 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
     );
   }
 
-  Widget _buildTypeSelector({required int index, required IconData icon, required String title}) {
+  Widget _buildTypeSelector(
+      {required int index, required IconData icon, required String title}) {
     final isSelected = _selectedType == index;
     return GestureDetector(
       onTap: () => setState(() => _selectedType = index),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Theme.of(context).cardColor,
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
@@ -211,14 +222,18 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? AppColors.primary : AppColors.textMuted, size: 28),
+            Icon(icon,
+                color: isSelected ? AppColors.primary : AppColors.textMuted,
+                size: 28),
             const SizedBox(height: 8),
             Text(
               title,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: isSelected ? Theme.of(context).colorScheme.onSurface : AppColors.textMuted,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              ),
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.onSurface
+                        : AppColors.textMuted,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  ),
             ),
           ],
         ),
@@ -238,12 +253,19 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
       style: Theme.of(context).textTheme.bodyMedium,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+        labelStyle: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: AppColors.textMuted),
         prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
         filled: true,
         fillColor: Theme.of(context).cardColor,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1)),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1)),
       ),
     );
   }

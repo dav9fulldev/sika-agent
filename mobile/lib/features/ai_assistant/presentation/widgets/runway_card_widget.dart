@@ -57,7 +57,11 @@ class RunwayCardWidget extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
+        border: Border.all(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,20 +77,23 @@ class RunwayCardWidget extends ConsumerWidget {
                       color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.timer_outlined, color: Color(0xFF38BDF8), size: 16),
+                    child: const Icon(Icons.timer_outlined,
+                        color: Color(0xFF38BDF8), size: 16),
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    langNotifier.tr('Autonomie financière (Runway)', 'Financial Runway'),
+                    langNotifier.tr(
+                        'Autonomie financière (Runway)', 'Financial Runway'),
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: const Color(0xFF94A3B8),
-                      fontWeight: FontWeight.w600,
-                    ),
+                          color: const Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
                   color: badgeColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
@@ -95,15 +102,14 @@ class RunwayCardWidget extends ConsumerWidget {
                 child: Text(
                   statusLabel,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: badgeColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: badgeColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
@@ -111,21 +117,21 @@ class RunwayCardWidget extends ConsumerWidget {
               Text(
                 '$estimatedDays',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(width: 6),
               Text(
-                langNotifier.tr('jours d\'autonomie restante', 'days remaining'),
+                langNotifier.tr(
+                    'jours d\'autonomie restante', 'days remaining'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w500,
-                ),
+                      color: const Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                    ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-
           Text(
             dailyBurnRateFcfa > 0
                 ? langNotifier.tr(
@@ -137,8 +143,8 @@ class RunwayCardWidget extends ConsumerWidget {
                     'Estimated based on your current balance with no recent expenses.',
                   ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF64748B),
-            ),
+                  color: const Color(0xFF64748B),
+                ),
           ),
         ],
       ),

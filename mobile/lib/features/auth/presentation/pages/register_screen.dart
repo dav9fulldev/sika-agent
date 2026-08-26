@@ -28,7 +28,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-  void _onRegisterPressed(AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
+  void _onRegisterPressed(
+      AuthNotifier authNotifier, LanguageNotifier langNotifier) async {
     final success = await authNotifier.registerWithEmail(
       _nameController.text,
       _emailController.text,
@@ -65,7 +66,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -91,16 +93,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     AppImages.logo,
                     width: 90,
                   ),
-                ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
+                )
+                    .animate()
+                    .fade(duration: 600.ms)
+                    .scale(delay: 200.ms, duration: 400.ms),
                 const SizedBox(height: 24),
 
                 Text(
-                  langNotifier.tr('Créer un compte SIKA', 'Create SIKA Account'),
+                  langNotifier.tr(
+                      'Créer un compte SIKA', 'Create SIKA Account'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                 ).animate().fade(delay: 300.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 8),
                 Text(
@@ -110,8 +116,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
                 ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 32),
 
@@ -124,16 +133,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             authState.errorMessage!,
-                            style: const TextStyle(color: AppColors.error, fontSize: 14),
+                            style: const TextStyle(
+                                color: AppColors.error, fontSize: 14),
                           ),
                         ),
                       ],
@@ -143,10 +155,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // 2. CHAMP NOM
                 TextField(
                   controller: _nameController,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: langNotifier.tr('Nom complet', 'Full Name'),
-                    prefixIcon: const Icon(Icons.person_outline, color: AppColors.brandSecondary),
+                    prefixIcon: const Icon(Icons.person_outline,
+                        color: AppColors.brandSecondary),
                   ),
                 ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 16),
@@ -154,11 +168,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // 3. CHAMP EMAIL
                 TextField(
                   controller: _emailController,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     hintText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined, color: AppColors.brandSecondary),
+                    prefixIcon: Icon(Icons.email_outlined,
+                        color: AppColors.brandSecondary),
                   ),
                 ).animate().fade(delay: 600.ms).slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 16),
@@ -167,14 +183,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: langNotifier.tr('Mot de passe', 'Password'),
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.brandSecondary),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded,
+                        color: AppColors.brandSecondary),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
                         size: 20,
                       ),
                       onPressed: () {
@@ -197,29 +220,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5),
                           )
                         : Text(langNotifier.tr('S\'inscrire', 'Sign Up')),
                   ),
-                ).animate().fade(delay: 800.ms).scale(delay: 800.ms, duration: 200.ms),
+                )
+                    .animate()
+                    .fade(delay: 800.ms)
+                    .scale(delay: 800.ms, duration: 200.ms),
                 const SizedBox(height: 24),
 
                 // SÉPARATEUR "OU"
                 Row(
                   children: [
-                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.2))),
+                    Expanded(
+                        child: Divider(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.2))),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         langNotifier.tr('OU', 'OR'),
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), 
-                          fontSize: 12, 
-                          fontWeight: FontWeight.bold
-                        ),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.4),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
-                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.2))),
+                    Expanded(
+                        child: Divider(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withValues(alpha: 0.2))),
                   ],
                 ).animate().fade(delay: 900.ms),
                 const SizedBox(height: 24),
@@ -229,18 +266,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   width: double.infinity,
                   height: 56,
                   child: OutlinedButton.icon(
-                    onPressed: authState.isLoading ? null : () => _onGoogleRegisterPressed(authNotifier),
+                    onPressed: authState.isLoading
+                        ? null
+                        : () => _onGoogleRegisterPressed(authNotifier),
                     icon: Image.network(
                       'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
                       width: 24,
                       errorBuilder: (context, error, stackTrace) => Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-                        child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.bold)),
+                        decoration: const BoxDecoration(
+                            shape: BoxShape.circle, color: Colors.white),
+                        child: const Text('G',
+                            style: TextStyle(
+                                color: Color(0xFF4285F4),
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                     label: Text(
-                      langNotifier.tr('S\'inscrire avec Google', 'Sign Up with Google'),
+                      langNotifier.tr(
+                          'S\'inscrire avec Google', 'Sign Up with Google'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 16,
@@ -249,8 +293,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.surface,
-                      side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      side: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.1)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
                 ).animate().fade(delay: 1000.ms).slideY(begin: 0.1, end: 0),
@@ -261,8 +310,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      langNotifier.tr('Déjà un compte ? ', 'Already have an account? '),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 14),
+                      langNotifier.tr(
+                          'Déjà un compte ? ', 'Already have an account? '),
+                      style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.6),
+                          fontSize: 14),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
