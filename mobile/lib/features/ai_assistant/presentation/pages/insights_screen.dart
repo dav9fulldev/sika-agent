@@ -235,6 +235,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                                   painter: _BuildCustomDonut(
                                     percentages: categoryDisplay.map((e) => e['pctValue'] as double).toList(),
                                     colors: categoryDisplay.map((e) => e['color'] as Color).toList(),
+                                    backgroundColor: Theme.of(context).cardColor,
                                   ),
                                 ),
                               ),
@@ -426,10 +427,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 class _BuildCustomDonut extends CustomPainter {
   final List<double> percentages;
   final List<Color> colors;
+  final Color backgroundColor;
 
   _BuildCustomDonut({
     required this.percentages,
     required this.colors,
+    required this.backgroundColor,
   });
 
   @override
@@ -441,7 +444,7 @@ class _BuildCustomDonut extends CustomPainter {
     final Paint backgroundPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = thickness
-      ..color = Theme.of(context).cardColor;
+      ..color = backgroundColor;
 
     canvas.drawCircle(center, radius, backgroundPaint);
 
