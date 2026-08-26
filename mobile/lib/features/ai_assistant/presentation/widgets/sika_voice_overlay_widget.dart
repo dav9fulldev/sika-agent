@@ -91,7 +91,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            color: const Color(0xF2020614), // Dark translucent backdrop (95% opacity)
+            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95),
             child: SafeArea(
               child: Column(
                 children: [

@@ -90,9 +90,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     final sikaData = ref.watch(sikaProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xff020614),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xff020614),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
         title: Column(
@@ -406,7 +406,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xff020614),
+                        color: Theme.of(context).scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                       ),

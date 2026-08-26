@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:camera/camera.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
@@ -14,58 +17,225 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
-  int _currentStep = 0;
+  int _currentStep = 0; // 0: ID Front, 1: ID Back, 2: Selfie
   bool _isProcessing = false;
-  File? _idCardImage;
+  File? _idCardFront;
+  File? _idCardBack;
   File? _selfieImage;
-  final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage(bool isIdCard) async {
+  List<CameraDescription> _cameras = [];
+  CameraController? _cameraController;
+  int _currentCameraIndex = 0;
+  bool _isCameraInitialized = false;
+
+  // ML Kit Variables
+  bool _isDetecting = false;
+  late final FaceDetector _faceDetector;
+  late final TextRecognizer _textRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _faceDetector = FaceDetector(
+      options: FaceDetectorOptions(
+        enableContours: false,
+        enableClassification: false,
+        enableLandmarks: false,
+        performanceMode: FaceDetectorMode.fast,
+      ),
+    );
+    _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    
+    _initCamera();
+  }
+
+  Future<void> _initCamera() async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-      );
-      if (image != null) {
-        setState(() {
-          if (isIdCard) {
-            _idCardImage = File(image.path);
-          } else {
-            _selfieImage = File(image.path);
-          }
-        });
+      _cameras = await availableCameras();
+      if (_cameras.isNotEmpty) {
+        await _startCamera(0); // Rear camera initially
       }
     } catch (e) {
-      debugPrint("Error picking image: $e");
+      debugPrint("Error initializing camera: $e");
     }
   }
 
-  void _nextStep() async {
-    if (_currentStep == 1) {
-      setState(() => _isProcessing = true);
-      // Simulate API verification
-      await Future.delayed(const Duration(seconds: 2));
-      
-      ref.read(authProvider.notifier).updateKycStatus(true);
-      
-      setState(() => _isProcessing = false);
-      
-      if (mounted) {
-        final langNotifier = ref.read(languageProvider.notifier);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(langNotifier.tr('Identité vérifiée avec succès !', 'Identity verified successfully!')),
-            backgroundColor: AppColors.emerald,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pop(context);
-      }
-    } else {
-      setState(() {
-        _currentStep++;
-      });
+  Future<void> _startCamera(int cameraIndex) async {
+    if (_cameras.isEmpty) return;
+    
+    _currentCameraIndex = cameraIndex;
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
     }
+
+    _cameraController = CameraController(
+      _cameras[cameraIndex],
+      ResolutionPreset.high,
+      enableAudio: false,
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888,
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+        
+        // Start processing images for auto-scan
+        _cameraController!.startImageStream(_processCameraFrame);
+      }
+    } catch (e) {
+      debugPrint("Camera error: $e");
+    }
+  }
+
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    if (_cameras.isEmpty) return null;
+    final camera = _cameras[_currentCameraIndex];
+    final sensorOrientation = camera.sensorOrientation;
+    
+    InputImageRotation? rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    if (rotation == null) return null;
+
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    if (format == null) return null;
+
+    if (image.planes.isEmpty) return null;
+
+    final WriteBuffer allBytes = WriteBuffer();
+    for (final Plane plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    final bytes = allBytes.done().buffer.asUint8List();
+
+    return InputImage.fromBytes(
+      bytes: bytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      ),
+    );
+  }
+
+  Future<void> _processCameraFrame(CameraImage image) async {
+    if (_isDetecting || _isProcessing) return;
+    _isDetecting = true;
+
+    try {
+      final inputImage = _inputImageFromCameraImage(image);
+      if (inputImage == null) {
+        _isDetecting = false;
+        return;
+      }
+
+      bool shouldCapture = false;
+
+      if (_currentStep < 2) {
+        // ID Card Auto-Scan logic
+        final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+        // Simplistic check: If there's a block of text, assume ID is presented
+        if (recognizedText.text.length > 50) { 
+          shouldCapture = true;
+        }
+      } else {
+        // Selfie Auto-Scan logic
+        final List<Face> faces = await _faceDetector.processImage(inputImage);
+        // If exactly one face is detected, auto capture
+        if (faces.length == 1) {
+          shouldCapture = true;
+        }
+      }
+
+      if (shouldCapture) {
+        await _triggerAutoCapture();
+      } else {
+        _isDetecting = false;
+      }
+    } catch (e) {
+      debugPrint("ML Kit processing error: $e");
+      _isDetecting = false;
+    }
+  }
+
+  Future<void> _triggerAutoCapture() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    
+    // Stop the image stream before taking a picture
+    try {
+      await _cameraController!.stopImageStream();
+    } catch (e) {
+      // Stream might already be stopped
+    }
+
+    try {
+      final XFile picture = await _cameraController!.takePicture();
+      
+      setState(() {
+        if (_currentStep == 0) {
+          _idCardFront = File(picture.path);
+          _currentStep = 1;
+        } else if (_currentStep == 1) {
+          _idCardBack = File(picture.path);
+          _currentStep = 2;
+        } else if (_currentStep == 2) {
+          _selfieImage = File(picture.path);
+        }
+      });
+      
+      _isDetecting = false;
+      
+      if (_currentStep == 2 && _selfieImage == null) {
+         // We just moved to step 2
+         int frontIndex = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+         if (frontIndex != -1) {
+           _isCameraInitialized = false;
+           await _startCamera(frontIndex);
+         } else {
+           await _startCamera(0); // Fallback
+         }
+      } else if (_selfieImage != null) {
+         _submitKyc();
+      } else {
+         // Restart stream for next step
+         await _startCamera(_currentCameraIndex);
+      }
+
+    } catch (e) {
+      debugPrint("Error taking auto picture: $e");
+      _isDetecting = false;
+    }
+  }
+
+  Future<void> _submitKyc() async {
+    setState(() => _isProcessing = true);
+    
+    // Simulate API verification
+    await Future.delayed(const Duration(seconds: 2));
+    
+    ref.read(authProvider.notifier).updateKycStatus(true);
+    
+    if (mounted) {
+      final langNotifier = ref.read(languageProvider.notifier);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(langNotifier.tr('Identité vérifiée par IA avec succès !', 'Identity verified by AI successfully!')),
+          backgroundColor: AppColors.emerald,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _faceDetector.close();
+    _textRecognizer.close();
+    _cameraController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -73,33 +243,46 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
     final langNotifier = ref.watch(languageProvider.notifier);
     
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.black, // Camera screen is dark
       appBar: AppBar(
-        backgroundColor: Theme.of(context).cardColor,
+        backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          langNotifier.tr('Vérification d\'Identité', 'Identity Verification'),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+          _currentStep == 0 ? langNotifier.tr('Scanner Recto (Auto)', 'Scan Front (Auto)')
+          : _currentStep == 1 ? langNotifier.tr('Scanner Verso (Auto)', 'Scan Back (Auto)')
+          : langNotifier.tr('Selfie (Auto)', 'Selfie (Auto)'),
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Progress Indicator
-              Row(
+        child: _isProcessing 
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                  const SizedBox(height: 24),
+                  Text(
+                    langNotifier.tr('Vérification IA en cours...', 'AI Verifying...'),
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              )
+            : Column(
+          children: [
+            // Progress Indicator
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
                 children: [
                   Expanded(
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _currentStep >= 0 ? AppColors.primary : Theme.of(context).cardColor,
+                        color: _currentStep >= 0 ? AppColors.primary : Colors.grey[800],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -109,172 +292,104 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _currentStep >= 1 ? AppColors.primary : Theme.of(context).cardColor,
+                        color: _currentStep >= 1 ? AppColors.primary : Colors.grey[800],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _currentStep >= 2 ? AppColors.primary : Colors.grey[800],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
-              
-              if (_currentStep == 0) _buildIdCardStep(langNotifier)
-              else _buildSelfieStep(langNotifier),
-              
-              const Spacer(),
-              
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : () {
-                    if (_currentStep == 0) {
-                      if (_idCardImage == null) {
-                        _pickImage(true);
-                      } else {
-                        _nextStep();
-                      }
-                    } else {
-                      if (_selfieImage == null) {
-                        _pickImage(false);
-                      } else {
-                        _nextStep();
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isProcessing
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2),
-                        )
-                      : Text(
-                          _currentStep == 0
-                              ? (_idCardImage == null ? langNotifier.tr('Prendre une photo', 'Take a photo') : langNotifier.tr('Continuer', 'Continue'))
-                              : (_selfieImage == null ? langNotifier.tr('Prendre un selfie', 'Take a selfie') : langNotifier.tr('Soumettre pour vérification', 'Submit for verification')),
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                ),
+            ),
+            
+            // Instructions
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Text(
+                _currentStep == 0 ? langNotifier.tr('Placez l\'avant de votre carte dans le cadre. L\'IA scannera automatiquement.', 'Place the front of your ID in the frame. AI will scan automatically.')
+                : _currentStep == 1 ? langNotifier.tr('Placez l\'arrière de votre carte. Le scan est automatique.', 'Place the back of your ID. Scan is automatic.')
+                : langNotifier.tr('Placez votre visage dans le cercle. La photo se prendra toute seule.', 'Place your face in the circle. It will capture automatically.'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
-            ],
-          ),
+            ),
+            
+            // Camera Preview with Overlay
+            Expanded(
+              child: _isCameraInitialized && _cameraController != null
+                  ? Stack(
+                      alignment: Alignment.center,
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_cameraController!),
+                        CustomPaint(
+                          painter: ScannerOverlayPainter(isCircle: _currentStep == 2),
+                          child: Container(),
+                        ),
+                      ],
+                    )
+                  : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            ),
+            
+            // The capture button is hidden since we are using Auto-Scan!
+            const SizedBox(height: 50),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildIdCardStep(LanguageNotifier langNotifier) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const Icon(Icons.badge_outlined, size: 80, color: AppColors.cyan),
-        const SizedBox(height: 24),
-        Text(
-          langNotifier.tr('Pièce d\'identité', 'Identity Document'),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          langNotifier.tr(
-            'Veuillez prendre une photo claire de votre pièce d\'identité (CNI, Passeport).',
-            'Please take a clear photo of your identity document (ID Card, Passport).'
-          ),
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.5),
-        ),
-        const SizedBox(height: 40),
-        GestureDetector(
-          onTap: () => _pickImage(true),
-          child: Container(
-            width: double.infinity,
-            height: 200,
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
-              image: _idCardImage != null
-                  ? DecorationImage(
-                      image: FileImage(_idCardImage!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: _idCardImage == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.add_a_photo_outlined, color: AppColors.textMuted, size: 40),
-                      const SizedBox(height: 12),
-                      Text(
-                        langNotifier.tr('Appuyez pour scanner', 'Tap to scan'),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-                      ),
-                    ],
-                  )
-                : const SizedBox(),
-          ),
-        ),
-      ],
-    );
+class ScannerOverlayPainter extends CustomPainter {
+  final bool isCircle;
+  ScannerOverlayPainter({required this.isCircle});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withOpacity(0.7);
+    
+    // Create the cutout path
+    Path overlayPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    Path cutoutPath = Path();
+
+    if (isCircle) {
+      cutoutPath.addOval(Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2), 
+        width: 300, 
+        height: 300
+      ));
+    } else {
+      double w = size.width * 0.85;
+      double h = w * 0.63; // ID card aspect ratio
+      cutoutPath.addRRect(RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: w, height: h),
+        const Radius.circular(16)
+      ));
+    }
+
+    // Combine paths to create the hole
+    final finalPath = Path.combine(PathOperation.difference, overlayPath, cutoutPath);
+    canvas.drawPath(finalPath, paint);
+
+    // Draw a border around the cutout
+    final borderPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+    canvas.drawPath(cutoutPath, borderPaint);
   }
 
-  Widget _buildSelfieStep(LanguageNotifier langNotifier) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const Icon(Icons.face_retouching_natural_rounded, size: 80, color: AppColors.cyan),
-        const SizedBox(height: 24),
-        Text(
-          langNotifier.tr('Selfie de sécurité', 'Security Selfie'),
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          langNotifier.tr(
-            'Prenez un selfie dans un endroit bien éclairé pour confirmer votre identité.',
-            'Take a selfie in a well-lit area to confirm your identity.'
-          ),
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.5),
-        ),
-        const SizedBox(height: 40),
-        GestureDetector(
-          onTap: () => _pickImage(false),
-          child: Container(
-            width: 200,
-            height: 250,
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
-              image: _selfieImage != null
-                  ? DecorationImage(
-                      image: FileImage(_selfieImage!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: _selfieImage == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.camera_front_outlined, color: AppColors.textMuted, size: 40),
-                      const SizedBox(height: 12),
-                      Text(
-                        langNotifier.tr('Ouvrir la caméra', 'Open camera'),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-                      ),
-                    ],
-                  )
-                : const SizedBox(),
-          ),
-        ),
-      ],
-    );
+  @override
+  bool shouldRepaint(covariant ScannerOverlayPainter oldDelegate) {
+    return oldDelegate.isCircle != isCircle;
   }
 }

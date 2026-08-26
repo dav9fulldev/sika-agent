@@ -83,9 +83,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     };
 
     return Scaffold(
-      backgroundColor: const Color(0xff020614),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xff020614),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
         title: Text(
