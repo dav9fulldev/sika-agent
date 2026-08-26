@@ -1,34 +1,28 @@
+# 1. OS (SYSTÈME D'EXPLOITATION) 
+# Note: On utilise l'image officielle python:3.11-slim (basée sur Debian)
 FROM python:3.11-slim
 
-WORKDIR /app
+# OPTIMISATION SÉCURITÉ: Création d'un utilisateur non-root
+RUN useradd -m -u 1000 appuser
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# 2. Mettre à jour le repo apt et installer des dépendances système
+RUN apt-get update && apt-get -y install libpq-dev gcc
 
-# Création d'un utilisateur non-root dédié (appuser: UID 1000)
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app && \
-    chown -R appuser:appuser /app
+# Définir le dossier de travail
+WORKDIR /opt/code-source
 
-# Installation des dépendances
+# OPTIMISATION CACHE: Copier UNIQUEMENT requirements.txt en premier
 COPY requirements.txt .
+
+# 4. Installer les dépendances Python avec pip
+# (Ne sera re-téléchargé que si le fichier requirements.txt est modifié)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copie du code applicatif et des migrations Alembic avec droits restreints
-COPY --chown=appuser:appuser app/ ./app/
-COPY --chown=appuser:appuser alembic/ ./alembic/
-COPY --chown=appuser:appuser alembic.ini .
+# 5. Copier le reste du code source
+COPY --chown=appuser:appuser . .
 
-# Basculer définitivement vers l'utilisateur non-root
+# Basculer vers l'utilisateur sécurisé
 USER appuser
 
-# Exposition du port conteneurisé (défaut Cloud Run: 8080)
-EXPOSE 8080
-
-# Health check intégré
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request, os; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8080') + '/health')" || exit 1
-
-# Démarrage Uvicorn bindé sur $PORT avec support des en-têtes de proxy Cloud Run
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]
-
+# 6. Exécuter le serveur web
+ENTRYPOINT ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
