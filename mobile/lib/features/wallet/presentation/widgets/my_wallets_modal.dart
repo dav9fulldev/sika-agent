@@ -42,8 +42,8 @@ class MyWalletsModal extends ConsumerWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.65,
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDarker,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(color: AppColors.border),
@@ -57,7 +57,7 @@ class MyWalletsModal extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -69,8 +69,8 @@ class MyWalletsModal extends ConsumerWidget {
             children: [
               Text(
                 langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -78,7 +78,7 @@ class MyWalletsModal extends ConsumerWidget {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white70, size: 24),
+                    icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), size: 24),
                     tooltip: langNotifier.tr('Actualiser les soldes', 'Refresh Balances'),
                     onPressed: () {
                       ref.read(walletProvider.notifier).syncAllWallets();
@@ -113,11 +113,11 @@ class MyWalletsModal extends ConsumerWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.account_balance_wallet_outlined, color: Colors.white38, size: 48),
+                        Icon(Icons.account_balance_wallet_outlined, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38), size: 48),
                         const SizedBox(height: 12),
                         Text(
                           langNotifier.tr('Aucun portefeuille connecté', 'No wallet connected'),
-                          style: const TextStyle(color: Colors.white70, fontSize: 15),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), fontSize: 15),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -125,10 +125,10 @@ class MyWalletsModal extends ConsumerWidget {
                             Navigator.pop(context);
                             ConnectWalletModal.show(context);
                           },
-                          icon: const Icon(Icons.add, color: Colors.white),
+                          icon: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface),
                           label: Text(
                             langNotifier.tr('Connecter un compte', 'Connect Account'),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
                         ),
@@ -145,7 +145,7 @@ class MyWalletsModal extends ConsumerWidget {
                       return Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: AppColors.border),
                         ),
@@ -172,8 +172,8 @@ class MyWalletsModal extends ConsumerWidget {
                                 children: [
                                   Text(
                                     item.provider,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -194,8 +194,8 @@ class MyWalletsModal extends ConsumerWidget {
                               children: [
                                 Text(
                                   currNotifier.format(item.balance),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),

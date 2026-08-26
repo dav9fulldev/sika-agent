@@ -63,10 +63,10 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
-        title: const Row(
-          children: [
+        title: Row(
+          children: <Widget>[
             CircleAvatar(
               backgroundColor: Color(0xFF10B981),
               radius: 16,
@@ -75,11 +75,11 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
             SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: <Widget>[
                 Text(
                   'SIKA Conversation',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -97,7 +97,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
+            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70)),
             onPressed: () => sikaNotifier.clearConversation(),
             tooltip: 'Nouvelle conversation',
           ),
@@ -109,7 +109,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           if (sikaData.state == SikaState.processing)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFF1E293B),
+              color: Theme.of(context).cardColor,
               child: const Row(
                 children: [
                   SizedBox(
@@ -202,17 +202,17 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: Theme.of(context).cardColor,
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF334155)),
               ),
               child: const Text('💬', style: TextStyle(fontSize: 40)),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Pose une question à SIKA',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -242,7 +242,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         constraints: const BoxConstraints(maxWidth: 280),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF10B981) : const Color(0xFF1E293B),
+          color: isUser ? Color(0xFF10B981) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -256,7 +256,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
         child: Text(
           message.text,
           style: TextStyle(
-            color: isUser ? Colors.white : const Color(0xFFE2E8F0),
+            color: isUser ? Theme.of(context).colorScheme.onSurface : Color(0xFFE2E8F0),
             fontSize: 14,
             height: 1.4,
           ),
@@ -268,8 +268,8 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
   Widget _buildInputBar(SikaData data, SikaNotifier notifier) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         border: Border(top: BorderSide(color: Color(0xFF334155))),
       ),
       child: Row(
@@ -294,7 +294,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           Expanded(
             child: TextField(
               controller: _textController,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
               decoration: const InputDecoration(
                 hintText: 'Demande à SIKA...',
                 hintStyle: TextStyle(color: Color(0xFF64748B)),

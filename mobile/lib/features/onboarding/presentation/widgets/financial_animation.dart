@@ -97,10 +97,10 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.auto_awesome_rounded,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       size: 44,
                     ),
                   ),
@@ -190,8 +190,8 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
                     ),
                     child: Text(
                       message,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),

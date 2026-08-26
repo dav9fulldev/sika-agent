@@ -43,8 +43,8 @@ class ProactiveAnalysisSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B), // Dark slate surface
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor, // Dark slate surface
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(color: Color(0xFFF59E0B), width: 2), // Amber accent top border
@@ -83,19 +83,19 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'SIKA Analysis',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Proactive SIKA Intervention',
                       style: TextStyle(
                         color: Color(0xFFF59E0B),
@@ -125,15 +125,15 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildMetricRow('💰 Expense Detected', '30 000 FCFA', isHighlight: true),
-                const Divider(color: Color(0xFF1E293B), height: 16),
-                _buildMetricRow('Category', 'Dining / Restaurant'),
+                _buildMetricRow(context, '💰 Expense Detected', '30 000 FCFA', isHighlight: true),
                 const SizedBox(height: 6),
-                _buildMetricRow('Similar spending this week', '12 500 FCFA'),
+                _buildMetricRow(context, 'Category', 'Dining / Restaurant'),
                 const SizedBox(height: 6),
-                _buildMetricRow('Remaining budget', '45 000 FCFA'),
+                _buildMetricRow(context, 'Similar spending this week', '12 500 FCFA'),
                 const SizedBox(height: 6),
-                _buildMetricRow('Monthly savings goal', '50 000 FCFA'),
+                _buildMetricRow(context, 'Remaining budget', '45 000 FCFA'),
+                const SizedBox(height: 6),
+                _buildMetricRow(context, 'Monthly savings goal', '50 000 FCFA'),
               ],
             ),
           ),
@@ -141,10 +141,10 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           const SizedBox(height: 20),
 
           // REASONING SECTION ("Why am I alerting you?")
-          const Text(
+          Text(
             'Why am I alerting you?',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -217,7 +217,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                   onPressed: onSetLimit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -234,14 +234,14 @@ class ProactiveAnalysisSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricRow(String label, String value, {bool isHighlight = false}) {
+  Widget _buildMetricRow(BuildContext context, String label, String value, {bool isHighlight = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            color: isHighlight ? Colors.white : const Color(0xFF94A3B8),
+            color: isHighlight ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
             fontSize: isHighlight ? 14 : 12.5,
             fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
           ),
@@ -249,7 +249,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            color: isHighlight ? const Color(0xFFF59E0B) : Colors.white,
+            color: isHighlight ? Color(0xFFF59E0B) : Theme.of(context).colorScheme.onSurface,
             fontSize: isHighlight ? 15 : 12.5,
             fontWeight: FontWeight.bold,
           ),

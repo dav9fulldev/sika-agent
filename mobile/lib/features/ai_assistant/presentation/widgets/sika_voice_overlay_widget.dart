@@ -101,7 +101,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                     child: Row(
                       children: [
                          IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                          icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface, size: 24),
                           onPressed: () async {
                             await sikaNotifier.stopListening();
                             sikaNotifier.clearConversation();
@@ -116,8 +116,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                   // 2. TITRE DE L'ÉCROUTE SIKA
                   Text(
                     titleText,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
@@ -135,7 +135,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: hasSubText
-                            ? Colors.white
+                            ? Theme.of(context).colorScheme.onSurface
                             : const Color(0xFF94A3B8),
                         fontSize: hasSubText ? 17 : 14,
                         fontWeight: hasSubText
@@ -192,12 +192,12 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                             child: Container(
                               width: 32,
                               height: 32,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.white,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     blurRadius: 16,
                                     spreadRadius: 4,
                                   ),

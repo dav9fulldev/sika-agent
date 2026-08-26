@@ -95,13 +95,13 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
         backgroundColor: const Color(0xff020614),
         elevation: 0,
         centerTitle: false,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'SIKA Hub',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -133,9 +133,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0B1329),
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,8 +151,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           const SizedBox(height: 6),
                           Text(
                             currNotifier.format(walletState.totalBalanceFcfa),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 30,
                               fontWeight: FontWeight.bold,
                             ),
@@ -174,11 +174,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                               onPressed: () {
                                 ConnectWalletModal.show(context);
                               },
-                              icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                              icon: Icon(Icons.add_circle_outline, color: Theme.of(context).colorScheme.onSurface, size: 20),
                               label: Text(
                                 langNotifier.tr('Connecter mes comptes', 'Connect my Wallets'),
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -210,9 +210,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0B1329),
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -389,9 +389,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1329),
+                color: Theme.of(context).cardColor,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.3),
@@ -408,11 +408,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       decoration: BoxDecoration(
                         color: const Color(0xff020614),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                       ),
                       child: TextField(
                         controller: _inputController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: langNotifier.tr('Poser une question à SIKA...', 'Ask SIKA anything...'),
                           hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 14),
@@ -431,9 +431,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         color: Color(0xFF3B82F6),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_upward_rounded,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                         size: 22,
                       ),
                     ),
@@ -457,9 +457,9 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1329),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03)),
       ),
       child: InkWell(
         onTap: onTap,

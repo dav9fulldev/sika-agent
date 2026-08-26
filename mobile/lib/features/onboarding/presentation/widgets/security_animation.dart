@@ -123,10 +123,10 @@ class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
                       ),
                     ],
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.shield_outlined,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       size: 52,
                     ),
                   ),
@@ -172,7 +172,7 @@ class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.6)),
         boxShadow: [
@@ -189,8 +189,8 @@ class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 10,
               fontWeight: FontWeight.bold,
             ),

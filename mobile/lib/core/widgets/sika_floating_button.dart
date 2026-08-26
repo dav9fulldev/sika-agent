@@ -28,9 +28,9 @@ class SikaFloatingButton extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(
+        child: Icon(
           Icons.mic_rounded,
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           size: 28,
         ),
       ),

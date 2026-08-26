@@ -120,12 +120,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     const SizedBox(height: 35),
                     Opacity(
                       opacity: _textFade.value,
-                      child: const Column(
+                      child: Column(
                         children: [
                           Text(
                             "Sika",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 42,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.8,
@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   builder: (context, child) {
                     return LinearProgressIndicator(
                       value: _progressController.value,
-                      backgroundColor: Colors.white.withValues(alpha: 0.08),
+                      backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         Color(0xFF10B981),
                       ),

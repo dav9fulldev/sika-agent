@@ -65,7 +65,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         backgroundColor: const Color(0xff020614),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -95,8 +95,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 const SizedBox(height: 24),
                 Text(
                   langNotifier.tr('Nouveau mot de passe', 'New Password'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
@@ -133,13 +133,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _otpController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: langNotifier.tr('Code de vérification', 'Verification code'),
@@ -154,14 +154,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: langNotifier.tr('Nouveau mot de passe', 'New password'),
                       hintStyle: const TextStyle(color: Color(0xFF475569)),
@@ -197,15 +197,15 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                       ),
                     ),
                     child: authState.isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2.5),
                           )
                         : Text(
                             langNotifier.tr('Réinitialiser', 'Reset Password'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),

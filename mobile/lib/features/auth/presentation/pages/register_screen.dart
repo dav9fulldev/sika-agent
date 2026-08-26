@@ -67,7 +67,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         backgroundColor: const Color(0xff020614),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -99,8 +99,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 Text(
                   langNotifier.tr('Créer un compte SIKA', 'Create SIKA Account'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -140,13 +140,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // 2. CHAMP NOM COMPLET
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _nameController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: langNotifier.tr('Nom complet', 'Full Name'),
                       hintStyle: const TextStyle(color: Color(0xFF475569)),
@@ -161,13 +161,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // 3. CHAMP EMAIL
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _emailController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       hintText: 'Email',
@@ -183,14 +183,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // 4. CHAMP MOT DE PASSE
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: langNotifier.tr('Créer un mot de passe', 'Create a Password'),
                       hintStyle: const TextStyle(color: Color(0xFF475569)),
@@ -227,15 +227,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     child: authState.isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2.5),
                           )
                         : Text(
                             langNotifier.tr('Créer mon compte', 'Create Account'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -247,7 +247,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // SÉPARATEUR
                 Row(
                   children: [
-                    const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                    Expanded(child: Divider(color: Theme.of(context).cardColor)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
@@ -255,7 +255,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                    Expanded(child: Divider(color: Theme.of(context).cardColor)),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -268,9 +268,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     onPressed: authState.isLoading ? null : () => _onGoogleRegisterPressed(authNotifier),
                     icon: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       child: const Text(
                         'G',
@@ -283,15 +283,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     label: Text(
                       langNotifier.tr('S\'inscrire avec Google', 'Sign Up with Google'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0B1329),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      backgroundColor: Theme.of(context).cardColor,
+                      side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),

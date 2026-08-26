@@ -134,8 +134,8 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
         right: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceDarker,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(color: AppColors.border),
@@ -150,7 +150,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white24,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -164,8 +164,8 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                 'Connecter un portefeuille',
                 'Connect a Wallet',
               ),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -230,7 +230,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? (prov['brandColor'] as Color).withValues(alpha: 0.15)
-                            : AppColors.surface,
+                            : Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected ? (prov['brandColor'] as Color) : AppColors.border,
@@ -260,7 +260,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
+                              color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70),
                               fontSize: 12,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             ),
@@ -278,16 +278,16 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
             // CHAMP NUMERO DE COMPTE
             Text(
               langNotifier.tr('Numéro de téléphone du compte', 'Account Mobile Number'),
-              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), fontSize: 13, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: Theme.of(context).cardColor,
                 hintText: '+225 07 00 00 00',
                 hintStyle: const TextStyle(color: Color(0xFF64748B)),
                 prefixIcon: const Icon(Icons.phone, color: AppColors.cyan),
@@ -327,7 +327,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                               'Un code de sécurité OTP à 6 chiffres vous sera envoyé par SMS pour valider votre identité.',
                               'A 6-digit OTP security code will be sent via SMS to verify your identity.',
                             ),
-                      style: const TextStyle(color: Colors.white70, fontSize: 11.5),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), fontSize: 11.5),
                     ),
                   ),
                 ],
@@ -349,14 +349,14 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                   ),
                 ),
                 child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface)
                     : Text(
                         langNotifier.tr(
                           'Recevoir le code OTP',
                           'Receive OTP Code',
                         ),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -368,14 +368,14 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                   onPressed: () => setState(() => _currentStep = 1),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   langNotifier.tr('Vérification du code OTP', 'OTP Code Verification'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -420,7 +420,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
             // CHAMP CODE OTP
             Text(
               langNotifier.tr('Code OTP à 6 chiffres', '6-Digit OTP Code'),
-              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), fontSize: 13, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -428,15 +428,15 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
               maxLength: 6,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 8,
               ),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: Theme.of(context).cardColor,
                 hintText: '123456',
                 counterText: '',
                 hintStyle: const TextStyle(color: Color(0xFF64748B), letterSpacing: 8),
@@ -468,14 +468,14 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                   ),
                 ),
                 child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface)
                     : Text(
                         langNotifier.tr(
                           'Valider & Activer le compte',
                           'Validate & Activate Account',
                         ),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),

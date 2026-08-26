@@ -32,7 +32,7 @@ class SavingsBoosterCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1329),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.2),
         boxShadow: [
@@ -60,8 +60,8 @@ class SavingsBoosterCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   langNotifier.tr('Booster d\'Épargne Autonome', 'Autonomous Savings Booster'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -97,11 +97,11 @@ class SavingsBoosterCard extends ConsumerWidget {
                     );
                     if (onBoostConfirmed != null) onBoostConfirmed!();
                   },
-                  icon: const Icon(Icons.savings_outlined, color: Colors.white, size: 18),
+                  icon: Icon(Icons.savings_outlined, color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
                     langNotifier.tr('Épargner ${currNotifier.format(500)} maintenant', 'Boost ${currNotifier.format(500)} now'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),

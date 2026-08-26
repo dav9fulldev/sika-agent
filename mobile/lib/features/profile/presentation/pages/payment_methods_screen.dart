@@ -17,17 +17,17 @@ class PaymentMethodsScreen extends ConsumerWidget {
     final paymentState = ref.watch(paymentProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -58,10 +58,10 @@ class PaymentMethodsScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.star_rounded, color: Colors.white, size: 32),
+                    child: Icon(Icons.star_rounded, color: Theme.of(context).colorScheme.onSurface, size: 32),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -72,8 +72,8 @@ class PaymentMethodsScreen extends ConsumerWidget {
                           isPremium
                               ? langNotifier.tr('Sika Premium Actif', 'Sika Premium Active')
                               : langNotifier.tr('Passez à Sika Premium', 'Upgrade to Sika Premium'),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -87,8 +87,8 @@ class PaymentMethodsScreen extends ConsumerWidget {
                               : langNotifier.tr(
                                   'Débloquez l\'IA illimitée et plus encore.',
                                   'Unlock unlimited AI and more.'),
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70),
                             fontSize: 13,
                           ),
                         ),
@@ -115,7 +115,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.border, style: BorderStyle.solid),
                 ),
@@ -126,7 +126,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       Text(
                         langNotifier.tr('Aucune méthode de paiement', 'No payment method'),
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -144,7 +144,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
             else
               ...paymentState.methods.map((method) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _buildPaymentMethodTile(method, ref, langNotifier),
+                child: _buildPaymentMethodTile(context, method, ref, langNotifier),
               )),
               
             const SizedBox(height: 24),
@@ -176,11 +176,11 @@ class PaymentMethodsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentMethodTile(PaymentMethod method, WidgetRef ref, LanguageNotifier langNotifier) {
+  Widget _buildPaymentMethodTile(BuildContext context, PaymentMethod method, WidgetRef ref, LanguageNotifier langNotifier) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: method.isDefault ? AppColors.emerald.withValues(alpha: 0.5) : AppColors.border,
@@ -192,12 +192,12 @@ class PaymentMethodsScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.surfaceDarker,
+              color: Theme.of(context).scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               method.type == 'card' ? Icons.credit_card_rounded : Icons.phone_android_rounded,
-              color: AppColors.textPrimary, 
+              color: Theme.of(context).colorScheme.onSurface, 
               size: 24,
             ),
           ),
@@ -210,8 +210,8 @@ class PaymentMethodsScreen extends ConsumerWidget {
                   children: [
                     Text(
                       method.title,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
@@ -249,7 +249,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted),
-            color: AppColors.surfaceDarker,
+            color: Theme.of(context).scaffoldBackgroundColor,
             onSelected: (value) {
               if (value == 'default') {
                 ref.read(paymentProvider.notifier).setDefault(method.id);
@@ -262,7 +262,7 @@ class PaymentMethodsScreen extends ConsumerWidget {
                 value: 'default',
                 child: Text(
                   langNotifier.tr('Définir par défaut', 'Set as default'),
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 ),
               ),
               PopupMenuItem<String>(

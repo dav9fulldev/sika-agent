@@ -17,6 +17,11 @@ class ApiConstants {
   static const String authForgotPassword = '/api/v1/sika/auth/forgot-password';
   static const String authResetPassword  = '/api/v1/sika/auth/reset-password';
 
+  // Users (KYC & Payment)
+  static const String usersMe = '/api/v1/users/me';
+  static const String usersKyc = '/api/v1/users/me/kyc';
+  static const String usersPaymentMethods = '/api/v1/users/me/payment-methods';
+
   // Agent SIKA
   static const String sikaHealth       = '/api/v1/sika/health';
   static const String sikaChat         = '/api/v1/sika/chat';

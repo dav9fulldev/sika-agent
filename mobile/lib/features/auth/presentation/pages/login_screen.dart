@@ -62,17 +62,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     showDialog(
       context: context,
       builder: (dlgCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1329),
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.onSurface),
               child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontSize: 16, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
-            const Text('Connexion Google', style: TextStyle(color: Colors.white, fontSize: 17)),
+            Text('Connexion Google', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 17)),
           ],
         ),
         content: Column(
@@ -86,13 +86,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: emailCtrl,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 hintText: 'votre.email@gmail.com',
                 hintStyle: const TextStyle(color: Color(0xFF64748B)),
                 filled: true,
-                fillColor: const Color(0xFF1E293B),
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
@@ -119,7 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-            child: const Text('Se connecter', style: TextStyle(color: Colors.white)),
+            child: Text('Se connecter', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
           ),
         ],
       ),
@@ -164,8 +164,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 Text(
                   langNotifier.tr('Connexion SIKA', 'SIKA Login'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -205,13 +205,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // 2. CHAMP EMAIL
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _emailController,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       hintText: 'Email',
@@ -227,14 +227,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // 3. CHAMP MOT DE PASSE
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
                   ),
                   child: TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: langNotifier.tr('Mot de passe', 'Password'),
                       hintStyle: const TextStyle(color: Color(0xFF475569)),
@@ -293,15 +293,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     child: authState.isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2.5),
                           )
                         : Text(
                             langNotifier.tr('Se connecter', 'Log In'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -313,7 +313,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // SÉPARATEUR "OU"
                 Row(
                   children: [
-                    const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                    Expanded(child: Divider(color: Theme.of(context).cardColor)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
@@ -321,7 +321,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                    Expanded(child: Divider(color: Theme.of(context).cardColor)),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -334,9 +334,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: authState.isLoading ? null : () => _onGoogleLoginPressed(authNotifier),
                     icon: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       child: const Text(
                         'G',
@@ -349,15 +349,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     label: Text(
                       langNotifier.tr('Continuer avec Google', 'Continue with Google'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0B1329),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      backgroundColor: Theme.of(context).cardColor,
+                      side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),

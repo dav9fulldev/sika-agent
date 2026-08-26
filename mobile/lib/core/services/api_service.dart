@@ -175,6 +175,96 @@ class ApiService {
   }
 
   // ============================================================================
+  // USER PROFILE & KYC API ENDPOINTS
+  // ============================================================================
+
+  Future<void> updateUserInfo(String name, String phone) async {
+    final response = await http
+        .put(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersMe}'),
+          headers: _headers,
+          body: jsonEncode({'name': name, 'phone': phone}),
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(_extractErrorMessage(response, 'Erreur de mise à jour'));
+    }
+  }
+
+  Future<void> submitKyc() async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersKyc}'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(_extractErrorMessage(response, 'Erreur KYC'));
+    }
+  }
+
+  // ============================================================================
+  // PAYMENT METHODS API ENDPOINTS
+  // ============================================================================
+
+  Future<List<dynamic>> getPaymentMethods() async {
+    final response = await http
+        .get(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(_extractErrorMessage(response, 'Erreur récupération des cartes'));
+  }
+
+  Future<Map<String, dynamic>> addPaymentMethod(Map<String, dynamic> data) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}'),
+          headers: _headers,
+          body: jsonEncode(data),
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(_extractErrorMessage(response, 'Erreur ajout méthode'));
+  }
+
+  Future<void> deletePaymentMethod(String id) async {
+    final response = await http
+        .delete(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}/$id'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(_extractErrorMessage(response, 'Erreur suppression'));
+    }
+  }
+
+  Future<void> setDefaultPaymentMethod(String id) async {
+    final response = await http
+        .put(
+          Uri.parse('$safeBaseUrl${ApiConstants.usersPaymentMethods}/$id/default'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(_extractErrorMessage(response, 'Erreur mise à jour défaut'));
+    }
+  }
+
+  // ============================================================================
   // SIKA AI & AGENT CONVERSATION
   // ============================================================================
 

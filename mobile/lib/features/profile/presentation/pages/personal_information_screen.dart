@@ -36,27 +36,36 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
 
   void _handleSave() async {
     setState(() => _isSaving = true);
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    final langNotifier = ref.read(languageProvider.notifier);
     
-    // Save locally to the state
-    ref.read(authProvider.notifier).updateUserInfo(
-      _nameController.text,
-      _phoneController.text,
-    );
-    
-    setState(() => _isSaving = false);
-    
-    if (mounted) {
-      final langNotifier = ref.read(languageProvider.notifier);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(langNotifier.tr('Informations mises à jour !', 'Information updated!')),
-          backgroundColor: AppColors.emerald,
-          behavior: SnackBarBehavior.floating,
-        ),
+    try {
+      await ref.read(authProvider.notifier).updateUserInfo(
+        _nameController.text,
+        _phoneController.text,
       );
-      Navigator.pop(context);
+      
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(langNotifier.tr('Informations mises à jour !', 'Information updated!')),
+            backgroundColor: AppColors.emerald,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(langNotifier.tr('Erreur lors de la mise à jour', 'Error during update')),
+            backgroundColor: AppColors.rose,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -68,17 +77,17 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           langNotifier.tr('Informations personnelles', 'Personal Information'),
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -95,8 +104,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
                     backgroundColor: AppColors.emerald,
                     child: Text(
                       initialLetter,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
                       ),
@@ -110,9 +119,9 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surfaceDarker, width: 3),
+                        border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
                       ),
-                      child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+                      child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
                     ),
                   ),
                 ],
@@ -154,14 +163,14 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
                   ),
                 ),
                 child: _isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2),
                       )
                     : Text(
                         langNotifier.tr('Enregistrer', 'Save Changes'),
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
               ),
             ),
@@ -193,13 +202,13 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
           controller: controller,
           readOnly: readOnly,
           style: TextStyle(
-            color: readOnly ? AppColors.textMuted : AppColors.textPrimary,
+            color: readOnly ? AppColors.textMuted : Theme.of(context).colorScheme.onSurface,
             fontSize: 15,
           ),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: AppColors.textMuted, size: 22),
             filled: true,
-            fillColor: AppColors.surface,
+            fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,

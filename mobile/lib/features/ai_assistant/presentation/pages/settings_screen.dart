@@ -4,6 +4,7 @@ import '../../../../core/services/sika_native_service.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/providers/theme_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -27,15 +28,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showLanguageBottomSheet(LanguageNotifier langNotifier, String currentLang) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-          decoration: const BoxDecoration(
-            color: AppColors.surfaceDarker,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -47,8 +48,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Text(
                     langNotifier.tr('Choisir la langue', 'Choose Language'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -75,7 +76,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final bool isSelected = currentLang == value;
     return Container(
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF0B1329) : Colors.transparent,
+        color: isSelected ? Theme.of(context).cardColor : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.5) : Colors.transparent,
@@ -90,7 +91,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(
           langName,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+            color: isSelected ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
             fontSize: 15,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
@@ -113,15 +114,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-          decoration: const BoxDecoration(
-            color: AppColors.surfaceDarker,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -133,8 +134,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Text(
                     langNotifier.tr('Choisir la devise', 'Choose Currency'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -152,7 +153,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF0B1329) : Colors.transparent,
+                    color: isSelected ? Theme.of(context).cardColor : Colors.transparent,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.5) : Colors.transparent,
@@ -167,7 +168,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     title: Text(
                       item['name'] as String,
                       style: TextStyle(
-                        color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                        color: isSelected ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
                         fontSize: 15,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       ),
@@ -197,18 +198,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final String currentCurrStr = currentAppCurrency.code;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           langNotifier.tr('Paramètres', 'Settings'),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -237,7 +238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () {},
           ),
 
-          const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),
+          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 2. SECTION PRÉFÉRENCES
           Padding(
@@ -257,12 +258,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _notificationPrefEnabled = val),
             title: Text(
               langNotifier.tr('Notifications', 'Notifications'),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            secondary: const Icon(Icons.notifications_none_rounded, color: AppColors.cyan, size: 22),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            subtitle: Text(
+              langNotifier.tr('Mises à jour et alertes', 'Updates and alerts'),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            activeThumbColor: AppColors.primary,
+          ),
+          Consumer(
+            builder: (context, ref, child) {
+              final themeMode = ref.watch(themeProvider);
+              final isDark = themeMode == ThemeMode.dark;
+              return SwitchListTile(
+                value: isDark,
+                onChanged: (val) {
+                  ref.read(themeProvider.notifier).toggleTheme();
+                },
+                title: Text(
+                  langNotifier.tr('Mode Sombre', 'Dark Mode'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(
+                  langNotifier.tr('Activer le thème foncé', 'Enable dark theme'),
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+                activeThumbColor: AppColors.primary,
+              );
+            }
           ),
           _buildActionTile(
             icon: Icons.language_rounded,
@@ -277,7 +300,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => _showCurrencyBottomSheet(currNotifier, currentAppCurrency, langNotifier),
           ),
 
-          const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),
+          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 3. SECTION VOICE & WAKE WORD
           const Padding(
@@ -304,7 +327,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             title: Text(
               langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: Text(
               langNotifier.tr(
@@ -318,7 +341,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),
+          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 4. SECTION PERCEPTION & OVERLAY
           const Padding(
@@ -338,7 +361,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _overlayEnabled = val),
             title: Text(
               langNotifier.tr('Bulle Flottante Android (Overlay)', 'Android Floating Bubble (Overlay)'),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: Text(
               langNotifier.tr(
@@ -359,7 +382,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Perception des Notifications Mobile Money',
                 'Mobile Money Notification Perception',
               ),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: Text(
               langNotifier.tr(
@@ -373,7 +396,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          const Divider(color: Color(0xFF1E293B), height: 24, thickness: 1),
+          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 5. SECTION SIKA SERVICES
           const Padding(
@@ -391,9 +414,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SwitchListTile(
             value: _proactiveGuardianEnabled,
             onChanged: (val) => setState(() => _proactiveGuardianEnabled = val),
-            title: const Text(
+            title: Text(
               'Proactive Guardian',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             secondary: const Icon(Icons.shield_outlined, color: AppColors.cyan, size: 22),
             activeThumbColor: const Color(0xFF10B981),
@@ -403,9 +426,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SwitchListTile(
             value: _voiceAssistantEnabled,
             onChanged: (val) => setState(() => _voiceAssistantEnabled = val),
-            title: const Text(
+            title: Text(
               'Voice Assistant',
-              style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             secondary: const Icon(Icons.keyboard_voice_outlined, color: AppColors.cyan, size: 22),
             activeThumbColor: const Color(0xFF10B981),
@@ -413,14 +436,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
 
-          const Divider(color: Color(0xFF1E293B), height: 32, thickness: 1),
+          Divider(color: Theme.of(context).cardColor, height: 32, thickness: 1),
 
           // 6. VERSION EN BAS DE PAGE
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             title: Text(
               langNotifier.tr('Version SIKA Agent', 'SIKA Agent Version'),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: const Text(
               'v1.0.0 (All Things Agentic Taskmaster)',
@@ -446,8 +469,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       leading: Icon(icon, color: AppColors.cyan, size: 22),
       title: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),

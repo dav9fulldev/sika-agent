@@ -197,9 +197,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur login API: $e');
       }
+      
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
+      }
+      
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       );
       return false;
     }
@@ -244,9 +250,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur register API: $e');
       }
+      
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
+      }
+      
       state = state.copyWith(
         isLoading: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       );
       return false;
     }
@@ -263,10 +275,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return res['otp']?.toString();
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
-      );
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
+      }
+      state = state.copyWith(isLoading: false, errorMessage: msg);
       return null;
     }
   }
@@ -282,10 +295,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
-      );
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
+      }
+      state = state.copyWith(isLoading: false, errorMessage: msg);
       return false;
     }
   }
@@ -355,6 +369,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String msg = e.toString().replaceAll('Exception: ', '');
       if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
         msg = "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.";
+      } else if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Connection refused')) {
+        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
       }
       state = state.copyWith(
         isLoading: false,
@@ -365,18 +381,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> updateUserInfo(String name, String phone) async {
-    if (state.user != null) {
-      state = state.copyWith(
-        user: state.user!.copyWith(name: name, phone: phone),
-      );
+    try {
+      await _apiService.updateUserInfo(name, phone);
+      if (state.user != null) {
+        state = state.copyWith(
+          user: state.user!.copyWith(name: name, phone: phone),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AUTH ERROR] updateUserInfo: $e');
+      }
+      rethrow;
     }
   }
 
   Future<void> updateKycStatus(bool isVerified) async {
-    if (state.user != null) {
-      state = state.copyWith(
-        user: state.user!.copyWith(isKycVerified: isVerified),
-      );
+    try {
+      if (isVerified) {
+        await _apiService.submitKyc();
+      }
+      if (state.user != null) {
+        state = state.copyWith(
+          user: state.user!.copyWith(isKycVerified: isVerified),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AUTH ERROR] updateKycStatus: $e');
+      }
+      rethrow;
     }
   }
 

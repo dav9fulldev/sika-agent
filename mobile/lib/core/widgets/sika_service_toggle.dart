@@ -23,7 +23,7 @@ class SikaServiceToggle extends StatelessWidget {
       title: const Text(
         'Service Vocal SIKA (Wake-word)',
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),

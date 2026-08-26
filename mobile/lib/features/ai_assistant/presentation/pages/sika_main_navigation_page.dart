@@ -108,7 +108,7 @@ class _SikaMainNavigationPageState
           child: Center(
             child: Icon(
               isListening ? Icons.mic_rounded : Icons.auto_awesome,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               size: isListening ? 30 : 24,
             ),
           ),
@@ -117,17 +117,17 @@ class _SikaMainNavigationPageState
 
       // 4. BARRE DE NAVIGATION MAQUETTE BLEU NUIT (#0B1329) AVEC BORDURE ULTRA-FINE
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF0B1329),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
           border: Border(
             top: BorderSide(
-              color: Colors.white10,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.10),
               width: 0.8,
             ),
           ),
         ),
         child: BottomAppBar(
-          color: const Color(0xFF0B1329),
+          color: Theme.of(context).cardColor,
           elevation: 0,
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,

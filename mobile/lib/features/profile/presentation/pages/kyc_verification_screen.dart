@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
@@ -14,6 +16,29 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   int _currentStep = 0;
   bool _isProcessing = false;
+  File? _idCardImage;
+  File? _selfieImage;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage(bool isIdCard) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        setState(() {
+          if (isIdCard) {
+            _idCardImage = File(image.path);
+          } else {
+            _selfieImage = File(image.path);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
 
   void _nextStep() async {
     if (_currentStep == 1) {
@@ -48,17 +73,17 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
     final langNotifier = ref.watch(languageProvider.notifier);
     
     return Scaffold(
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           langNotifier.tr('Vérification d\'Identité', 'Identity Verification'),
-          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -74,7 +99,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _currentStep >= 0 ? AppColors.primary : AppColors.surface,
+                        color: _currentStep >= 0 ? AppColors.primary : Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -84,7 +109,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _currentStep >= 1 ? AppColors.primary : AppColors.surface,
+                        color: _currentStep >= 1 ? AppColors.primary : Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -101,7 +126,21 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isProcessing ? null : _nextStep,
+                  onPressed: _isProcessing ? null : () {
+                    if (_currentStep == 0) {
+                      if (_idCardImage == null) {
+                        _pickImage(true);
+                      } else {
+                        _nextStep();
+                      }
+                    } else {
+                      if (_selfieImage == null) {
+                        _pickImage(false);
+                      } else {
+                        _nextStep();
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
@@ -109,16 +148,16 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
                     ),
                   ),
                   child: _isProcessing
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2),
                         )
                       : Text(
-                          _currentStep == 0 
-                              ? langNotifier.tr('Prendre une photo', 'Take a photo')
-                              : langNotifier.tr('Soumettre pour vérification', 'Submit for verification'),
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          _currentStep == 0
+                              ? (_idCardImage == null ? langNotifier.tr('Prendre une photo', 'Take a photo') : langNotifier.tr('Continuer', 'Continue'))
+                              : (_selfieImage == null ? langNotifier.tr('Prendre un selfie', 'Take a selfie') : langNotifier.tr('Soumettre pour vérification', 'Submit for verification')),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
@@ -137,7 +176,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         const SizedBox(height: 24),
         Text(
           langNotifier.tr('Pièce d\'identité', 'Identity Document'),
-          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         Text(
@@ -149,24 +188,35 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           style: const TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 40),
-        Container(
-          width: double.infinity,
-          height: 200,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.add_a_photo_outlined, color: AppColors.textMuted, size: 40),
-              const SizedBox(height: 12),
-              Text(
-                langNotifier.tr('Appuyez pour scanner', 'Tap to scan'),
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-              ),
-            ],
+        GestureDetector(
+          onTap: () => _pickImage(true),
+          child: Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
+              image: _idCardImage != null
+                  ? DecorationImage(
+                      image: FileImage(_idCardImage!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: _idCardImage == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.add_a_photo_outlined, color: AppColors.textMuted, size: 40),
+                      const SizedBox(height: 12),
+                      Text(
+                        langNotifier.tr('Appuyez pour scanner', 'Tap to scan'),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                      ),
+                    ],
+                  )
+                : const SizedBox(),
           ),
         ),
       ],
@@ -181,7 +231,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         const SizedBox(height: 24),
         Text(
           langNotifier.tr('Selfie de sécurité', 'Security Selfie'),
-          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         Text(
@@ -193,24 +243,35 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           style: const TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.5),
         ),
         const SizedBox(height: 40),
-        Container(
-          width: 200,
-          height: 250,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.camera_front_outlined, color: AppColors.textMuted, size: 40),
-              const SizedBox(height: 12),
-              Text(
-                langNotifier.tr('Ouvrir la caméra', 'Open camera'),
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-              ),
-            ],
+        GestureDetector(
+          onTap: () => _pickImage(false),
+          child: Container(
+            width: 200,
+            height: 250,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: AppColors.border, width: 2, style: BorderStyle.solid),
+              image: _selfieImage != null
+                  ? DecorationImage(
+                      image: FileImage(_selfieImage!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: _selfieImage == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.camera_front_outlined, color: AppColors.textMuted, size: 40),
+                      const SizedBox(height: 12),
+                      Text(
+                        langNotifier.tr('Ouvrir la caméra', 'Open camera'),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+                      ),
+                    ],
+                  )
+                : const SizedBox(),
           ),
         ),
       ],

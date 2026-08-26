@@ -6,7 +6,7 @@ avec les données propres à chaque utilisateur.
 
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -53,6 +53,16 @@ class UserModel(Base):
         default="email"
     )
 
+    phone = Column(
+        String(20),
+        nullable=True
+    )
+
+    is_kyc_verified = Column(
+        Boolean,
+        default=False
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
@@ -87,6 +97,12 @@ class UserModel(Base):
 
     memories = relationship(
         "AgentMemoryModel",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    payment_methods = relationship(
+        "PaymentMethodModel",
         back_populates="user",
         cascade="all, delete-orphan"
     )

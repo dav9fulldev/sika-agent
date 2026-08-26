@@ -19,7 +19,7 @@ class HumanConfirmationCard extends StatelessWidget {
   void _showBiometricModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0B1329),
+      backgroundColor: Theme.of(context).cardColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -27,8 +27,8 @@ class HumanConfirmationCard extends StatelessWidget {
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
-          decoration: const BoxDecoration(
-            color: Color(0xFF0B1329),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
               child: Column(
@@ -56,10 +56,10 @@ class HumanConfirmationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Authentification Biométrique',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -77,7 +77,7 @@ class HumanConfirmationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                     ),
@@ -91,16 +91,16 @@ class HumanConfirmationCard extends StatelessWidget {
                             children: [
                               Text(
                                 'Validation Partenaire SIKA',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
+                              const Text(
                                 'Code Secret / Empreinte requis (comme sur l\'application officielle)',
                                 style: TextStyle(
-                                  color: const Color(0xFF94A3B8),
+                                  color: Color(0xFF94A3B8),
                                   fontSize: 11,
                                 ),
                               ),
@@ -126,7 +126,7 @@ class HumanConfirmationCard extends StatelessWidget {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).colorScheme.onSurface,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -154,7 +154,7 @@ class HumanConfirmationCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFF10B981).withValues(alpha: 0.6), // Emerald border
@@ -222,7 +222,7 @@ class HumanConfirmationCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  border: Border.all(color: Theme.of(context).cardColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,12 +248,12 @@ class HumanConfirmationCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const Divider(color: Color(0xFF1E293B), height: 16),
-                    _buildDetailRow('Destinataire', recipientText),
+                    Divider(color: Theme.of(context).cardColor, height: 16),
+                    _buildDetailRow(context, 'Destinataire', recipientText),
                     const SizedBox(height: 4),
-                    _buildDetailRow('Plateforme', 'PayMeChap / Wave'),
+                    _buildDetailRow(context, 'Plateforme', 'PayMeChap / Wave'),
                     const SizedBox(height: 4),
-                    _buildDetailRow('Frais', '0 FCFA'),
+                    _buildDetailRow(context, 'Frais', '0 FCFA'),
                   ],
                 ),
               ),
@@ -288,7 +288,7 @@ class HumanConfirmationCard extends StatelessWidget {
                     label: const Text('Valider (Face ID / Empreinte)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -305,7 +305,7 @@ class HumanConfirmationCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -318,8 +318,8 @@ class HumanConfirmationCard extends StatelessWidget {
         ),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),

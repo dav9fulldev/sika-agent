@@ -26,7 +26,7 @@ class WalletRebalanceCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1329),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF635BFF).withValues(alpha: 0.4), width: 1.2),
         boxShadow: [
@@ -54,8 +54,8 @@ class WalletRebalanceCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   langNotifier.tr('Équilibrage Multi-Portefeuilles', 'Smart Wallet Auto-Balancer'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -91,11 +91,11 @@ class WalletRebalanceCard extends ConsumerWidget {
                     );
                     if (onRebalanceConfirmed != null) onRebalanceConfirmed!();
                   },
-                  icon: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+                  icon: Icon(Icons.bolt_rounded, color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
                     langNotifier.tr('Rééquilibrer en 1 Clic', 'Auto-Rebalance in 1 Tap'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),

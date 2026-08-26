@@ -88,10 +88,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         backgroundColor: const Color(0xff020614),
         elevation: 0,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Insights',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
@@ -102,16 +102,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1329),
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedPeriodKey,
-                  dropdownColor: const Color(0xFF0B1329),
+                  dropdownColor: Theme.of(context).cardColor,
                   icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w600),
                   items: periodLabels.keys.map((String key) {
                     return DropdownMenuItem<String>(
                       value: key,
@@ -144,9 +144,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1329),
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,8 +184,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           children: [
                             Text(
                               currNotifier.format(totalExpenseFcfa),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -243,8 +243,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                                 children: [
                                   Text(
                                     categoryDisplay.isNotEmpty ? categoryDisplay.first['pctString'] as String : '0%',
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -277,9 +277,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,8 +334,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         children: [
                           Text(
                             currNotifier.format(targetSavingsGoal),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
@@ -358,7 +358,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           height: 10,
                           child: LinearProgressIndicator(
                             value: progressRatio,
-                            backgroundColor: const Color(0xFF1E293B),
+                            backgroundColor: Theme.of(context).cardColor,
                             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                           ),
                         ),
@@ -366,8 +366,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       const SizedBox(height: 12),
 
                       Text(
-                        '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ' +
-                            langNotifier.tr('épargnés dans ce coffre', 'saved in this vault'),
+                        '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ${langNotifier.tr('épargnés dans ce coffre', 'saved in this vault')}',
                         style: const TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 13,
@@ -413,8 +412,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         ),
         Text(
           percentage,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
@@ -442,7 +441,7 @@ class _BuildCustomDonut extends CustomPainter {
     final Paint backgroundPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = thickness
-      ..color = const Color(0xFF1E293B);
+      ..color = Theme.of(context).cardColor;
 
     canvas.drawCircle(center, radius, backgroundPaint);
 

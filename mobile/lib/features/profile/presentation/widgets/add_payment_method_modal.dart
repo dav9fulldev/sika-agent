@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../../core/constants/app_colors.dart';
-import '../../../../../core/providers/language_provider.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/payment_provider.dart';
 
 class AddPaymentMethodModal extends ConsumerStatefulWidget {
@@ -11,7 +11,7 @@ class AddPaymentMethodModal extends ConsumerStatefulWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -92,7 +92,7 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             children: [
               Text(
                 langNotifier.tr('Ajouter un moyen', 'Add a method'),
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
@@ -131,10 +131,31 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    label: 'Expiration (MM/AA)',
+                    controller: _expiryController,
+                    icon: Icons.date_range_rounded,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildTextField(
+                    label: 'CVC',
+                    controller: TextEditingController(),
+                    icon: Icons.security_rounded,
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             _buildTextField(
-              label: 'Date d\'expiration (MM/AA)',
-              controller: _expiryController,
-              icon: Icons.date_range_rounded,
+              label: 'Nom du titulaire',
+              controller: TextEditingController(),
+              icon: Icons.person_outline_rounded,
             ),
           ] else ...[
             _buildTextField(
@@ -157,10 +178,10 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: _isSaving
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2))
                   : Text(
                       langNotifier.tr('Ajouter', 'Add'),
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),
           ),
@@ -176,7 +197,7 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface,
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
@@ -190,7 +211,7 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             Text(
               title,
               style: TextStyle(
-                color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
+                color: isSelected ? Theme.of(context).colorScheme.onSurface : AppColors.textMuted,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
@@ -210,13 +231,13 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: Theme.of(context).cardColor,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 1)),
       ),

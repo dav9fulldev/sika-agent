@@ -114,8 +114,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   Text(
                                     step['title'] as String,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
@@ -213,8 +213,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           _currentPage == onboardingSteps.length - 1
                               ? langNotifier.tr('Commencer', 'Get Started')
                               : langNotifier.tr('Suivant', 'Next'),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,

@@ -11,6 +11,7 @@ from app.services.logging_sanitizer import setup_secure_logging
 from app.routes.sika_router import router as sika_router
 from app.routes.wallet_router import router as wallet_router
 from app.routes.perception_router import router as perception_router
+from app.routes.user_router import router as user_router
 from app.database import Base, engine
 
 """
@@ -148,6 +149,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 app.include_router(sika_router)
 app.include_router(wallet_router)
 app.include_router(perception_router)
+app.include_router(user_router)
 
 
 @app.get("/")

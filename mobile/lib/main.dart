@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'core/services/sika_native_service.dart';
 import 'core/constants/app_theme.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/providers/theme_provider.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
@@ -21,14 +22,14 @@ void main() async {
   );
 }
 
-class SikaApp extends StatefulWidget {
+class SikaApp extends ConsumerStatefulWidget {
   const SikaApp({super.key});
 
   @override
-  State<SikaApp> createState() => _SikaAppState();
+  ConsumerState<SikaApp> createState() => _SikaAppState();
 }
 
-class _SikaAppState extends State<SikaApp> {
+class _SikaAppState extends ConsumerState<SikaApp> {
   bool _splashFinished = false;
 
   @override
@@ -58,6 +59,7 @@ class _SikaAppState extends State<SikaApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeProvider);
     return Consumer(
       builder: (context, ref, child) {
         final authState = ref.watch(authProvider);
@@ -103,7 +105,9 @@ class _SikaAppState extends State<SikaApp> {
 
         return MaterialApp(
           title: 'SIKA Assistant',
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
           debugShowCheckedModeBanner: false,
           home: AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),

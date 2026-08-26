@@ -19,11 +19,11 @@ class ProfileScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0B1329),
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           langNotifier.tr('Déconnexion', 'Log Out'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
         ),
         content: Text(
           langNotifier.tr(
@@ -56,7 +56,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             child: Text(
               langNotifier.tr('Déconnexion', 'Log Out'),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -70,7 +70,7 @@ class ProfileScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -100,7 +100,7 @@ class ProfileScreen extends ConsumerWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white24,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -111,8 +111,8 @@ class ProfileScreen extends ConsumerWidget {
                   children: [
                     Text(
                       langNotifier.tr('Historique des Mouvements', 'Transactions & History'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -140,23 +140,23 @@ class ProfileScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B1329),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: selectedProviderFilter,
                       isExpanded: true,
-                      dropdownColor: const Color(0xFF0B1329),
+                      dropdownColor: Theme.of(context).cardColor,
                       icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.cyan),
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13, fontWeight: FontWeight.w600),
                       items: [
                         DropdownMenuItem<String>(
                           value: 'ALL',
                           child: Text(
-                            langNotifier.tr('Tous les comptes', 'All Accounts') + ' (${movements.length})',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            '${langNotifier.tr('Tous les comptes', 'All Accounts')} (${movements.length})',
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold),
                           ),
                         ),
                         ...connectedWallets.map((w) {
@@ -165,7 +165,7 @@ class ProfileScreen extends ConsumerWidget {
                             value: w.provider,
                             child: Text(
                               label,
-                              style: const TextStyle(color: Colors.white),
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                             ),
                           );
                         }),
@@ -188,7 +188,7 @@ class ProfileScreen extends ConsumerWidget {
                       ? Center(
                           child: Text(
                             langNotifier.tr('Aucun mouvement trouvé', 'No movements found'),
-                            style: const TextStyle(color: Colors.white54),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54)),
                           ),
                         )
                       : ListView.separated(
@@ -215,8 +215,8 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               title: Text(
                                 item.recipient.isNotEmpty ? item.recipient : item.description,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
@@ -235,7 +235,7 @@ class ProfileScreen extends ConsumerWidget {
                                   Text(
                                     '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
                                     style: TextStyle(
-                                      color: isDeposit ? AppColors.emerald : Colors.white,
+                                      color: isDeposit ? AppColors.emerald : Theme.of(context).colorScheme.onSurface,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                     ),
@@ -244,7 +244,7 @@ class ProfileScreen extends ConsumerWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppColors.surface,
+                                      color: Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -286,14 +286,14 @@ class ProfileScreen extends ConsumerWidget {
     final connectedCount = walletState.wallets.length;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDarker,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         title: Text(
           langNotifier.tr('Profil & Compte', 'Profile & Account'),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -318,7 +318,7 @@ class ProfileScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.border),
             ),
@@ -329,8 +329,8 @@ class ProfileScreen extends ConsumerWidget {
                   backgroundColor: AppColors.emerald,
                   child: Text(
                     initialLetter,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
@@ -348,8 +348,8 @@ class ProfileScreen extends ConsumerWidget {
                               userName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -413,7 +413,7 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // MENU OPTIONS (LISTE ÉPURÉE ET INTERACTIVE)
-          _buildMenuItem(
+          _buildMenuItem(context,
             icon: Icons.person_outline,
             title: langNotifier.tr('Informations personnelles', 'Personal Information'),
             onTap: () {
@@ -423,7 +423,7 @@ class ProfileScreen extends ConsumerWidget {
               );
             },
           ),
-          _buildMenuItem(
+          _buildMenuItem(context,
             icon: Icons.verified_user_outlined,
             title: langNotifier.tr('Vérification d\'Identité (KYC)', 'Identity Verification (KYC)'),
             trailingText: isKycVerified 
@@ -436,15 +436,15 @@ class ProfileScreen extends ConsumerWidget {
               );
             },
           ),
-          _buildMenuItem(
+          _buildMenuItem(context,
             icon: Icons.account_balance_wallet_outlined,
             title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-            trailingText: '$connectedCount ' + langNotifier.tr('connectés', 'connected'),
+            trailingText: '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
             onTap: () {
               MyWalletsModal.show(context);
             },
           ),
-          _buildMenuItem(
+          _buildMenuItem(context,
             icon: Icons.credit_card_outlined,
             title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
             onTap: () {
@@ -454,10 +454,10 @@ class ProfileScreen extends ConsumerWidget {
               );
             },
           ),
-          _buildMenuItem(
+          _buildMenuItem(context,
             icon: Icons.history,
             title: langNotifier.tr('Historique des transactions', 'Transaction History'),
-            trailingText: '${walletState.movements.length} ' + langNotifier.tr('mouvements', 'movements'),
+            trailingText: '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
             onTap: () {
               _showMovementsModal(context, ref, langNotifier);
             },
@@ -489,7 +489,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuItem({
+  Widget _buildMenuItem(BuildContext context, {
     required IconData icon,
     required String title,
     String? trailingText,
@@ -498,7 +498,7 @@ class ProfileScreen extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
@@ -510,8 +510,8 @@ class ProfileScreen extends ConsumerWidget {
           leading: Icon(icon, color: AppColors.cyan),
           title: Text(
             title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),

@@ -21,7 +21,7 @@ class ProactiveAlertCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B), // Dark slate surface
+        color: Theme.of(context).cardColor, // Dark slate surface
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFFF59E0B).withValues(alpha: 0.6), // Amber border
@@ -89,8 +89,8 @@ class ProactiveAlertCard extends StatelessWidget {
                     ),
                     child: Text(
                       amountText,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),

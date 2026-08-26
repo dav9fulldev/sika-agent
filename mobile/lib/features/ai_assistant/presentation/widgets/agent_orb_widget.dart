@@ -93,7 +93,7 @@ class AgentOrbWidget extends StatelessWidget {
                     colors: [
                       orbColor.withValues(alpha: 0.85),
                       orbColor.withValues(alpha: 0.35),
-                      const Color(0xFF1E293B),
+                      Theme.of(context).cardColor,
                     ],
                   ),
                   boxShadow: [
@@ -104,7 +104,7 @@ class AgentOrbWidget extends StatelessWidget {
                     ),
                   ],
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
                     width: 2,
                   ),
                 ),
@@ -113,7 +113,7 @@ class AgentOrbWidget extends StatelessWidget {
                     width: 76,
                     height: 76,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -125,7 +125,7 @@ class AgentOrbWidget extends StatelessWidget {
                                   ? Icons.volume_up
                                   : Icons.mic_none_rounded,
                       size: 42,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),

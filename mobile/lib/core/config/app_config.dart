@@ -30,7 +30,7 @@ class AppConfig {
   // URL de développement local
   // ---------------------------------------------------------------------------
 
-  /// Émulateur Android : 10.0.2.2 pointe vers localhost de la machine hôte.
+  /// Émulateur Android : URL du cloud run
   static const String _emulatorUrl = 'https://sika-backend-1064195418653.europe-west9.run.app';
 
   // ---------------------------------------------------------------------------
