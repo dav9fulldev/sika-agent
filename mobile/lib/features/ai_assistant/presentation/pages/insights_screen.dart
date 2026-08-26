@@ -110,7 +110,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: DropdownButton<String>(
                   value: _selectedPeriodKey,
                   dropdownColor: Theme.of(context).cardColor,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
+                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), size: 18),
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w600),
                   items: periodLabels.keys.map((String key) {
                     return DropdownMenuItem<String>(
@@ -164,8 +164,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       const SizedBox(width: 10),
                       Text(
                         langNotifier.tr('Dépenses totales', 'Total Expenses'),
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -196,7 +196,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                                   ? langNotifier.tr('Basé sur vos transactions récentes', 'Based on recent transactions')
                                   : langNotifier.tr('Aucune dépense enregistrée', 'No expenses recorded'),
                               style: TextStyle(
-                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : const Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -215,7 +215,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                             ] else ...[
                               Text(
                                 langNotifier.tr('Aucune catégorie disponible', 'No categories available'),
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
                               ),
                             ],
                           ],
@@ -301,8 +301,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                               const SizedBox(width: 10),
                               Text(
                                 '${langNotifier.tr("Objectif d'épargne", "Savings Goal")} • $coffreNom',
-                                style: const TextStyle(
-                                  color: Color(0xFF64748B),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -317,7 +317,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                             ),
                             child: Text(
                               langNotifier.tr('Coffre Actif', 'Active Vault'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Color(0xFF10B981),
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -343,7 +343,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           ),
                           Text(
                             '$pctString%',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Color(0xFF10B981),
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -368,7 +368,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
                       Text(
                         '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ${langNotifier.tr('épargnés dans ce coffre', 'saved in this vault')}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
@@ -403,8 +403,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             const SizedBox(width: 12),
             Text(
               name,
-              style: const TextStyle(
-                color: Color(0xFF94A3B8),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),

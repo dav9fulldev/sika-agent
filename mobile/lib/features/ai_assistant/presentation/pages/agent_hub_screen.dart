@@ -109,7 +109,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
             Text(
               'Autonomous Financial Agent',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
               ),
@@ -142,8 +142,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         children: [
                           Text(
                             langNotifier.tr('Solde total', 'Total Balance'),
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -162,8 +162,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                             walletState.wallets.isEmpty
                                 ? langNotifier.tr('Aucun portefeuille connecté', 'No wallets connected')
                                 : langNotifier.tr('sur ${walletState.wallets.length} portefeuille(s)', 'across ${walletState.wallets.length} wallet(s)'),
-                            style: const TextStyle(
-                              color: Color(0xFF475569),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                               fontSize: 12,
                             ),
                           ),
@@ -223,8 +223,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                               children: [
                                 Text(
                                   langNotifier.tr('État de Sika', 'Sika Status'),
-                                  style: const TextStyle(
-                                    color: Color(0xFF64748B),
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -232,7 +232,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                 const SizedBox(height: 8),
                                 Text(
                                   langNotifier.tr('Actif et à l\'écoute', 'Active & Listening'),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Color(0xFF10B981),
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -241,8 +241,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                 const SizedBox(height: 4),
                                 Text(
                                   langNotifier.tr('Je veille sur vos finances', 'Watching over your finances'),
-                                  style: const TextStyle(
-                                    color: Color(0xFF475569),
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -333,8 +333,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     // TEXTE SECTION SUGGESTIONS
                     Text(
                       langNotifier.tr('Suggestions pour vous', 'Suggestions for you'),
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -415,7 +415,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: langNotifier.tr('Poser une question à SIKA...', 'Ask SIKA anything...'),
-                          hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 14),
+                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 14),
                           border: InputBorder.none,
                         ),
                         onSubmitted: (val) => _submitQuery(val, sikaNotifier),
@@ -473,8 +473,8 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
               Expanded(
                 child: Text(
                   text,
-                  style: const TextStyle(
-                    color: Color(0xFFE2E8F0),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -482,7 +482,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
               ),
               const Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Color(0xFF475569),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 size: 14,
               ),
             ],

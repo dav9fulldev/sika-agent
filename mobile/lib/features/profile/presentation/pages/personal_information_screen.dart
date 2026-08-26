@@ -191,8 +191,8 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.textMuted,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -202,11 +202,11 @@ class _PersonalInformationScreenState extends ConsumerState<PersonalInformationS
           controller: controller,
           readOnly: readOnly,
           style: TextStyle(
-            color: readOnly ? AppColors.textMuted : Theme.of(context).colorScheme.onSurface,
+            color: readOnly ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6) : Theme.of(context).colorScheme.onSurface,
             fontSize: 15,
           ),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppColors.textMuted, size: 22),
+            prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 22),
             filled: true,
             fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(

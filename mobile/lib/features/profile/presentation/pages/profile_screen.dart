@@ -30,14 +30,14 @@ class ProfileScreen extends ConsumerWidget {
             'Êtes-vous sûr de vouloir vous déconnecter de votre compte SIKA ?',
             'Are you sure you want to log out of your SIKA account?',
           ),
-          style: const TextStyle(color: Color(0xFF94A3B8)),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
               langNotifier.tr('Annuler', 'Cancel'),
-              style: const TextStyle(color: Color(0xFF64748B)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
           ),
           ElevatedButton(
@@ -132,7 +132,7 @@ class ProfileScreen extends ConsumerWidget {
                     'Synchronisation automatique en temps réel de vos portefeuilles connectés.',
                     'Real-time automated sync across your connected wallets.',
                   ),
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
                 ),
                 const SizedBox(height: 16),
 
@@ -223,8 +223,8 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               subtitle: Text(
                                 '${item.walletProvider} • ${item.category}',
-                                style: const TextStyle(
-                                  color: Color(0xFF94A3B8),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                   fontSize: 12,
                                 ),
                               ),
@@ -249,7 +249,7 @@ class ProfileScreen extends ConsumerWidget {
                                     ),
                                     child: Text(
                                       item.status,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: AppColors.cyan,
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
@@ -391,8 +391,8 @@ class ProfileScreen extends ConsumerWidget {
                               userEmail,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                 fontSize: 13,
                               ),
                             ),
@@ -522,13 +522,13 @@ class ProfileScreen extends ConsumerWidget {
               if (trailingText != null)
                 Text(
                   trailingText,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                 ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
             ],
           ),
         ),

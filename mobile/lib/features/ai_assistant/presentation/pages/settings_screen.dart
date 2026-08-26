@@ -55,7 +55,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                    icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -91,7 +91,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(
           langName,
           style: TextStyle(
-            color: isSelected ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
+            color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 15,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
@@ -141,7 +141,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                    icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -168,7 +168,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     title: Text(
                       item['name'] as String,
                       style: TextStyle(
-                        color: isSelected ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
+                        color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         fontSize: 15,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       ),
@@ -223,8 +223,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               langNotifier.tr('Compte', 'Account'),
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -245,8 +245,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               langNotifier.tr('Préférences', 'Preferences'),
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -262,7 +262,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             subtitle: Text(
               langNotifier.tr('Mises à jour et alertes', 'Updates and alerts'),
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
             ),
             activeThumbColor: AppColors.primary,
           ),
@@ -281,7 +281,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 subtitle: Text(
                   langNotifier.tr('Activer le thème foncé', 'Enable dark theme'),
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
                 ),
                 activeThumbColor: AppColors.primary,
               );
@@ -308,7 +308,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Text(
               'VOICE & WAKE WORD',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
@@ -334,7 +334,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
                 'Allows calling SIKA in background without opening the app.',
               ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -349,7 +349,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Text(
               'PERCEPTION & OVERLAY',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
@@ -368,7 +368,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Affiche des alertes proactives au-dessus des autres applications.',
                 'Displays proactive alerts on top of other applications.',
               ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -389,7 +389,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
                 'Allows SIKA to read Wave, Orange Money and MTN alerts.',
               ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
             ),
             activeThumbColor: const Color(0xFF10B981),
             activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
@@ -404,7 +404,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Text(
               'Sika Services',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -447,9 +447,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             subtitle: const Text(
               'v1.0.0 (All Things Agentic Taskmaster)',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
             ),
-            trailing: const Icon(Icons.info_outline, color: Color(0xFF475569), size: 20),
+            trailing: const Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 20),
           ),
         ],
       ),
@@ -478,7 +478,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       subtitle: subtitle != null
           ? Text(
         subtitle,
-        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
       )
           : null,
       trailing: Row(
@@ -487,8 +487,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (trailingText != null)
             Text(
               trailingText,
-              style: const TextStyle(
-                color: Color(0xFF94A3B8),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
