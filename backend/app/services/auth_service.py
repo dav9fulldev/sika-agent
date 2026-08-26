@@ -318,3 +318,23 @@ class OAuth2AuthService:
 
 # Instance singleton
 oauth2_auth_service = OAuth2AuthService()
+
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from ..database import get_db
+
+security = HTTPBearer()
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> UserModel:
+    payload = oauth2_auth_service.verify_token(credentials.credentials)
+    if not payload or 'sub' not in payload:
+        raise HTTPException(status_code=401, detail="Token invalide ou manquant")
+    user_id = payload['sub']
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable")
+    return user
