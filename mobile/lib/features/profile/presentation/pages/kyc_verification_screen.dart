@@ -176,7 +176,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           }
           _isDetecting = false;
         } else if (_targetDetectionTime != null && 
-                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 3)) {
+                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 2)) {
           await _triggerAutoCapture();
         } else {
           if (mounted && _feedbackMessage != feedback) {
