@@ -138,7 +138,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       bool targetFound = false;
       String feedback = '';
 
-      if (_currentStep < 3) {
+      if (_currentStep < 2) {
         // ID Card Auto-Scan logic
         final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
         if (recognizedText.text.length > 50) { 
@@ -176,7 +176,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           }
           _isDetecting = false;
         } else if (_targetDetectionTime != null && 
-                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 2)) {
+                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 3)) {
           await _triggerAutoCapture();
         } else {
           if (mounted && _feedbackMessage != feedback) {
