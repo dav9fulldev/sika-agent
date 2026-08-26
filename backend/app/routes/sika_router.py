@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Request
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import UserModel
@@ -135,8 +135,21 @@ def auth_reset_password(data: Dict[str, Any]):
 # ============================================================================
 
 @router.post("/chat", response_model=SikaResponseDTO)
-async def sika_chat(data: SikaQueryDTO, authorization: Optional[str] = Header(None)):
+async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optional[str] = Header(None)):
     """Endpoint principal SIKA AI."""
+    # Protection Rate Limiting pour l'IA
+    if authorization:
+        user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+        security_rate_limiter.check_ai_rate_limit(str(user_id))
+    else:
+        # Fallback to IP address for unauthenticated requests
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        else:
+            client_ip = request.client.host if request.client else "unknown"
+        security_rate_limiter.check_ai_rate_limit(f"ip_{client_ip}")
+        
     ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
     firstname = ctx_dict.get("user_firstname", "David")
 
@@ -229,6 +242,7 @@ def sika_list_tts_voices():
 async def sika_agent_process(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
     """Endpoint principal de traitement de la boucle Agent Taskmaster (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    security_rate_limiter.check_ai_rate_limit(str(user_id))
     query = data.get("query", "")
     return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
 

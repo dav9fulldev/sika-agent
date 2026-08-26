@@ -26,6 +26,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: sika_user
+          POSTGRES_PASSWORD: sika_password
+          POSTGRES_DB: sika_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -49,9 +64,9 @@ jobs:
           cd backend
           PYTHONPATH=. pytest tests/
         env:
-          # On peut définir des variables d'environnement bidon pour les tests si besoin
+          # On définit l'environnement de test et on pointe sur le container PostgreSQL
           ENV: testing
-          DATABASE_URL: sqlite:///./test.db
+          DATABASE_URL: postgresql+psycopg2://sika_user:sika_password@localhost:5432/sika_test_db
 
       - name: Authentification via Google Cloud Workload Identity
         uses: google-github-actions/auth@v2

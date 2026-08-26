@@ -119,6 +119,16 @@ class SecurityRateLimiter:
                 detail="Trop de requêtes financières simultanées. Veuillez patienter un instant."
             )
 
+    def check_ai_rate_limit(self, user_id: str, max_requests: int = 20, window_minutes: int = 1) -> None:
+        """Protège les endpoints IA contre le spam pour éviter l'explosion des coûts de l'API externe."""
+        allowed = self.store.check_rate_limit(f"ai_chat_{user_id}", max_requests=max_requests, window_seconds=window_minutes * 60)
+        if not allowed:
+            logger.warning(f"[SECURITY AI SPAM] User {user_id} a dépassé la limite d'usage de l'IA.")
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de messages envoyés à l'assistant. Veuillez patienter un moment avant de réessayer."
+            )
+
     # =========================================================================
     # 5. GESTION DES OTP (MOT DE PASSE OUBLIÉ)
     # =========================================================================

@@ -37,7 +37,6 @@ def clean_security_environment():
     """Initialise et nettoie la base de données et les caches de sécurité avant chaque test."""
     Base.metadata.create_all(bind=engine)
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()
@@ -58,7 +57,6 @@ def clean_security_environment():
 
     _reset_db_safely()
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()
