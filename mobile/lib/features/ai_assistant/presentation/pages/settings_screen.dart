@@ -303,8 +303,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 3. SECTION VOICE & WAKE WORD
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'VOICE & WAKE WORD',
               style: TextStyle(
@@ -344,8 +344,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 4. SECTION PERCEPTION & OVERLAY
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'PERCEPTION & OVERLAY',
               style: TextStyle(
@@ -399,8 +399,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
 
           // 5. SECTION SIKA SERVICES
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'Sika Services',
               style: TextStyle(
@@ -445,11 +445,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               langNotifier.tr('Version SIKA Agent', 'SIKA Agent Version'),
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               'v1.0.0 (All Things Agentic Taskmaster)',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
             ),
-            trailing: const Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 20),
+            trailing: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 20),
           ),
         ],
       ),

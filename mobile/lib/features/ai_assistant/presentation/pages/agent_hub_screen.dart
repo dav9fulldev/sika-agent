@@ -480,7 +480,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 size: 14,

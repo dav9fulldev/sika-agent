@@ -196,7 +196,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                                   ? langNotifier.tr('Basé sur vos transactions récentes', 'Based on recent transactions')
                                   : langNotifier.tr('Aucune dépense enregistrée', 'No expenses recorded'),
                               style: TextStyle(
-                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : const Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
