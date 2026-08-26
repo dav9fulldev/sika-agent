@@ -4,6 +4,7 @@ class AppImages {
   static const String sikaLogo = 'assets/images/sika_logo.png';
   static const String logo = 'assets/images/sika_logo.png';
   static const String bienv = 'assets/images/bienv.png';
+  static const String googleLogo = 'assets/images/google_logo.png';
 
   // Mobile Money Provider Logos
   static const String wave = 'assets/images/wave.png';
