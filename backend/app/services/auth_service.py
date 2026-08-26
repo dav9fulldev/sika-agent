@@ -331,9 +331,9 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> UserModel:
     payload = oauth2_auth_service.verify_token(credentials.credentials)
-    if not payload or 'sub' not in payload:
+    if not payload or 'user_id' not in payload:
         raise HTTPException(status_code=401, detail="Token invalide ou manquant")
-    user_id = payload['sub']
+    user_id = payload['user_id']
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable")

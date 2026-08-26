@@ -19,6 +19,10 @@ class KycVerificationScreen extends ConsumerStatefulWidget {
 class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   int _currentStep = 0; // 0: ID Front, 1: ID Back, 2: Selfie
   bool _isProcessing = false;
+  
+  bool _isTargetDetected = false;
+  DateTime? _targetDetectionTime;
+  String _feedbackMessage = '';
   File? _idCardFront;
   File? _idCardBack;
   File? _selfieImage;
@@ -131,27 +135,73 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
         return;
       }
 
-      bool shouldCapture = false;
+      bool targetFound = false;
+      String feedback = '';
 
-      if (_currentStep < 2) {
+      if (_currentStep < 3) {
         // ID Card Auto-Scan logic
         final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-        // Simplistic check: If there's a block of text, assume ID is presented
         if (recognizedText.text.length > 50) { 
-          shouldCapture = true;
+          targetFound = true;
+          feedback = 'Carte détectée. Maintenez...';
+        } else {
+          feedback = 'Placez la carte dans le cadre.';
         }
       } else {
         // Selfie Auto-Scan logic
         final List<Face> faces = await _faceDetector.processImage(inputImage);
-        // If exactly one face is detected, auto capture
         if (faces.length == 1) {
-          shouldCapture = true;
+          final face = faces.first;
+          if (face.headEulerAngleY != null && face.headEulerAngleY!.abs() > 15) {
+             feedback = 'Regardez droit devant vous.';
+          } else {
+             targetFound = true;
+             feedback = 'Visage détecté. Ne bougez pas...';
+          }
+        } else if (faces.isEmpty) {
+          feedback = 'Aucun visage détecté ou espace sombre.';
+        } else {
+          feedback = 'Un seul visage autorisé.';
         }
       }
 
-      if (shouldCapture) {
-        await _triggerAutoCapture();
+      if (targetFound) {
+        if (!_isTargetDetected) {
+          if (mounted) {
+            setState(() {
+              _isTargetDetected = true;
+              _targetDetectionTime = DateTime.now();
+              _feedbackMessage = feedback;
+            });
+          }
+          _isDetecting = false;
+        } else if (_targetDetectionTime != null && 
+                   DateTime.now().difference(_targetDetectionTime!) > const Duration(seconds: 3)) {
+          await _triggerAutoCapture();
+        } else {
+          if (mounted && _feedbackMessage != feedback) {
+            setState(() {
+              _feedbackMessage = feedback;
+            });
+          }
+          _isDetecting = false;
+        }
       } else {
+        if (_isTargetDetected) {
+          if (mounted) {
+            setState(() {
+              _isTargetDetected = false;
+              _targetDetectionTime = null;
+              _feedbackMessage = feedback;
+            });
+          }
+        } else if (_feedbackMessage != feedback) {
+          if (mounted) {
+            setState(() {
+               _feedbackMessage = feedback;
+            });
+          }
+        }
         _isDetecting = false;
       }
     } catch (e) {
@@ -174,6 +224,9 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       final XFile picture = await _cameraController!.takePicture();
       
       setState(() {
+        _isTargetDetected = false;
+        _targetDetectionTime = null;
+        _feedbackMessage = '';
         if (_currentStep == 0) {
           _idCardFront = File(picture.path);
           _currentStep = 1;
@@ -332,9 +385,31 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
                       children: [
                         CameraPreview(_cameraController!),
                         CustomPaint(
-                          painter: ScannerOverlayPainter(isCircle: _currentStep == 2),
+                          painter: ScannerOverlayPainter(
+                            isCircle: _currentStep == 2,
+                            isTargetDetected: _isTargetDetected,
+                          ),
                           child: Container(),
                         ),
+                        if (_feedbackMessage.isNotEmpty)
+                          Positioned(
+                            bottom: 60,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _feedbackMessage,
+                                style: TextStyle(
+                                  color: _isTargetDetected ? AppColors.emerald : Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     )
                   : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
@@ -351,7 +426,8 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
 class ScannerOverlayPainter extends CustomPainter {
   final bool isCircle;
-  ScannerOverlayPainter({required this.isCircle});
+  final bool isTargetDetected;
+  ScannerOverlayPainter({required this.isCircle, this.isTargetDetected = false});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -382,14 +458,14 @@ class ScannerOverlayPainter extends CustomPainter {
 
     // Draw a border around the cutout
     final borderPaint = Paint()
-      ..color = AppColors.primary
+      ..color = isTargetDetected ? AppColors.emerald : AppColors.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
+      ..strokeWidth = isTargetDetected ? 5.0 : 3.0;
     canvas.drawPath(cutoutPath, borderPaint);
   }
 
   @override
   bool shouldRepaint(covariant ScannerOverlayPainter oldDelegate) {
-    return oldDelegate.isCircle != isCircle;
+    return oldDelegate.isCircle != isCircle || oldDelegate.isTargetDetected != isTargetDetected;
   }
 }

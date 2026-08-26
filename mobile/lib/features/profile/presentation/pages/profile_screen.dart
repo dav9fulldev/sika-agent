@@ -430,6 +430,16 @@ class ProfileScreen extends ConsumerWidget {
                 ? langNotifier.tr('Vérifié', 'Verified') 
                 : langNotifier.tr('Non vérifié', 'Unverified'),
             onTap: () {
+              if (isKycVerified) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(langNotifier.tr('Identité déjà vérifiée.', 'Identity already verified.')),
+                    backgroundColor: AppColors.emerald,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const KycVerificationScreen()),
