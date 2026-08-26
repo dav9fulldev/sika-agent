@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../providers/sika_provider.dart';
@@ -90,28 +92,21 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     final sikaData = ref.watch(sikaProvider);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
         centerTitle: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'SIKA Hub',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 20,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               'Autonomous Financial Agent',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
               ),
             ),
           ],
@@ -128,72 +123,56 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   children: [
                     const SizedBox(height: 15),
 
-                    // 1. BLOC SOLDE TOTAL AVEC LOGOS OFFICIELS WAVE, ORANGE MONEY & MTN MOMO
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            langNotifier.tr('Solde total', 'Total Balance'),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            currNotifier.format(walletState.totalBalanceFcfa),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            walletState.wallets.isEmpty
-                                ? langNotifier.tr('Aucun portefeuille connecté', 'No wallets connected')
-                                : langNotifier.tr('sur ${walletState.wallets.length} portefeuille(s)', 'across ${walletState.wallets.length} wallet(s)'),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                              fontSize: 12,
-                            ),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 46,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                ConnectWalletModal.show(context);
-                              },
-                              icon: Icon(Icons.add_circle_outline, color: Theme.of(context).colorScheme.onSurface, size: 20),
-                              label: Text(
-                                langNotifier.tr('Connecter mes comptes', 'Connect my Wallets'),
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                    // 1. BLOC SOLDE TOTAL
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              langNotifier.tr('Solde total', 'Total Balance'),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                fontWeight: FontWeight.w500,
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00B4D8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              currNotifier.format(walletState.totalBalanceFcfa),
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              walletState.wallets.isEmpty
+                                  ? langNotifier.tr('Aucun portefeuille connecté', 'No wallets connected')
+                                  : langNotifier.tr('sur ${walletState.wallets.length} portefeuille(s)', 'across ${walletState.wallets.length} wallet(s)'),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  ConnectWalletModal.show(context);
+                                },
+                                icon: const Icon(Icons.add_circle_outline, size: 20),
+                                label: Text(langNotifier.tr('Connecter mes comptes', 'Connect my Wallets')),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.brandSecondary,
+                                  foregroundColor: Colors.white,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ).animate().fade(duration: 400.ms).slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
 
                     // 2. MODULE CŒUR 1: INDICE D'AUTONOMIE FINANCIÈRE (RUNWAY) DYNAMIQUE
@@ -202,81 +181,74 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       dailyBurnRateFcfa: walletState.movements.isEmpty 
                           ? 0.0 
                           : (walletState.movements.fold<double>(0.0, (sum, m) => sum + m.amount) / 30.0),
-                    ),
+                    ).animate().fade(delay: 100.ms).slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
 
                     // 3. BLOC ÉTAT DE SIKA (ROBOT EN LÉVITATION)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  langNotifier.tr('État de Sika', 'Sika Status'),
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    langNotifier.tr('État de Sika', 'Sika Status'),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  langNotifier.tr('Actif et à l\'écoute', 'Active & Listening'),
-                                  style: TextStyle(
-                                    color: Color(0xFF10B981),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    langNotifier.tr('Actif et à l\'écoute', 'Active & Listening'),
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: AppColors.success,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  langNotifier.tr('Je veille sur vos finances', 'Watching over your finances'),
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                    fontSize: 13,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    langNotifier.tr('Je veille sur vos finances', 'Watching over your finances'),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
 
-                          AnimatedBuilder(
-                            animation: _robotAnimationController,
-                            builder: (context, child) {
-                              return Transform.translate(
-                                offset: Offset(0, _robotFloatAnimation.value),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Image.asset(
-                                    AppImages.bienv,
-                                    width: 82,
-                                    height: 82,
-                                    fit: BoxFit.cover,
+                            AnimatedBuilder(
+                              animation: _robotAnimationController,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(0, _robotFloatAnimation.value),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.asset(
+                                      AppImages.bienv,
+                                      width: 82,
+                                      height: 82,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ).animate().fade(delay: 200.ms).slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 16),
 
                     // 4. MODULE CŒUR 2: ÉQUILIBRAGE MULTI-PORTEFEUILLES (Si au moins 2 comptes connectes)
                     if (walletState.wallets.length >= 2) ...[
                       WalletRebalanceCard(
                         onRebalanceConfirmed: () => widget.onOpenChat(),
-                      ),
+                      ).animate().fade(delay: 300.ms).slideY(begin: 0.1, end: 0),
                       const SizedBox(height: 16),
                     ],
 
@@ -284,7 +256,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                     if (walletState.wallets.isNotEmpty) ...[
                       SavingsBoosterCard(
                         onBoostConfirmed: () => widget.onOpenChat(),
-                      ),
+                      ).animate().fade(delay: 400.ms).slideY(begin: 0.1, end: 0),
                       const SizedBox(height: 16),
                     ],
 
@@ -300,7 +272,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         onDismiss: () {
                           setState(() => _showAlert = false);
                         },
-                      ),
+                      ).animate().fade().scale(),
 
                     // HUMAN CONFIRMATION BANNER (Pilote par l'action reelle de SIKA)
                     if (sikaData.pendingActionId != null && sikaData.state == SikaState.securityValidation) ...[
@@ -326,22 +298,22 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                             sikaNotifier.clearConversation();
                           },
                         );
-                      }),
+                      }).animate().fade().scale(),
                       const SizedBox(height: 16),
                     ],
 
                     // TEXTE SECTION SUGGESTIONS
-                    Text(
-                      langNotifier.tr('Suggestions pour vous', 'Suggestions for you'),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 16),
+                      child: Text(
+                        langNotifier.tr('Suggestions pour vous', 'Suggestions for you'),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 12),
+                    ).animate().fade(delay: 500.ms),
 
                     _buildSuggestionPill(
                       iconData: Icons.account_balance_wallet_outlined,
@@ -350,6 +322,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         langNotifier.tr('Combien d\'argent ai-je au total ?', 'How much money do I have in total?'),
                         sikaNotifier,
                       ),
+                      delayMs: 600,
                     ),
 
                     _buildSuggestionPill(
@@ -359,6 +332,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         langNotifier.tr('Comment progresse mon objectif d\'épargne ?', 'How is my savings goal progressing?'),
                         sikaNotifier,
                       ),
+                      delayMs: 650,
                     ),
 
                     _buildSuggestionPill(
@@ -368,6 +342,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         langNotifier.tr('Quel est mon solde Mobile Money total ?', 'What is my total Mobile Money balance?'),
                         sikaNotifier,
                       ),
+                      delayMs: 700,
                     ),
 
                     _buildSuggestionPill(
@@ -377,6 +352,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                         langNotifier.tr('Analyser mes dépenses récentes', 'Analyze my recent expenses'),
                         sikaNotifier,
                       ),
+                      delayMs: 750,
                     ),
 
                     const SizedBox(height: 20),
@@ -389,12 +365,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 16,
                     offset: const Offset(0, -4),
                   ),
@@ -404,7 +379,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
                         color: Theme.of(context).scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(24),
@@ -412,29 +386,33 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                       ),
                       child: TextField(
                         controller: _inputController,
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 15),
                         decoration: InputDecoration(
-                          hintText: langNotifier.tr('Poser une question à SIKA...', 'Ask SIKA anything...'),
-                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 14),
+                          hintText: langNotifier.tr('Demander à SIKA...', 'Ask SIKA...'),
+                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 15),
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          fillColor: Colors.transparent,
                         ),
                         onSubmitted: (val) => _submitQuery(val, sikaNotifier),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () => _submitQuery(_inputController.text, sikaNotifier),
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: const BoxDecoration(
-                        color: Color(0xFF3B82F6),
+                        color: AppColors.brandPrimary,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.arrow_upward_rounded,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        size: 22,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
                   ),
@@ -447,48 +425,40 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     );
   }
 
-
-
   Widget _buildSuggestionPill({
     required IconData iconData,
     required String text,
     required VoidCallback onTap,
+    required int delayMs,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03)),
-      ),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Row(
             children: [
-              Icon(iconData, color: const Color(0xFF38BDF8), size: 18),
-              const SizedBox(width: 14),
+              Icon(iconData, color: AppColors.brandSecondary, size: 20),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   text,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 13.5,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
               Icon(
                 Icons.arrow_forward_ios_rounded,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                 size: 14,
               ),
             ],
           ),
         ),
       ),
-    );
+    ).animate().fade(delay: delayMs.ms).slideX(begin: 0.1, end: 0);
   }
 }

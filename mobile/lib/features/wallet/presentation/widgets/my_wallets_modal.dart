@@ -69,9 +69,7 @@ class MyWalletsModal extends ConsumerWidget {
             children: [
               Text(
                 langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 20,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -102,7 +100,9 @@ class MyWalletsModal extends ConsumerWidget {
               'Consultez et gérez vos comptes Mobile Money connectés.',
               'View and manage your connected Mobile Money accounts.',
             ),
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF94A3B8),
+            ),
           ),
 
           const SizedBox(height: 20),
@@ -117,7 +117,9 @@ class MyWalletsModal extends ConsumerWidget {
                         const SizedBox(height: 12),
                         Text(
                           langNotifier.tr('Aucun portefeuille connecté', 'No wallet connected'),
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70), fontSize: 15),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
@@ -172,18 +174,15 @@ class MyWalletsModal extends ConsumerWidget {
                                 children: [
                                   Text(
                                     item.provider,
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurface,
-                                      fontSize: 16,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     item.accountNumber,
-                                    style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                      fontSize: 12,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: const Color(0xFF64748B),
                                     ),
                                   ),
                                 ],
@@ -194,9 +193,7 @@ class MyWalletsModal extends ConsumerWidget {
                               children: [
                                 Text(
                                   currNotifier.format(item.balance),
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontSize: 16,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),

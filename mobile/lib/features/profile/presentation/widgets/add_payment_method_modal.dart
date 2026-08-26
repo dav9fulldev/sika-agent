@@ -92,7 +92,9 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             children: [
               Text(
                 langNotifier.tr('Ajouter un moyen', 'Add a method'),
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
@@ -181,7 +183,10 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
                   ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2))
                   : Text(
                       langNotifier.tr('Ajouter', 'Add'),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
           ),
@@ -210,9 +215,8 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             const SizedBox(height: 8),
             Text(
               title,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: isSelected ? Theme.of(context).colorScheme.onSurface : AppColors.textMuted,
-                fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
               ),
             ),
@@ -231,10 +235,10 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      style: Theme.of(context).textTheme.bodyMedium,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
         prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
         filled: true,
         fillColor: Theme.of(context).cardColor,

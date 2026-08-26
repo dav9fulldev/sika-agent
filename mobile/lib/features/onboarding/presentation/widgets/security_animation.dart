@@ -189,9 +189,7 @@ class _SecurityAnimationState extends ConsumerState<SecurityAnimation>
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 10,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),

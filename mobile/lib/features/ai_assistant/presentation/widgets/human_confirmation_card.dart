@@ -58,9 +58,7 @@ class HumanConfirmationCard extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'Authentification Biométrique',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 18,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -68,9 +66,8 @@ class HumanConfirmationCard extends StatelessWidget {
                   Text(
                     'Confirmez avec Face ID ou votre empreinte digitale pour autoriser le transfert de $amountText vers $recipientText.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF94A3B8),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -91,17 +88,15 @@ class HumanConfirmationCard extends StatelessWidget {
                             children: [
                               Text(
                                 'Validation Partenaire SIKA',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 13,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              const Text(
+                              const SizedBox(height: 2),
+                              Text(
                                 'Code Secret / Empreinte requis (comme sur l\'application officielle)',
-                                style: TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 11,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: const Color(0xFF94A3B8),
                                 ),
                               ),
                             ],
@@ -120,9 +115,9 @@ class HumanConfirmationCard extends StatelessWidget {
                         onConfirm();
                       },
                       icon: const Icon(Icons.fingerprint, size: 22),
-                      label: const Text(
+                      label: Text(
                         'Scanner l\'empreinte / Face ID',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
@@ -137,9 +132,9 @@ class HumanConfirmationCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text(
+                    child: Text(
                       'Annuler la transaction',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: const Color(0xFF94A3B8)),
                     ),
                   ),
                 ],
@@ -192,23 +187,21 @@ class HumanConfirmationCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Validation requise par l\'humain',
-                          style: TextStyle(
-                            color: Color(0xFF10B981),
-                            fontSize: 14,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: const Color(0xFF10B981),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           'Sika attend votre confirmation par empreinte ou Face ID',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 11,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF94A3B8),
                           ),
                         ),
                       ],
@@ -232,17 +225,15 @@ class HumanConfirmationCard extends StatelessWidget {
                       children: [
                         Text(
                           actionTitle,
-                          style: const TextStyle(
-                            color: Color(0xFF10B981),
-                            fontSize: 13,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF10B981),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           amountText,
-                          style: const TextStyle(
-                            color: Color(0xFF10B981),
-                            fontSize: 16,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFF10B981),
                             fontWeight: FontWeight.bold,
                           ),
                         ),

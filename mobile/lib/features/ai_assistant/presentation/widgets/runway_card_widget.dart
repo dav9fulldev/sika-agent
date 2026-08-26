@@ -78,9 +78,8 @@ class RunwayCardWidget extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Text(
                     langNotifier.tr('Autonomie financière (Runway)', 'Financial Runway'),
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: const Color(0xFF94A3B8),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -95,9 +94,8 @@ class RunwayCardWidget extends ConsumerWidget {
                 ),
                 child: Text(
                   statusLabel,
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: badgeColor,
-                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -112,18 +110,15 @@ class RunwayCardWidget extends ConsumerWidget {
             children: [
               Text(
                 '$estimatedDays',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 32,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 langNotifier.tr('jours d\'autonomie restante', 'days remaining'),
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 14,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF94A3B8),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -141,9 +136,8 @@ class RunwayCardWidget extends ConsumerWidget {
                     'Estimation basée sur votre solde actuel sans dépenses récentes.',
                     'Estimated based on your current balance with no recent expenses.',
                   ),
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF64748B),
             ),
           ),
         ],

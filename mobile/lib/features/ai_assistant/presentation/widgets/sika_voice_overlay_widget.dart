@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 
@@ -59,7 +60,6 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
         sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.speaking;
         
-    final bool isListening = sikaData.state == SikaState.listening;
     final String recognizedText = sikaData.currentText ?? '';
 
     // L'overlay vocal ne doit s'afficher que si on est en mode vocal !
@@ -91,7 +91,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95),
+            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.90),
             child: SafeArea(
               child: Column(
                 children: [
@@ -101,12 +101,12 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                     child: Row(
                       children: [
                          IconButton(
-                          icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface, size: 24),
+                          icon: Icon(Icons.close_rounded, color: Theme.of(context).colorScheme.onSurface, size: 28),
                           onPressed: () async {
                             await sikaNotifier.stopListening();
                             sikaNotifier.clearConversation();
                           },
-                        ),
+                        ).animate().fade().scale(),
                       ],
                     ),
                   ),
@@ -116,13 +116,11 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                   // 2. TITRE DE L'ÉCROUTE SIKA
                   Text(
                     titleText,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 26,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
-                  ),
+                  ).animate().fade().slideY(begin: 0.2, end: 0),
                   const SizedBox(height: 10),
 
                   // RECONNAISSANCE VOCALE EN DIRECT OU INSTRUCTION
@@ -133,17 +131,16 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       textAlign: TextAlign.center,
                       maxLines: 5,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: hasSubText
                             ? Theme.of(context).colorScheme.onSurface
-                            : const Color(0xFF94A3B8),
-                        fontSize: hasSubText ? 17 : 14,
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         fontWeight: hasSubText
                             ? FontWeight.w600
                             : FontWeight.normal,
                       ),
                     ),
-                  ),
+                  ).animate().fade(delay: 200.ms),
 
                   const Spacer(),
 
@@ -209,7 +206,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                       );
                     },
                   ),
-                  ),
+                  ).animate().fade(duration: 800.ms).scale(delay: 100.ms, duration: 400.ms),
 
                   const Spacer(),
 
@@ -225,7 +222,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                         );
                       },
                     ),
-                  ),
+                  ).animate().fade(delay: 300.ms),
 
                   const SizedBox(height: 30),
                 ],

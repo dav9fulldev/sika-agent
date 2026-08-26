@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
@@ -38,7 +39,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(langNotifier.tr('Mot de passe réinitialisé avec succès !', 'Password reset successful!')),
-          backgroundColor: AppColors.cyan,
+          backgroundColor: AppColors.brandPrimary,
         ),
       );
       
@@ -60,10 +61,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     final authNotifier = ref.read(authProvider.notifier);
 
     return Scaffold(
-      backgroundColor: const Color(0xff020614),
       appBar: AppBar(
-        backgroundColor: const Color(0xff020614),
-        elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -81,9 +79,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                        blurRadius: 30,
-                        spreadRadius: 8,
+                        color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                        blurRadius: 40,
+                        spreadRadius: 10,
                       ),
                     ],
                   ),
@@ -91,16 +89,16 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     AppImages.logo,
                     width: 90,
                   ),
-                ),
-                const SizedBox(height: 24),
+                ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
+                const SizedBox(height: 32),
+                
                 Text(
                   langNotifier.tr('Nouveau mot de passe', 'New Password'),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 24,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
-                ),
+                ).animate().fade(delay: 300.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 8),
                 Text(
                   langNotifier.tr(
@@ -108,110 +106,84 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     'Enter the code received and your new password.',
                   ),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 14,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
-                ),
-                const SizedBox(height: 32),
+                ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
+                const SizedBox(height: 40),
 
                 if (authState.errorMessage != null)
                   Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.rose.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.rose.withValues(alpha: 0.4)),
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                     ),
-                    child: Text(
-                      authState.errorMessage!,
-                      style: const TextStyle(color: AppColors.rose, fontSize: 13),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            authState.errorMessage!,
+                            style: const TextStyle(color: AppColors.error, fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ).animate().fade().slideY(begin: -0.1, end: 0),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+                TextField(
+                  controller: _otpController,
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: langNotifier.tr('Code de vérification', 'Verification code'),
+                    prefixIcon: const Icon(Icons.password_outlined, color: AppColors.brandSecondary),
                   ),
-                  child: TextField(
-                    controller: _otpController,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: langNotifier.tr('Code de vérification', 'Verification code'),
-                      hintStyle: const TextStyle(color: Color(0xFF475569)),
-                      prefixIcon: const Icon(Icons.password_outlined, color: AppColors.cyan, size: 20),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
+                ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
                 const SizedBox(height: 16),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
-                  ),
-                  child: TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: langNotifier.tr('Nouveau mot de passe', 'New password'),
-                      hintStyle: const TextStyle(color: Color(0xFF475569)),
-                      prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.cyan, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: const Color(0xFF64748B),
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          setState(() => _obscurePassword = !_obscurePassword);
-                        },
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    hintText: langNotifier.tr('Nouveau mot de passe', 'New password'),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.brandSecondary),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        size: 20,
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                ).animate().fade(delay: 600.ms).slideY(begin: 0.1, end: 0),
+                const SizedBox(height: 32),
 
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed: authState.isLoading
                         ? null
                         : () => _onResetPressed(authNotifier, langNotifier),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
                     child: authState.isLoading
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                           )
-                        : Text(
-                            langNotifier.tr('Réinitialiser', 'Reset Password'),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                        : Text(langNotifier.tr('Réinitialiser', 'Reset Password')),
                   ),
-                ),
+                ).animate().fade(delay: 700.ms).scale(delay: 700.ms, duration: 200.ms),
               ],
             ),
           ),

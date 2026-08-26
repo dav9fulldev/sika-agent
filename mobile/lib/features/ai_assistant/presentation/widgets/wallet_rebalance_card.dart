@@ -54,9 +54,7 @@ class WalletRebalanceCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   langNotifier.tr('Équilibrage Multi-Portefeuilles', 'Smart Wallet Auto-Balancer'),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -70,9 +68,8 @@ class WalletRebalanceCard extends ConsumerWidget {
               'Votre compte Wave (${currNotifier.format(15000)}) risque d\'être insuffisant pour vos dépenses de fin de semaine. SIKA suggère de transférer ${currNotifier.format(7000)} depuis Orange Money.',
               'Your Wave account (${currNotifier.format(15000)}) might fall short for weekend bills. SIKA suggests transferring ${currNotifier.format(7000)} from Orange Money.',
             ),
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 12.5,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF94A3B8),
               height: 1.4,
             ),
           ),
@@ -94,9 +91,7 @@ class WalletRebalanceCard extends ConsumerWidget {
                   icon: Icon(Icons.bolt_rounded, color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
                     langNotifier.tr('Rééquilibrer en 1 Clic', 'Auto-Rebalance in 1 Tap'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),

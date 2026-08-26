@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../wallet/providers/wallet_provider.dart';
@@ -90,9 +92,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         centerTitle: false,
         title: Text(
           'Insights',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 24,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -142,11 +142,18 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             // 1. DÉPENSES TOTALES DYNAMIQUES
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,20 +191,17 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           children: [
                             Text(
                               currNotifier.format(totalExpenseFcfa),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 26,
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               totalExpenseFcfa > 0
                                   ? langNotifier.tr('Basé sur vos transactions récentes', 'Based on recent transactions')
                                   : langNotifier.tr('Aucune dépense enregistrée', 'No expenses recorded'),
-                              style: TextStyle(
-                                color: totalExpenseFcfa > 0 ? const Color(0xFF10B981) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: totalExpenseFcfa > 0 ? AppColors.success : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -260,7 +264,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                 ],
               ),
-            ),
+            ).animate().fade(duration: 400.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad),
 
             const SizedBox(height: 20),
 
@@ -276,11 +280,18 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
                 return Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04)),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,15 +379,14 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
                       Text(
                         '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ${langNotifier.tr('épargnés dans ce coffre', 'saved in this vault')}',
-                        style: TextStyle(
-                          color: Color(0xFF10B981),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF10B981),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                );
+                ).animate().fade(duration: 400.ms, delay: 100.ms).slideY(begin: 0.1, curve: Curves.easeOutQuad);
               },
             ),
           ],

@@ -89,18 +89,15 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                   children: [
                     Text(
                       'SIKA Analysis',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 18,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       'Proactive SIKA Intervention',
-                      style: TextStyle(
-                        color: Color(0xFFF59E0B),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: const Color(0xFFF59E0B),
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -143,9 +140,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           // REASONING SECTION ("Why am I alerting you?")
           Text(
             'Why am I alerting you?',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 14,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -157,11 +152,10 @@ class ProactiveAnalysisSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
             ),
-            child: const Text(
+            child: Text(
               'This single expense consumes about two-thirds of your remaining budget (45,000 FCFA) and threatens your 50,000 FCFA savings target.',
-              style: TextStyle(
-                color: Color(0xFFE2E8F0),
-                fontSize: 13,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFFE2E8F0),
                 height: 1.4,
               ),
             ),
@@ -170,11 +164,10 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           const SizedBox(height: 24),
 
           // ACTION CHOICES ("What would you like to do?")
-          const Text(
+          Text(
             'What would you like to do?',
-            style: TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 13,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF94A3B8),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -240,9 +233,8 @@ class ProactiveAnalysisSheet extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: isHighlight ? Theme.of(context).colorScheme.onSurface : Color(0xFF94A3B8),
-            fontSize: isHighlight ? 14 : 12.5,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: isHighlight ? Theme.of(context).colorScheme.onSurface : const Color(0xFF94A3B8),
             fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
           ),
         ),

@@ -139,9 +139,8 @@ class AgentOrbWidget extends StatelessWidget {
           child: Text(
             _getStatusText(),
             key: ValueKey(state),
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: orbColor,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.3,
             ),

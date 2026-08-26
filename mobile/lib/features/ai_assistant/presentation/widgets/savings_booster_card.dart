@@ -60,9 +60,7 @@ class SavingsBoosterCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   langNotifier.tr('Booster d\'Épargne Autonome', 'Autonomous Savings Booster'),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -76,9 +74,8 @@ class SavingsBoosterCard extends ConsumerWidget {
               'En mettant de côté ${currNotifier.format(500)} aujourd\'hui, vous atteindrez votre coffre "$coffreName" (${currNotifier.format(targetAmount)}) avec 5 jours d\'avance !',
               'By putting aside ${currNotifier.format(500)} today, you will reach your "$coffreName" target (${currNotifier.format(targetAmount)}) 5 days earlier!',
             ),
-            style: const TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 12.5,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF94A3B8),
               height: 1.4,
             ),
           ),
@@ -100,9 +97,7 @@ class SavingsBoosterCard extends ConsumerWidget {
                   icon: Icon(Icons.savings_outlined, color: Theme.of(context).colorScheme.onSurface, size: 18),
                   label: Text(
                     langNotifier.tr('Épargner ${currNotifier.format(500)} maintenant', 'Boost ${currNotifier.format(500)} now'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 13,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),

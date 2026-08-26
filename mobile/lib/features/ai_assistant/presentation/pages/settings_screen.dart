@@ -222,10 +222,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              langNotifier.tr('Compte', 'Account'),
-              style: TextStyle(
+              langNotifier.tr('Compte', 'Account').toUpperCase(),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
@@ -244,10 +243,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              langNotifier.tr('Préférences', 'Preferences'),
-              style: TextStyle(
+              langNotifier.tr('Préférences', 'Preferences').toUpperCase(),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
@@ -258,13 +256,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _notificationPrefEnabled = val),
             title: Text(
               langNotifier.tr('Notifications', 'Notifications'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               langNotifier.tr('Mises à jour et alertes', 'Updates and alerts'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
-            activeThumbColor: AppColors.primary,
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
           Consumer(
             builder: (context, ref, child) {
@@ -277,13 +279,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 },
                 title: Text(
                   langNotifier.tr('Mode Sombre', 'Dark Mode'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
                   langNotifier.tr('Activer le thème foncé', 'Enable dark theme'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
-                activeThumbColor: AppColors.primary,
+                activeThumbColor: AppColors.brandPrimary,
+                activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               );
             }
           ),
@@ -300,16 +306,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => _showCurrencyBottomSheet(currNotifier, currentAppCurrency, langNotifier),
           ),
 
-          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
+          Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 24, thickness: 1),
 
           // 3. SECTION VOICE & WAKE WORD
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'VOICE & WAKE WORD',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
               ),
@@ -327,30 +332,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             title: Text(
               langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               langNotifier.tr(
                 'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
                 'Allows calling SIKA in background without opening the app.',
               ),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                height: 1.3,
+              ),
             ),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
+          Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 24, thickness: 1),
 
           // 4. SECTION PERCEPTION & OVERLAY
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'PERCEPTION & OVERLAY',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1,
               ),
@@ -361,17 +368,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _overlayEnabled = val),
             title: Text(
               langNotifier.tr('Bulle Flottante Android (Overlay)', 'Android Floating Bubble (Overlay)'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               langNotifier.tr(
                 'Affiche des alertes proactives au-dessus des autres applications.',
                 'Displays proactive alerts on top of other applications.',
               ),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                height: 1.3,
+              ),
             ),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
           SwitchListTile(
@@ -382,30 +392,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Perception des Notifications Mobile Money',
                 'Mobile Money Notification Perception',
               ),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               langNotifier.tr(
                 'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
                 'Allows SIKA to read Wave, Orange Money and MTN alerts.',
               ),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                height: 1.3,
+              ),
             ),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
+          Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 24, thickness: 1),
 
           // 5. SECTION SIKA SERVICES
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
               'Sika Services',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
@@ -416,11 +428,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _proactiveGuardianEnabled = val),
             title: Text(
               'Proactive Guardian',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
-            secondary: const Icon(Icons.shield_outlined, color: AppColors.cyan, size: 22),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            secondary: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.shield_outlined, color: AppColors.brandPrimary, size: 22),
+            ),
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
           SwitchListTile(
@@ -428,28 +447,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (val) => setState(() => _voiceAssistantEnabled = val),
             title: Text(
               'Voice Assistant',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
-            secondary: const Icon(Icons.keyboard_voice_outlined, color: AppColors.cyan, size: 22),
-            activeThumbColor: const Color(0xFF10B981),
-            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            secondary: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.keyboard_voice_outlined, color: AppColors.brandPrimary, size: 22),
+            ),
+            activeThumbColor: AppColors.brandPrimary,
+            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
 
-          Divider(color: Theme.of(context).cardColor, height: 32, thickness: 1),
+          Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 32, thickness: 1),
 
           // 6. VERSION EN BAS DE PAGE
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
             title: Text(
               langNotifier.tr('Version SIKA Agent', 'SIKA Agent Version'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               'v1.0.0 (All Things Agentic Taskmaster)',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7), fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
             ),
-            trailing: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), size: 20),
+            trailing: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3), size: 22),
           ),
         ],
       ),
@@ -463,43 +491,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String? trailingText,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-      leading: Icon(icon, color: AppColors.cyan, size: 22),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurface,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
       ),
-      subtitle: subtitle != null
-          ? Text(
-        subtitle,
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
-      )
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailingText != null)
-            Text(
-              trailingText,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (trailingText != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    trailingText,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  size: 22,
+                ),
+              ],
             ),
-          const SizedBox(width: 6),
-          const Icon(
-            Icons.arrow_forward_ios_rounded,
-            color: Color(0xFF334155),
-            size: 14,
           ),
-        ],
+        ),
       ),
     );
   }

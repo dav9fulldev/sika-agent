@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../widgets/sika_robot_animation.dart';
 import '../widgets/financial_animation.dart';
@@ -114,9 +115,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   Text(
                                     step['title'] as String,
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurface,
-                                      fontSize: 26,
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
                                     ),
@@ -128,9 +127,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   Text(
                                     step['subtitle'] as String,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Color(0xff94a3b8),
-                                      fontSize: 15,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: const Color(0xff94a3b8),
                                       height: 1.45,
                                     ),
                                   ),
@@ -194,15 +192,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         borderRadius: BorderRadius.circular(16),
                         gradient: const LinearGradient(
                           colors: [
-                            Color(0xff3f8cff),
-                            Color(0xff635bff),
+                            AppColors.brandPrimary,
+                            AppColors.brandSecondary,
                           ],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xff635bff).withValues(alpha: 0.3),
+                            color: AppColors.brandPrimary.withValues(alpha: 0.3),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -213,9 +211,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           _currentPage == onboardingSteps.length - 1
                               ? langNotifier.tr('Commencer', 'Get Started')
                               : langNotifier.tr('Suivant', 'Next'),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: 16,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),

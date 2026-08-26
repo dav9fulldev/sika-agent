@@ -190,9 +190,7 @@ class _FinancialAnimationState extends ConsumerState<FinancialAnimation> with Ti
                     ),
                     child: Text(
                       message,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 11,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
                     ),

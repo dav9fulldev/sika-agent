@@ -65,17 +65,15 @@ class ProactiveAlertCard extends StatelessWidget {
                       children: [
                         Text(
                           '⚠️ $title',
-                          style: const TextStyle(
-                            color: Color(0xFFF59E0B),
-                            fontSize: 15,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: const Color(0xFFF59E0B),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Proactive SIKA Intervention',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 11,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF94A3B8),
                           ),
                         ),
                       ],
@@ -89,9 +87,7 @@ class ProactiveAlertCard extends StatelessWidget {
                     ),
                     child: Text(
                       amountText,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -101,9 +97,8 @@ class ProactiveAlertCard extends StatelessWidget {
               const SizedBox(height: 14),
               Text(
                 message,
-                style: const TextStyle(
-                  color: Color(0xFFE2E8F0),
-                  fontSize: 13.5,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFFE2E8F0),
                   height: 1.4,
                 ),
               ),

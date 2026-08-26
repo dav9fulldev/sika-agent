@@ -164,9 +164,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                 'Connecter un portefeuille',
                 'Connect a Wallet',
               ),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 20,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -176,7 +174,9 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                 'Choisissez votre partenaire de paiement et entrez votre numéro de mobile.',
                 'Choose your payment partner and enter your mobile number.',
               ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF94A3B8),
+              ),
             ),
 
             if (_localErrorMessage != null) ...[
@@ -259,10 +259,9 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                             prov['name'] as String,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isSelected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.70),
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: isSelected ? Theme.of(context).colorScheme.onSurface : AppColors.textMuted,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                             ),
                           ),
                         ],

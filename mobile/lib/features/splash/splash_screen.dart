@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_images.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -124,21 +125,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         children: [
                           Text(
                             "Sika",
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 42,
+                            style: Theme.of(context).textTheme.displayLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.8,
                             ),
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(
                             "Your Autonomous\nFinancial Agent",
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFF38BDF8), // Cyan lumineux parfaitement lisible
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: AppColors.brandPrimary,
+                              fontWeight: FontWeight.w600,
                               height: 1.4,
                               letterSpacing: 0.6,
                             ),
@@ -188,8 +186,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     return LinearProgressIndicator(
                       value: _progressController.value,
                       backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFF10B981),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.success,
                       ),
                     );
                   },
