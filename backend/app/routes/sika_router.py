@@ -1,5 +1,8 @@
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..models.user import UserModel
 from typing import Dict, Any, Optional
 from ..schemas.sika_dto import SikaQueryDTO, SikaConfirmTransactionDTO, SikaResponseDTO
 from ..services.sika_ai import SikaAI
@@ -72,7 +75,7 @@ def auth_google(data: Dict[str, Any]):
     return oauth2_auth_service.google_login(email=email, name=name, id_token=id_token)
 
 @router.get("/auth/me")
-def auth_me(authorization: Optional[str] = Header(None)):
+def auth_me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     """Route protégée vérifiant le jeton OAuth2 Bearer."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Jeton Authorization Bearer manquant.")
@@ -80,6 +83,16 @@ def auth_me(authorization: Optional[str] = Header(None)):
     payload = oauth2_auth_service.verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Jeton invalide ou expiré.")
+    
+    # Fetch latest user state from DB
+    user_id = payload.get("user_id")
+    if user_id:
+        user = db.query(UserModel).filter(UserModel.id == user_id).first()
+        if user:
+            payload["full_name"] = user.full_name
+            payload["phone"] = user.phone
+            payload["is_kyc_verified"] = user.is_kyc_verified
+
     return {
         "status": "AUTHENTICATED",
         "user": payload

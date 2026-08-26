@@ -121,6 +121,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 id: (uData["id"] ?? '1').toString(),
                 name: displayName,
                 email: (uData["email"] ?? "").toString(),
+                phone: uData["phone"]?.toString(),
+                isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
               ),
             );
             return;
@@ -187,6 +189,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
+          phone: uData["phone"]?.toString(),
+          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
         ),
       );
 
@@ -240,6 +244,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email.trim()).toString(),
+          phone: uData["phone"]?.toString(),
+          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
         ),
       );
 
@@ -354,6 +360,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           id: (uData["id"] ?? '1').toString(),
           name: displayName,
           email: (uData["email"] ?? email).toString(),
+          phone: uData["phone"]?.toString(),
+          isKycVerified: uData["is_kyc_verified"] == 1 || uData["is_kyc_verified"] == true,
           photoUrl: photoUrl,
           isGoogleAuth: true,
         ),
