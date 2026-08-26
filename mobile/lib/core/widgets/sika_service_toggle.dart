@@ -20,7 +20,7 @@ class SikaServiceToggle extends StatelessWidget {
       activeTrackColor: AppColors.success.withValues(alpha: 0.2),
       inactiveThumbColor: AppColors.textSecondary,
       inactiveTrackColor: AppColors.border,
-      title: const Text(
+      title: Text(
         'Service Vocal SIKA (Wake-word)',
         style: TextStyle(
           color: Theme.of(context).colorScheme.onSurface,
