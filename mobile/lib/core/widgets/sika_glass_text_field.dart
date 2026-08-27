@@ -9,6 +9,8 @@ class SikaGlassTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType keyboardType;
   final int? maxLines;
+  final ValueChanged<String>? onSubmitted;
+  final FocusNode? focusNode;
 
   const SikaGlassTextField({
     super.key,
@@ -19,6 +21,8 @@ class SikaGlassTextField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
+    this.onSubmitted,
+    this.focusNode,
   });
 
   @override
@@ -35,9 +39,11 @@ class SikaGlassTextField extends StatelessWidget {
       ),
       child: TextField(
             controller: controller,
+            focusNode: focusNode,
             obscureText: obscureText,
             keyboardType: keyboardType,
             maxLines: maxLines,
+            onSubmitted: onSubmitted,
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: hintText,

@@ -14,6 +14,9 @@ import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
 import '../../../wallet/providers/wallet_provider.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
+import '../../../../core/widgets/sika_glass_text_field.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenChat;
@@ -526,37 +529,12 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
           ),
           const SizedBox(height: 32),
           // Connection CTA
-          GestureDetector(
-            onTap: () => ConnectWalletModal.show(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.brandPrimary.withValues(alpha: 0.2),
-                    Colors.white.withValues(alpha: 0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add_rounded,
-                      color: AppColors.brandPrimary, size: 20),
-                  const SizedBox(width: 10),
-                  Text(
-                    langNotifier.tr('Ajouter un compte', 'Add Account'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: SikaPremiumButton(
+              onPressed: () => ConnectWalletModal.show(context),
+              text: langNotifier.tr('Ajouter un compte', 'Add Account'),
+              prefixWidget: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -608,10 +586,10 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppColors.darkSurfaceHighlight,
+                    color: AppColors.darkSurface.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
+                      color: AppColors.brandPrimary.withValues(alpha: 0.15),
                     ),
                   ),
                   child: Row(
@@ -648,24 +626,11 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
   Widget _buildSikaStatusCard(BuildContext context, dynamic langNotifier,
       SikaNotifier sikaNotifier, SikaData sikaData) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+    return SikaGlassCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      borderRadius: BorderRadius.circular(28),
+      blur: 24.0,
+      opacity: 0.2,
       child: Stack(
         children: [
           // Background Glow
@@ -830,10 +795,10 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
+          color: AppColors.darkSurface.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: AppColors.brandPrimary.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
@@ -881,74 +846,34 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
   Widget _buildInputBar(
       BuildContext context, SikaNotifier notifier, dynamic langNotifier) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.darkSurfaceHighlight.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SikaGlassTextField(
+        controller: _inputController,
+        focusNode: _inputFocus,
+        hintText: langNotifier.tr('Posez une question...', 'Ask a question...'),
+        prefixIcon: Icons.auto_awesome_rounded,
+        onSubmitted: (val) => _submitQuery(val, notifier),
+        suffixIcon: GestureDetector(
+          onTap: () => _submitQuery(_inputController.text, notifier),
+          child: Container(
+            margin: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.brandPrimary, Color(0xFF635BFF)],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brandPrimary.withValues(alpha: 0.4),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.arrow_upward_rounded,
+                color: Colors.white, size: 20),
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _inputController,
-              focusNode: _inputFocus,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                  ),
-              decoration: InputDecoration(
-                hintText: langNotifier.tr(
-                    'Posez une question...', 'Ask a question...'),
-                hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 14,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                prefixIcon: Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppColors.brandPrimary.withValues(alpha: 0.8),
-                  size: 20,
-                ),
-              ),
-              onSubmitted: (val) => _submitQuery(val, notifier),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _submitQuery(_inputController.text, notifier),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.brandPrimary, Color(0xFF635BFF)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.brandPrimary.withValues(alpha: 0.4),
-                      blurRadius: 10),
-                ],
-              ),
-              child: const Icon(Icons.arrow_upward_rounded,
-                  color: Colors.white, size: 20),
-            ),
-          ),
-        ],
       ),
     );
   }

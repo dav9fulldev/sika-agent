@@ -183,22 +183,22 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             height: 70,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              color: AppColors.darkSurface.withValues(alpha: 0.65),
+              color: AppColors.darkSurface.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.12),
+                color: AppColors.brandPrimary.withValues(alpha: 0.15),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
