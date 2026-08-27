@@ -87,18 +87,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    const Color backgroundWaveColor =
-        Color(0xff020614); // Identique au fond de wave.png
-
     return Scaffold(
-      backgroundColor: backgroundWaveColor,
+      backgroundColor: AppColors.darkBackground,
       body: Stack(
         children: [
-          // 1. FOND UNIFORME EXACTEMENT IDENTIQUE À WAVE.PNG
+          // 1. FOND UNIFORME
           Container(
             width: double.infinity,
             height: double.infinity,
-            color: backgroundWaveColor,
+            color: AppColors.darkBackground,
           ),
 
           // 2. LOGO ET TEXTE ANIMÉ AU CENTRE
@@ -182,24 +179,36 @@ class _SplashScreenState extends State<SplashScreen>
             bottom: 50,
             left: 85,
             right: 85,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                height: 4,
-                child: AnimatedBuilder(
-                  animation: _progressController,
-                  builder: (context, child) {
-                    return LinearProgressIndicator(
-                      value: _progressController.value,
-                      backgroundColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.08),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.success,
-                      ),
-                    );
-                  },
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  height: 4,
+                  child: AnimatedBuilder(
+                    animation: _progressController,
+                    builder: (context, child) {
+                      return LinearProgressIndicator(
+                        value: _progressController.value,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.success,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

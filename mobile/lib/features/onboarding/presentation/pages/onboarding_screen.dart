@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
 import '../widgets/sika_robot_animation.dart';
 import '../widgets/financial_animation.dart';
 import '../widgets/security_animation.dart';
@@ -62,7 +64,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xff020614),
+      backgroundColor: AppColors.darkBackground,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -80,7 +82,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
           ),
 
-          // 2. CONTENU DU PAGE VIEW
+          // 2. CONTENU PRINCIPAL
           SafeArea(
             child: Column(
               children: [
@@ -106,49 +108,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           return Opacity(
                             opacity: value,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24.0,
-                                vertical: 16.0,
-                              ),
-                              child: Column(
-                                children: [
-                                  const SizedBox(height: 30),
-
-                                  // TITRE DE L'ÉTAPE
-                                  Text(
-                                    step['title'] as String,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                  ),
-
-                                  const SizedBox(height: 14),
-
-                                  // SOUS-TITRE DE L'ÉTAPE
-                                  Text(
-                                    step['subtitle'] as String,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: const Color(0xff94a3b8),
-                                          height: 1.45,
-                                        ),
-                                  ),
-
-                                  const Spacer(),
-
-                                  // COMPOSANT ANIMÉ DÉDIÉ
-                                  step['widget'] as Widget,
-
-                                  const Spacer(flex: 2),
-                                ],
+                              padding: const EdgeInsets.all(24.0),
+                              child: Center(
+                                child: step['widget'] as Widget,
                               ),
                             ),
                           );
@@ -158,78 +120,91 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                 ),
 
-                // 3. INDICATEURS DE PAGE
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    onboardingSteps.length,
-                    (index) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == index ? 24 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _currentPage == index
-                            ? const Color(0xff3f8cff)
-                            : const Color(0xff1e293b),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // 4. MAIN ACTION BUTTON (SUIVANT / COMMENCER)
+                // 3. PANNEAU INFÉRIEUR EN VERRE
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (_currentPage < onboardingSteps.length - 1) {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeInOutCubic,
-                        );
-                      } else {
-                        widget.onFinish();
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.brandPrimary,
-                            AppColors.brandSecondary,
-                          ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                AppColors.brandPrimary.withValues(alpha: 0.3),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: SikaGlassCard(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 32,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // TITRE
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            onboardingSteps[_currentPage]['title'] as String,
+                            key: ValueKey<String>(onboardingSteps[_currentPage]['title'] as String),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          _currentPage == onboardingSteps.length - 1
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // SOUS-TITRE
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            onboardingSteps[_currentPage]['subtitle'] as String,
+                            key: ValueKey<String>(onboardingSteps[_currentPage]['subtitle'] as String),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: const Color(0xff94a3b8),
+                                  height: 1.45,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // INDICATEURS DE PAGE
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            onboardingSteps.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: _currentPage == index ? 24 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _currentPage == index
+                                    ? AppColors.brandPrimary
+                                    : AppColors.brandPrimary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // BOUTON ACTION
+                        SikaPremiumButton(
+                          onPressed: () {
+                            if (_currentPage < onboardingSteps.length - 1) {
+                              _pageController.nextPage(
+                                duration: const Duration(milliseconds: 400),
+                                curve: Curves.easeInOutCubic,
+                              );
+                            } else {
+                              widget.onFinish();
+                            }
+                          },
+                          text: _currentPage == onboardingSteps.length - 1
                               ? langNotifier.tr('Commencer', 'Get Started')
                               : langNotifier.tr('Suivant', 'Next'),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
