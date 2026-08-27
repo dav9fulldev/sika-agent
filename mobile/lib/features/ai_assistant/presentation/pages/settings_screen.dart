@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -24,21 +25,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // États pour les switchs de préférences générales
   bool _notificationPrefEnabled = true;
 
-  // DÉCLENCHEMENT DU BOTTOM SHEET DE SÉLECTION DE LANGUE
   void _showLanguageBottomSheet(
       LanguageNotifier langNotifier, String currentLang) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            color: AppColors.darkBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -51,7 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     langNotifier.tr('Choisir la langue', 'Choose Language'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -61,12 +61,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             .colorScheme
                             .onSurface
                             .withValues(alpha: 0.6),
-                        size: 20),
+                        size: 24),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               _buildLanguageOption(
                   'English', 'English', currentLang, langNotifier),
               const SizedBox(height: 8),
@@ -131,16 +131,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            color: AppColors.darkBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -153,7 +153,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     langNotifier.tr('Choisir la devise', 'Choose Currency'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -163,12 +163,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             .colorScheme
                             .onSurface
                             .withValues(alpha: 0.6),
-                        size: 20),
+                        size: 24),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               ...currencies.map((item) {
                 final curr = item['currency'] as AppCurrency;
                 final bool isSelected = currentCurr == curr;
@@ -268,14 +268,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
-          _buildActionTile(
-            icon: Icons.lock_outline_rounded,
-            title: langNotifier.tr('Sécurité', 'Security'),
-            subtitle: langNotifier.tr('PIN, biométrie', 'PIN, biometrics'),
-            onTap: () {},
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SikaGlassCard(
+              padding: EdgeInsets.zero,
+              child: _buildActionTile(
+                icon: Icons.lock_outline_rounded,
+                title: langNotifier.tr('Sécurité', 'Security'),
+                subtitle: langNotifier.tr('PIN, biométrie', 'PIN, biometrics'),
+                onTap: () {},
+              ),
+            ),
           ),
 
-          Divider(color: Theme.of(context).cardColor, height: 24, thickness: 1),
+          const SizedBox(height: 24),
 
           // 2. SECTION PRÉFÉRENCES
           Padding(
@@ -292,81 +298,88 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
-          SwitchListTile(
-            value: _notificationPrefEnabled,
-            onChanged: (val) => setState(() => _notificationPrefEnabled = val),
-            title: Text(
-              langNotifier.tr('Notifications', 'Notifications'),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              langNotifier.tr('Mises à jour et alertes', 'Updates and alerts'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
-                  ),
-            ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          ),
-          Consumer(builder: (context, ref, child) {
-            final themeMode = ref.watch(themeProvider);
-            final isDark = themeMode == ThemeMode.dark;
-            return SwitchListTile(
-              value: isDark,
-              onChanged: (val) {
-                ref.read(themeProvider.notifier).toggleTheme();
-              },
-              title: Text(
-                langNotifier.tr('Mode Sombre', 'Dark Mode'),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                langNotifier.tr('Activer le thème foncé', 'Enable dark theme'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SikaGlassCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _notificationPrefEnabled,
+                    onChanged: (val) => setState(() => _notificationPrefEnabled = val),
+                    title: Text(
+                      langNotifier.tr('Notifications', 'Notifications'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
+                    subtitle: Text(
+                      langNotifier.tr('Mises à jour et alertes', 'Updates and alerts'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  ),
+                  Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                  Consumer(builder: (context, ref, child) {
+                    final themeMode = ref.watch(themeProvider);
+                    final isDark = themeMode == ThemeMode.dark;
+                    return SwitchListTile(
+                      value: isDark,
+                      onChanged: (val) {
+                        ref.read(themeProvider.notifier).toggleTheme();
+                      },
+                      title: Text(
+                        langNotifier.tr('Mode Sombre', 'Dark Mode'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        langNotifier.tr('Activer le thème foncé', 'Enable dark theme'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                      ),
+                      activeThumbColor: AppColors.brandPrimary,
+                      activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    );
+                  }),
+                  Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                  _buildActionTile(
+                    icon: Icons.language_rounded,
+                    title: langNotifier.tr('Langue', 'Language'),
+                    trailingText: currentLang,
+                    onTap: () => _showLanguageBottomSheet(langNotifier, currentLang),
+                  ),
+                  Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                  _buildActionTile(
+                    icon: Icons.payments_outlined,
+                    title: langNotifier.tr('Devise', 'Currency'),
+                    trailingText: currentCurrStr,
+                    onTap: () => _showCurrencyBottomSheet(
+                        currNotifier, currentAppCurrency, langNotifier),
+                  ),
+                ],
               ),
-              activeThumbColor: AppColors.brandPrimary,
-              activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            );
-          }),
-          _buildActionTile(
-            icon: Icons.language_rounded,
-            title: langNotifier.tr('Langue', 'Language'),
-            trailingText: currentLang,
-            onTap: () => _showLanguageBottomSheet(langNotifier, currentLang),
-          ),
-          _buildActionTile(
-            icon: Icons.payments_outlined,
-            title: langNotifier.tr('Devise', 'Currency'),
-            trailingText: currentCurrStr,
-            onTap: () => _showCurrencyBottomSheet(
-                currNotifier, currentAppCurrency, langNotifier),
+            ),
           ),
 
-          Divider(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.05),
-              height: 24,
-              thickness: 1),
+          const SizedBox(height: 24),
 
           // 3. SECTION VOICE & WAKE WORD
           Padding(
@@ -383,49 +396,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
-          SwitchListTile(
-            value: _wakeWordEnabled,
-            onChanged: (val) {
-              setState(() => _wakeWordEnabled = val);
-              if (val) {
-                SikaNativeService.startSikaService();
-              } else {
-                SikaNativeService.stopSikaService();
-              }
-            },
-            title: Text(
-              langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              langNotifier.tr(
-                'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
-                'Allows calling SIKA in background without opening the app.',
-              ),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
-                    height: 1.3,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SikaGlassCard(
+              padding: EdgeInsets.zero,
+              child: SwitchListTile(
+                value: _wakeWordEnabled,
+                onChanged: (val) {
+                  setState(() => _wakeWordEnabled = val);
+                  if (val) {
+                    SikaNativeService.startSikaService();
+                  } else {
+                    SikaNativeService.stopSikaService();
+                  }
+                },
+                title: Text(
+                  langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  langNotifier.tr(
+                    'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
+                    'Allows calling SIKA in background without opening the app.',
                   ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7),
+                        height: 1.3,
+                      ),
+                ),
+                activeThumbColor: AppColors.brandPrimary,
+                activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
             ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          Divider(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.05),
-              height: 24,
-              thickness: 1),
+          const SizedBox(height: 24),
 
           // 4. SECTION PERCEPTION & OVERLAY
           Padding(
@@ -442,80 +455,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
-          SwitchListTile(
-            value: _overlayEnabled,
-            onChanged: (val) => setState(() => _overlayEnabled = val),
-            title: Text(
-              langNotifier.tr('Bulle Flottante Android (Overlay)',
-                  'Android Floating Bubble (Overlay)'),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              langNotifier.tr(
-                'Affiche des alertes proactives au-dessus des autres applications.',
-                'Displays proactive alerts on top of other applications.',
-              ),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
-                    height: 1.3,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SikaGlassCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _overlayEnabled,
+                    onChanged: (val) => setState(() => _overlayEnabled = val),
+                    title: Text(
+                      langNotifier.tr('Bulle Flottante Android (Overlay)',
+                          'Android Floating Bubble (Overlay)'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      langNotifier.tr(
+                        'Affiche des alertes proactives au-dessus des autres applications.',
+                        'Displays proactive alerts on top of other applications.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.7),
+                            height: 1.3,
+                          ),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   ),
-            ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          ),
-          SwitchListTile(
-            value: _notificationsEnabled,
-            onChanged: (val) => setState(() => _notificationsEnabled = val),
-            title: Text(
-              langNotifier.tr(
-                'Perception des Notifications Mobile Money',
-                'Mobile Money Notification Perception',
-              ),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              langNotifier.tr(
-                'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
-                'Allows SIKA to read Wave, Orange Money and MTN alerts.',
-              ),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
-                    height: 1.3,
+                  Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                  SwitchListTile(
+                    value: _notificationsEnabled,
+                    onChanged: (val) => setState(() => _notificationsEnabled = val),
+                    title: Text(
+                      langNotifier.tr(
+                        'Perception des Notifications Mobile Money',
+                        'Mobile Money Notification Perception',
+                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      langNotifier.tr(
+                        'Autorise SIKA à lire les alertes Wave, Orange Money et MTN.',
+                        'Allows SIKA to read Wave, Orange Money and MTN alerts.',
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.7),
+                            height: 1.3,
+                          ),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   ),
+                ],
+              ),
             ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           ),
 
-          Divider(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.05),
-              height: 24,
-              thickness: 1),
+          const SizedBox(height: 24),
 
           // 5. SECTION SIKA SERVICES
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Text(
-              'Sika Services',
+              'SIKA SERVICES',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: Theme.of(context)
                         .colorScheme
@@ -526,60 +544,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
             ),
           ),
-          SwitchListTile(
-            value: _proactiveGuardianEnabled,
-            onChanged: (val) => setState(() => _proactiveGuardianEnabled = val),
-            title: Text(
-              'Proactive Guardian',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            secondary: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.brandPrimary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SikaGlassCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _proactiveGuardianEnabled,
+                    onChanged: (val) => setState(() => _proactiveGuardianEnabled = val),
+                    title: Text(
+                      'Proactive Guardian',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    secondary: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shield_outlined,
+                          color: AppColors.brandPrimary, size: 22),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  ),
+                  Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                  SwitchListTile(
+                    value: _voiceAssistantEnabled,
+                    onChanged: (val) => setState(() => _voiceAssistantEnabled = val),
+                    title: Text(
+                      'Voice Assistant',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    secondary: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.keyboard_voice_outlined,
+                          color: AppColors.brandPrimary, size: 22),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.shield_outlined,
-                  color: AppColors.brandPrimary, size: 22),
             ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-          ),
-          SwitchListTile(
-            value: _voiceAssistantEnabled,
-            onChanged: (val) => setState(() => _voiceAssistantEnabled = val),
-            title: Text(
-              'Voice Assistant',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            secondary: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.brandPrimary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.keyboard_voice_outlined,
-                  color: AppColors.brandPrimary, size: 22),
-            ),
-            activeThumbColor: AppColors.brandPrimary,
-            activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           ),
 
-          Divider(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.05),
-              height: 32,
-              thickness: 1),
+          const SizedBox(height: 32),
 
           // 6. VERSION EN BAS DE PAGE
           ListTile(
@@ -619,86 +642,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String? trailingText,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.05)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        title,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                        subtitle,
+                        style:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.6),
+                                ),
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.6),
-                                  ),
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
-                if (trailingText != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    trailingText,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                  ),
-                ],
+              ),
+              if (trailingText != null) ...[
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.3),
-                  size: 22,
+                Text(
+                  trailingText,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
+                      ),
                 ),
               ],
-            ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
+                size: 22,
+              ),
+            ],
           ),
         ),
       ),

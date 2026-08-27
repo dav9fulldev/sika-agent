@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
 import '../../../wallet/providers/wallet_provider.dart';
@@ -21,7 +22,13 @@ class ProfileScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+          ),
+        ),
         title: Text(
           langNotifier.tr('Déconnexion', 'Log Out'),
           style: TextStyle(
@@ -48,7 +55,8 @@ class ProfileScreen extends ConsumerWidget {
                   color: Theme.of(context)
                       .colorScheme
                       .onSurface
-                      .withValues(alpha: 0.6)),
+                      .withValues(alpha: 0.6),
+                  fontWeight: FontWeight.bold),
             ),
           ),
           ElevatedButton(
@@ -63,13 +71,14 @@ class ProfileScreen extends ConsumerWidget {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.rose,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
               langNotifier.tr('Déconnexion', 'Log Out'),
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
+              style: const TextStyle(
+                  color: Colors.white,
                   fontWeight: FontWeight.bold),
             ),
           ),
@@ -85,10 +94,7 @@ class ProfileScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           final walletState = ref.watch(walletProvider);
@@ -106,21 +112,28 @@ class ProfileScreen extends ConsumerWidget {
                     }).toList();
 
           return Container(
-            height: MediaQuery.of(context).size.height * 0.75,
-            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: BoxDecoration(
+              color: AppColors.darkBackground,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
+                    width: 48,
+                    height: 5,
                     decoration: BoxDecoration(
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withValues(alpha: 0.24),
-                      borderRadius: BorderRadius.circular(2),
+                          .withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ),
                 ),
@@ -351,13 +364,13 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).cardColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           langNotifier.tr('Profil & Compte', 'Profile & Account'),
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -374,242 +387,273 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: Stack(
         children: [
-          // USER PROFILE HEADER CARD
+          // HALO D'AMBIANCE DE FOND
           Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.brandPrimary, AppColors.brandSecondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.5),
+                radius: 1.0,
+                colors: [
+                  Color(0x0a3f8cff),
+                  Colors.transparent,
+                ],
               ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.brandPrimary.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
             ),
-            child: Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2), width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
+          ),
+          
+          ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // USER PROFILE HEADER CARD
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.brandPrimary, AppColors.brandSecondary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: CircleAvatar(
-                    radius: 36,
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    child: Text(
-                      initialLetter,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2), width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
+                      child: CircleAvatar(
+                        radius: 36,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        child: Text(
+                          initialLetter,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  userName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color:
+                                          AppColors.warning.withValues(alpha: 0.5)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.star_rounded,
+                                        size: 12, color: AppColors.warning),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Premium',
+                                      style: TextStyle(
+                                        color: AppColors.warning,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  userEmail,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.8),
+                                      ),
+                                ),
+                              ),
+                              if (isKycVerified) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.verified_rounded,
+                                      color: AppColors.success, size: 14),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // MENU OPTIONS (GROUPED IN A GLASS CARD)
+              SikaGlassCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.person_outline,
+                      title: langNotifier.tr(
+                          'Informations personnelles', 'Personal Information'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const PersonalInformationScreen()),
+                        );
+                      },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.verified_user_outlined,
+                      title: langNotifier.tr('Vérification d\'Identité (KYC)',
+                          'Identity Verification (KYC)'),
+                      trailingText: isKycVerified
+                          ? langNotifier.tr('Vérifié', 'Verified')
+                          : langNotifier.tr('Non vérifié', 'Unverified'),
+                      onTap: () {
+                        if (isKycVerified) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(langNotifier.tr('Identité déjà vérifiée.',
+                                  'Identity already verified.')),
+                              backgroundColor: AppColors.emerald,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const KycVerificationScreen()),
+                        );
+                      },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
+                      trailingText:
+                          '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
+                      onTap: () {
+                        MyWalletsModal.show(context);
+                      },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.credit_card_outlined,
+                      title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const PaymentMethodsScreen()),
+                        );
+                      },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.history,
+                      title: langNotifier.tr(
+                          'Historique des transactions', 'Transaction History'),
+                      trailingText:
+                          '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
+                      onTap: () {
+                        _showMovementsModal(context, ref, langNotifier);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // LOGOUT BUTTON
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showLogoutDialog(context, ref, langNotifier),
+                  icon: const Icon(Icons.logout, color: AppColors.rose),
+                  label: Text(
+                    langNotifier.tr('Déconnexion', 'Log Out'),
+                    style: const TextStyle(
+                        color: AppColors.rose, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.rose.withValues(alpha: 0.05),
+                    side: BorderSide(color: AppColors.rose.withValues(alpha: 0.3), width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              userName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.warning.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                      AppColors.warning.withValues(alpha: 0.5)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.star_rounded,
-                                    size: 12, color: AppColors.warning),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Premium',
-                                  style: TextStyle(
-                                    color: AppColors.warning,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              userEmail,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                  ),
-                            ),
-                          ),
-                          if (isKycVerified) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.verified_rounded,
-                                  color: AppColors.success, size: 14),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // MENU OPTIONS (LISTE ÉPURÉE ET INTERACTIVE)
-          _buildMenuItem(
-            context,
-            icon: Icons.person_outline,
-            title: langNotifier.tr(
-                'Informations personnelles', 'Personal Information'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const PersonalInformationScreen()),
-              );
-            },
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.verified_user_outlined,
-            title: langNotifier.tr('Vérification d\'Identité (KYC)',
-                'Identity Verification (KYC)'),
-            trailingText: isKycVerified
-                ? langNotifier.tr('Vérifié', 'Verified')
-                : langNotifier.tr('Non vérifié', 'Unverified'),
-            onTap: () {
-              if (isKycVerified) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(langNotifier.tr('Identité déjà vérifiée.',
-                        'Identity already verified.')),
-                    backgroundColor: AppColors.emerald,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const KycVerificationScreen()),
-              );
-            },
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.account_balance_wallet_outlined,
-            title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-            trailingText:
-                '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
-            onTap: () {
-              MyWalletsModal.show(context);
-            },
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.credit_card_outlined,
-            title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const PaymentMethodsScreen()),
-              );
-            },
-          ),
-          _buildMenuItem(
-            context,
-            icon: Icons.history,
-            title: langNotifier.tr(
-                'Historique des transactions', 'Transaction History'),
-            trailingText:
-                '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
-            onTap: () {
-              _showMovementsModal(context, ref, langNotifier);
-            },
-          ),
-
-          const SizedBox(height: 32),
-
-          // LOGOUT BUTTON (DÉCONNEXION EFFECTIVE)
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () => _showLogoutDialog(context, ref, langNotifier),
-              icon: const Icon(Icons.logout, color: AppColors.rose),
-              label: Text(
-                langNotifier.tr('Déconnexion', 'Log Out'),
-                style: const TextStyle(
-                    color: AppColors.rose, fontWeight: FontWeight.bold),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.rose),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
+              const SizedBox(height: 20),
+            ],
           ),
         ],
       ),
@@ -623,74 +667,53 @@ class ProfileScreen extends ConsumerWidget {
     String? trailingText,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.05)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
+                child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-                if (trailingText != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    trailingText,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                  ),
-                ],
+              ),
+              if (trailingText != null) ...[
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.3),
-                  size: 24,
+                Text(
+                  trailingText,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.5),
+                      ),
                 ),
               ],
-            ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
+                size: 24,
+              ),
+            ],
           ),
         ),
       ),

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
+import '../../../../core/widgets/sika_glass_text_field.dart';
 
 class PersonalInformationScreen extends ConsumerStatefulWidget {
   const PersonalInformationScreen({super.key});
@@ -82,9 +85,9 @@ class _PersonalInformationScreenState
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.darkBackground,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).cardColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
@@ -108,15 +111,29 @@ class _PersonalInformationScreenState
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.emerald,
-                    child: Text(
-                      initialLetter,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppColors.brandPrimary.withValues(alpha: 0.2), width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
+                      child: Text(
+                        initialLetter,
+                        style: const TextStyle(
+                          color: AppColors.brandPrimary,
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -126,14 +143,14 @@ class _PersonalInformationScreenState
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: AppColors.brandPrimary,
                         shape: BoxShape.circle,
                         border: Border.all(
                             color: Theme.of(context).scaffoldBackgroundColor,
                             width: 3),
                       ),
-                      child: Icon(Icons.camera_alt_rounded,
-                          color: Theme.of(context).colorScheme.onSurface,
+                      child: const Icon(Icons.camera_alt_rounded,
+                          color: Colors.white,
                           size: 20),
                     ),
                   ),
@@ -143,54 +160,38 @@ class _PersonalInformationScreenState
             const SizedBox(height: 40),
 
             // Form Fields
-            _buildTextField(
-              label: langNotifier.tr('Nom complet', 'Full Name'),
-              controller: _nameController,
-              icon: Icons.person_outline,
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: langNotifier.tr('Adresse Email', 'Email Address'),
-              controller: _emailController,
-              icon: Icons.email_outlined,
-              readOnly: true, // Email is usually non-editable easily
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: langNotifier.tr('Numéro de téléphone', 'Phone Number'),
-              controller: _phoneController,
-              icon: Icons.phone_outlined,
+            SikaGlassCard(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  _buildTextField(
+                    label: langNotifier.tr('Nom complet', 'Full Name'),
+                    controller: _nameController,
+                    icon: Icons.person_outline,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    label: langNotifier.tr('Adresse Email', 'Email Address'),
+                    controller: _emailController,
+                    icon: Icons.email_outlined,
+                    readOnly: true, // Email is non-editable easily
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    label: langNotifier.tr('Numéro de téléphone', 'Phone Number'),
+                    controller: _phoneController,
+                    icon: Icons.phone_outlined,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 40),
 
             // Save Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _isSaving
-                    ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            strokeWidth: 2),
-                      )
-                    : Text(
-                        langNotifier.tr('Enregistrer', 'Save Changes'),
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                      ),
-              ),
+            SikaPremiumButton(
+              onPressed: _handleSave,
+              isLoading: _isSaving,
+              text: langNotifier.tr('Enregistrer', 'Save Changes'),
             ),
           ],
         ),
@@ -217,39 +218,44 @@ class _PersonalInformationScreenState
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          readOnly: readOnly,
-          style: TextStyle(
-            color: readOnly
-                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
-                : Theme.of(context).colorScheme.onSurface,
-            fontSize: 15,
+        if (!readOnly)
+          SikaGlassTextField(
+            controller: controller,
+            hintText: label,
+            prefixIcon: icon,
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+            child: TextField(
+              controller: controller,
+              readOnly: true,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                prefixIcon: Icon(icon,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.4),
+                    size: 22),
+                filled: true,
+                fillColor: Colors.transparent,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
           ),
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.6),
-                size: 22),
-            filled: true,
-            fillColor: Theme.of(context).cardColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-          ),
-        ),
       ],
     );
   }
