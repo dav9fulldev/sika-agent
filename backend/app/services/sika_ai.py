@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -1233,6 +1234,8 @@ class SikaAIService:
         context_str = f"Solde total: {total_balance_fcfa} FCFA\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} FCFA)" for w in active_wallets])
 
         system_instruction = f"""
+            RÈGLE CRITIQUE — ACTIONS FINANCIÈRES ET TOOLS :
+
 Tu es SIKA, un agent financier intelligent pour PayMeChap.
 Utilisateur : {firstname}
 
@@ -1246,6 +1249,8 @@ RÈGLES STRICTES :
 4. Si une information est ambiguë (plusieurs contacts avec le même nom), pose une question courte pour clarifier avant d'agir. Ne demande PAS le numéro si tu l'as déjà trouvé.
 5. Tu ne peux pas exécuter directement une transaction. Appelle `prepare_transfer`, cela mettra la transaction en attente de confirmation humaine.
 6. Réponds de manière concise, naturelle et chaleureuse.
+    7. Tu ne dois JAMAIS inventer un `action_id` ni générer un identifiant commençant par "act_" dans une réponse texte si `prepare_transfer` n'a pas été appelé avec succès.
+    8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
 """
         
         messages = []
@@ -1357,6 +1362,51 @@ RÈGLES STRICTES :
             else:
                 # No function calls, so it's a final text response
                 final_response_text = response.text
+
+                # Defensive fallback: if the model produced a textual action_id like "act_...",
+                # only accept it if we can verify the action exists (in-memory or DB).
+                try:
+                    match = re.search(r"(act_[A-Za-z0-9_-]{6,})", final_response_text)
+                    if match and not action_id:
+                        candidate = match.group(1)
+                        from ..agent.orchestrator import sika_orchestrator
+
+                        # 1) Check in-memory action store
+                        if sika_orchestrator.action_store.get(candidate):
+                            action_detected = "prepare_transfer"
+                            action_id = candidate
+                            action_data_detected = sika_orchestrator.action_store[candidate].get("result") or {}
+                            final_response_text = "J'ai préparé l'opération. Veux-tu confirmer ?"
+                        else:
+                            # 2) Fallback: check persistent DB for a matching action
+                            try:
+                                from sqlalchemy.orm import Session
+                                from ..database import engine
+                                from ..models.sika_action import SikaActionModel
+
+                                with Session(engine) as db:
+                                    act = db.query(SikaActionModel).filter(SikaActionModel.action_id == candidate).first()
+                                    if act:
+                                        action_detected = "prepare_transfer"
+                                        action_id = candidate
+                                        try:
+                                            action_data_detected = json.loads(act.payload_json) if act.payload_json else {}
+                                        except Exception:
+                                            action_data_detected = {}
+                                        # Mirror into in-memory store for subsequent checks
+                                        sika_orchestrator.action_store[candidate] = {
+                                            "action_id": candidate,
+                                            "user_id": act.user_id,
+                                            "action_type": act.action_type,
+                                            "status": act.status,
+                                            "result": None,
+                                        }
+                                        final_response_text = "J'ai préparé l'opération. Veux-tu confirmer ?"
+                            except Exception as e:
+                                logger.warning(f"Fallback DB lookup failed for action_id {candidate}: {e}")
+                except Exception as e:
+                    logger.warning(f"Fallback action_id verification failed: {e}")
+
                 break
                 
             step += 1
@@ -1373,8 +1423,9 @@ RÈGLES STRICTES :
             "suggestions": [],
             "provider": "VERTEX_AI_AGENT",
             "model": self.model,
-            "requires_confirmation": (action_detected == "prepare_transfer"),
-            "status": "WAITING_CONFIRMATION" if action_detected == "prepare_transfer" else "PROCESSED",
+            # Require a real action_id to mark as requiring confirmation.
+            "requires_confirmation": (action_detected == "prepare_transfer" and bool(action_id)),
+            "status": "WAITING_CONFIRMATION" if (action_detected == "prepare_transfer" and bool(action_id)) else "PROCESSED",
             "should_speak": True,
             "agent_steps": agent_steps,
         }
