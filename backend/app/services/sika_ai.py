@@ -1210,7 +1210,22 @@ class SikaAIService:
         from ..agent.tool_registry import tool_registry
         from google.genai import types
 
-        safe_tools = tool_registry.get_gemini_tools()
+        # Some deployed revisions may not implement `get_gemini_tools` yet.
+        # Use a safe fallback to build the list of safe tools when missing.
+        try:
+            safe_tools = tool_registry.get_gemini_tools()
+        except AttributeError:
+            safe_tools = []
+            defs = getattr(tool_registry, "_definitions", {}) or {}
+            for name, def_item in defs.items():
+                # Accept READ_ONLY and CONFIRMATION_REQUIRED tools as safe
+                if getattr(def_item, 'risk_level', None) and getattr(def_item.risk_level, 'value', '') in [
+                    'READ_ONLY',
+                    'CONFIRMATION_REQUIRED',
+                ]:
+                    func = getattr(tool_registry, '_tools', {}).get(name)
+                    if func:
+                        safe_tools.append(func)
 
         active_wallets = [w for w in context.get("wallets", []) if w.get("is_active", True)]
         total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
