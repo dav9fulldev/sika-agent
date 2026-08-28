@@ -5,7 +5,40 @@ Suite de Tests pour les Tools Financiers et le ToolRegistry de SIKA (Phase 5 Ét
 import pytest
 from app.agent.tool_registry import tool_registry
 from app.agent.tools.tool_models import RiskLevel, ToolResult
+from app.services.sika_ai import SikaAIService
 import app.agent.tools  # S'assurer que tous les tools sont enregistrés
+
+
+class FakeGenAIOModel:
+    async def generate_content(self, **kwargs):
+        class FakeResponse:
+            function_calls = [
+                type("Call", (), {"name": "prepare_transfer", "args": {"provider": "wave", "amount": 20000, "recipient": "Jean", "currency": "XOF"}})()
+            ]
+            candidates = []
+            text = ""
+
+        return FakeResponse()
+
+
+class FakeGenAIClient:
+    def __init__(self):
+        self.aio = type("AIO", (), {"models": FakeGenAIOModel()})()
+
+
+@pytest.mark.asyncio
+async def test_13_prepare_transfer_response_includes_action_id():
+    """13. Le résultat de préparation du transfert renvoie un action_id exploitable pour /agent/confirm."""
+    service = SikaAIService()
+    service.client = FakeGenAIClient()
+
+    result = await service.chat("Envoie 20 000 FCFA à Jean.", user_id="42")
+
+    assert result["requires_confirmation"] is True
+    assert result["action_id"] is not None
+    assert result["action_id"] != ""
+    assert result["action_data"]["recipient"] == "Jean"
+    assert result["action_data"]["amount"] == 20000.0
 
 def test_1_registry_finds_tools():
     """1. Le registre trouve correctement tous les tools enregistrés."""

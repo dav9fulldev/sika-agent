@@ -1194,162 +1194,175 @@ class SikaAIService:
         financial_context: Optional[Dict[str, Any]] = None,
         conversation_history: Optional[List[Any]] = None,
         user_firstname: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Point d'entrée principal SIKA.
-
-        Étapes :
-
-        1. Analyse locale de l'intention.
-        2. Préparation ou exécution des actions financières.
-        3. Appel Gemini via Vertex AI pour enrichir
-           la réponse conversationnelle.
-        4. Fallback local en cas d'erreur.
+        Point d'entrée principal SIKA (Agent Taskmaster).
+        Utilise une boucle ReAct avec Function Calling dynamique.
         """
-
         context = financial_context or {}
+        firstname = user_firstname or context.get("user_firstname") or "David"
+        is_english = self._is_english(user_message)
 
-        firstname = (
-            user_firstname
-            or context.get("user_firstname")
-            or "David"
-        )
+        if not self.client:
+            return self._chat_basic(user_message, context, firstname, is_english)
 
-        is_english = self._is_english(
-            user_message
-        )
+        from ..agent.tool_registry import tool_registry
+        from google.genai import types
 
-        # =========================================================
-        # ÉTAPE 1 : MOTEUR MÉTIER SIKA
-        # =========================================================
+        safe_tools = tool_registry.get_gemini_tools()
 
-        executed_result = self._chat_basic(
-            user_message=user_message,
-            financial_context=context,
-            user_firstname=firstname,
-            is_english=is_english,
-        )
+        active_wallets = [w for w in context.get("wallets", []) if w.get("is_active", True)]
+        total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
+        
+        context_str = f"Solde total: {total_balance_fcfa} FCFA\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} FCFA)" for w in active_wallets])
 
-        # =========================================================
-        # ÉTAPE 2 : GEMINI VIA VERTEX AI
-        # =========================================================
-
-        if self.client:
-
-            try:
-
-                language_instruction = "Réponds naturellement dans la langue utilisée par l'utilisateur (français ou anglais)."
-
-                active_wallets = [
-                    w for w in context.get("wallets", []) if w.get("is_active", True)
-                ]
-                total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
-                
-                context_str = f"Solde total: {total_balance_fcfa} FCFA\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} FCFA)" for w in active_wallets])
-
-                system_instruction = f"""
-Tu es SIKA, un agent financier intelligent.
-
+        system_instruction = f"""
+Tu es SIKA, un agent financier intelligent pour PayMeChap.
 Utilisateur : {firstname}
 
-{language_instruction}
-
-Tu aides l'utilisateur à comprendre ses finances,
-ses portefeuilles connectés, ses dépenses,
-son épargne et ses transferts.
-
-Contexte financier actuel de l'utilisateur :
+Contexte financier de l'utilisateur :
 {context_str}
 
-Le moteur métier SIKA a déjà analysé la demande.
-
-Action détectée :
-{executed_result.get("action")}
-
-Résultat métier :
-{executed_result.get("response")}
-
-Règles importantes :
-
-- Ne jamais inventer de solde ou de transaction. Utilise uniquement le "Contexte financier actuel" ci-dessus.
-- Si le Résultat métier indique que la demande n'est pas comprise (Action détectée: None), ignore le message d'erreur du Résultat métier et utilise le Contexte financier pour répondre directement et naturellement à la question de l'utilisateur !
-- Ne jamais prétendre qu'une opération financière
-  a été exécutée si le moteur métier ne l'indique pas.
-- Réponds de manière concise, naturelle et chaleureuse.
-- Si une confirmation de sécurité est nécessaire,
-  indique clairement qu'elle est requise.
+RÈGLES STRICTES :
+1. Tu dois aider l'utilisateur à comprendre ses finances, épargner, et transférer de l'argent.
+2. N'invente JAMAIS un solde ou une transaction. Utilise les outils disponibles pour chercher l'information.
+3. Si l'utilisateur veut envoyer de l'argent, utilise `search_contact` pour vérifier le numéro, puis appelle `prepare_transfer`.
+4. Si une information est ambiguë (plusieurs contacts avec le même nom), pose une question courte pour clarifier avant d'agir. Ne demande PAS le numéro si tu l'as déjà trouvé.
+5. Tu ne peux pas exécuter directement une transaction. Appelle `prepare_transfer`, cela mettra la transaction en attente de confirmation humaine.
+6. Réponds de manière concise, naturelle et chaleureuse.
 """
+        
+        messages = []
+        if conversation_history:
+            for msg in conversation_history:
+                messages.append(types.Content(
+                    role="model" if msg.get("role") == "model" else "user",
+                    parts=[types.Part.from_text(text=msg.get("content", ""))]
+                ))
+        
+        messages.append(
+            types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+        )
+        
+        max_steps = 5
+        step = 0
+        final_response_text = ""
+        action_detected = "chat"
+        action_data_detected = None
+        action_id = None
+        agent_steps: list[dict] = []
 
-                response = (
-                    self.client.models.generate_content(
-                        model=self.model,
-                        contents=user_message,
-                        config={
-                            "system_instruction":
-                                system_instruction
-                        },
+        # Safe, observable labels for each tool — never expose internal reasoning
+        _TOOL_LABELS = {
+            "get_financial_context": "Analyse de votre situation financière",
+            "search_contact": "Recherche du bénéficiaire",
+            "prepare_transfer": "Préparation du transfert",
+            "get_transaction_history": "Lecture de l'historique des transactions",
+            "get_spending_analysis": "Analyse de vos dépenses",
+            "get_budget_status": "Vérification de votre budget",
+            "get_savings_goals": "Lecture de vos objectifs d'épargne",
+        }
+        
+        while step < max_steps:
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=messages,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        tools=safe_tools,
+                        temperature=0.2
                     )
                 )
+            except Exception as e:
+                logger.error(f"Gemini error during generation: {e}")
+                return self._chat_basic(user_message, context, firstname, is_english)
 
-                if response and response.text:
+            # Add model response to history
+            if getattr(response, 'candidates', None) and len(response.candidates) > 0:
+                messages.append(response.candidates[0].content)
 
-                    formatted = self._format_response(
-                        sika_response=response.text,
-                        user_message=user_message,
-                        financial_context=context,
-                        is_english=is_english,
-                    )
+            if response.function_calls:
+                # If there are function calls, execute them
+                for call in response.function_calls:
+                    logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name} with args: {call.args}")
+                    
+                    try:
+                        # Execution via safe tool_registry
+                        tool_res = tool_registry.execute(call.name, call.args)
+                        res_dict = tool_res.to_dict()
+                        step_status = "completed"
+                    except Exception as e:
+                        logger.error(f"Tool execution failed: {e}")
+                        res_dict = {"error": str(e)}
+                        step_status = "failed"
 
-                    # =================================================
-                    # L'ACTION MÉTIER RESTE PRIORITAIRE
-                    # =================================================
+                    # Record this as a safe, observable agent step
+                    agent_steps.append({
+                        "id": f"step_{len(agent_steps) + 1}",
+                        "type": call.name,
+                        "label": _TOOL_LABELS.get(call.name, "Analyse en cours"),
+                        "status": step_status,
+                    })
 
-                    if executed_result.get("action") in [
-                        "deposit_to_coffre",
-                        "prepare_transfer",
-                        "get_total_balance",
-                    ]:
-
-                        formatted["response"] = (
-                            executed_result["response"]
+                    # Append function result
+                    messages.append(
+                        types.Content(
+                            role="function", 
+                            parts=[
+                                types.Part.from_function_response(
+                                    name=call.name,
+                                    response=res_dict
+                                )
+                            ]
                         )
-
-                    formatted["action"] = (
-                        executed_result.get("action")
-                        or formatted.get("action")
                     )
+                    
+                    # If this was a CONFIRMATION_REQUIRED tool like prepare_transfer, we can yield back to the user
+                    tool_def = tool_registry.get_definition(call.name)
+                    if tool_def and tool_def.risk_level.value == "CONFIRMATION_REQUIRED":
+                        action_detected = call.name
+                        action_data_detected = res_dict.get("data", {})
+                        action_id = action_data_detected.get("action_id")
+                        if action_id:
+                            # Enregistrement dans l'orchestrateur sécurisé SIKA
+                            from ..agent.orchestrator import sika_orchestrator
+                            sika_orchestrator.register_action(
+                                action_id=action_id,
+                                user_id=int(user_id) if user_id and user_id.isdigit() else 1,
+                                action_type="TRANSFER" if call.name == "prepare_transfer" else "GENERIC_ACTION",
+                                payload=action_data_detected
+                            )
+                            final_response_text = f"J'ai préparé l'opération. Veux-tu confirmer ?"
+                        break
+                
+                if action_detected == "prepare_transfer":
+                    break
+            else:
+                # No function calls, so it's a final text response
+                final_response_text = response.text
+                break
+                
+            step += 1
+            
+        if not final_response_text:
+            final_response_text = "Je n'ai pas pu terminer l'analyse."
 
-                    formatted["action_data"] = (
-                        executed_result.get("action_data")
-                        or formatted.get("action_data")
-                    )
-
-                    formatted["sentiment"] = (
-                        executed_result.get("sentiment")
-                        or formatted.get("sentiment")
-                    )
-
-                    formatted["suggestions"] = (
-                        executed_result.get("suggestions")
-                        or formatted.get("suggestions")
-                    )
-
-                    return formatted
-
-            except Exception as error:
-
-                logger.warning(
-                    "⚠️ Erreur Gemini via Vertex AI : "
-                    f"{error}. "
-                    "Retour au moteur métier SIKA."
-                )
-
-        # =========================================================
-        # ÉTAPE 3 : FALLBACK
-        # =========================================================
-
-        return executed_result
-
+        return {
+            "response": final_response_text,
+            "action": action_detected,
+            "action_id": action_id,
+            "action_data": action_data_detected,
+            "sentiment": "positive",
+            "suggestions": [],
+            "provider": "VERTEX_AI_AGENT",
+            "model": self.model,
+            "requires_confirmation": (action_detected == "prepare_transfer"),
+            "status": "WAITING_CONFIRMATION" if action_detected == "prepare_transfer" else "PROCESSED",
+            "should_speak": True,
+            "agent_steps": agent_steps,
+        }
 
 # Instance globale utilisée dans l'application
 sika_ai_service = SikaAIService()

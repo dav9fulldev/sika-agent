@@ -9,10 +9,13 @@ from . import tools
 from ..services.sika_ai import SikaAI
 from ..routes.wallet_router import CONNECTED_USER_WALLETS
 
-import time
-
-from datetime import datetime, timedelta, timezone
 import json
+import logging
+import requests
+from datetime import datetime, timezone, timedelta
+from sqlalchemy.orm import Session
+import time
+import math
 
 logger = logging.getLogger("SikaAgentOrchestrator")
 
@@ -94,6 +97,7 @@ class SikaAgentOrchestrator:
                     existing.user_id = user_id
                     existing.expires_at = expires_at
                     existing.updated_at = now_utc
+                    existing.payload_json = json.dumps(payload) if payload else None
                     _log_action_event(db, action_id, user_id, prev_st, "WAITING_CONFIRMATION", "ACTION_REGISTERED", "REPLACED_EXISTING", payload)
                 else:
                     db.add(SikaActionModel(
@@ -104,7 +108,8 @@ class SikaAgentOrchestrator:
                         status="WAITING_CONFIRMATION",
                         created_at=now_utc,
                         expires_at=expires_at,
-                        updated_at=now_utc
+                        updated_at=now_utc,
+                        payload_json=json.dumps(payload) if payload else None
                     ))
                     _log_action_event(db, action_id, user_id, None, "WAITING_CONFIRMATION", "ACTION_CREATED", "INITIAL_REGISTRATION", payload)
                 db.commit()
@@ -254,16 +259,24 @@ class SikaAgentOrchestrator:
         final_state = self.state.value
         self.state = AgentState.IDLE
 
+        action_id = ai_response.get("action_id")
+        action_data = ai_response.get("action_data")
+        if requires_confirmation and not action_id and action_data and isinstance(action_data, dict):
+            action_id = action_data.get("action_id")
+
         return {
             "query": query,
             "state": final_state,
-            "status": "PROCESSED",
+            "status": "WAITING_CONFIRMATION" if requires_confirmation else "PROCESSED",
             "message": ai_response.get("response", ai_response.get("message")),
             "action": action,
+            "action_id": action_id,
+            "action_data": action_data,
             "tool_result": tool_result,
             "requires_confirmation": requires_confirmation,
             "provider": ai_response.get("provider", self.ai_service.provider.upper()),
-            "model": ai_response.get("model", os.getenv("GEMINI_MODEL", "gemini-3.5-flash"))
+            "model": ai_response.get("model", os.getenv("GEMINI_MODEL", "gemini-3.5-flash")),
+            "agent_steps": ai_response.get("agent_steps", [])
         }
 
     async def confirm_action(self, action_id: str, user_id: int = 1, user_confirmed: bool = True) -> Dict[str, Any]:
@@ -404,6 +417,7 @@ class SikaAgentOrchestrator:
             if cur_st == "CANCELLED":
                 return {"success": False, "status": "CANCELLED", "message": "Cette demande de transaction a été annulée.", "speech_text": "Cette demande de transaction a été annulée.", "should_speak": True}
 
+        action_payload_json = None
         # 2. VERROUILLAGE ATOMIQUE SQL (WAITING_CONFIRMATION / PREPARED -> EXECUTING) AVEC FILTRE TTL ET OWNERSHIP
         try:
             from sqlalchemy import or_
@@ -416,6 +430,8 @@ class SikaAgentOrchestrator:
                 ).update({"status": "EXECUTING", "updated_at": now_utc}, synchronize_session=False)
 
                 if affected > 0:
+                    locked_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                    action_payload_json = locked_action.payload_json if locked_action else None
                     _log_action_event(db, action_id, user_id, "WAITING_CONFIRMATION", "EXECUTING", "ACTION_EXECUTING", "USER_CONFIRMED")
                 db.commit()
 
@@ -464,21 +480,94 @@ class SikaAgentOrchestrator:
             action_meta["status"] = "EXECUTING"
 
         # 3. EXÉCUTION SUR L'API PAYMECHAP (TRANSACTION SQL FERMÉE PENDANT L'APPEL RÉSEAU)
+        # Validation sécurisée du payload financier
+        parsed_payload = None
+        if action_payload_json:
+            try:
+                parsed_payload = json.loads(action_payload_json)
+            except Exception:
+                pass
+
+        if not parsed_payload or not isinstance(parsed_payload, dict):
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "FAILED", "updated_at": datetime.now(timezone.utc)})
+                    _log_action_event(db, action_id, user_id, "EXECUTING", "FAILED", "ACTION_FAILED", "INVALID_OR_MISSING_PAYLOAD")
+                    db.commit()
+            except Exception:
+                pass
+            if action_meta: action_meta["status"] = "FAILED"
+            return {
+                "success": False,
+                "status": "FAILED",
+                "action_id": action_id,
+                "message": "Les données de la transaction sont invalides ou manquantes.",
+                "speech_text": "Les données de la transaction sont invalides ou manquantes.",
+                "should_speak": True
+            }
+
         try:
             if "transfer" in action_id or "act_tr" in action_id:
+                # Extraction dynamique et sécurisée
+                try:
+                    amount = float(parsed_payload.get("amount", 0))
+                    if math.isnan(amount) or math.isinf(amount):
+                        raise ValueError("Le montant ne peut pas être NaN ou Infinity.")
+                except (ValueError, TypeError):
+                    amount = 0.0
+                    
+                recipient_phone = str(parsed_payload.get("recipient_phone") or parsed_payload.get("recipient") or "").strip()
+                
+                # Rejet catégorique si les données sont invalides (pas de fallback hardcodé)
+                if amount <= 0 or not recipient_phone:
+                    raise ValueError("Montant invalide ou destinataire manquant dans le payload.")
+
+                motif = parsed_payload.get("motif", "Transfert SIKA")
+                
                 payout_res = paymechap_api_service.execute_payout(
                     access_token="",
-                    recipient_phone="0701020304",
-                    amount=20000.0,
-                    motif="Transfert SIKA vers Kouamé Jean",
+                    recipient_phone=recipient_phone,
+                    amount=amount,
+                    motif=motif,
                     action_id=action_id
                 )
 
             elif "dep_coffre" in action_id or "deposit" in action_id:
-                payout_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=1, montant=10000.0)
+                try:
+                    amount = float(parsed_payload.get("amount", 0))
+                    if math.isnan(amount) or math.isinf(amount):
+                        raise ValueError("Le montant ne peut pas être NaN ou Infinity.")
+                except (ValueError, TypeError):
+                    amount = 0.0
+                    
+                coffre_id = parsed_payload.get("coffre_id")
+                
+                if amount <= 0 or not coffre_id:
+                    raise ValueError("Montant invalide ou coffre_id manquant pour le dépôt.")
+                    
+                payout_res = paymechap_api_service.deposit_to_coffre(access_token="", coffre_id=coffre_id, montant=amount, action_id=action_id)
             else:
                 payout_res = {"success": True, "message": "Opération sans payout spécifique"}
-        except Exception as net_exc:
+                
+        except ValueError as val_err:
+            logger.warning(f"[PAYLOAD REJECT] Rejet de l'exécution pour {action_id} : {val_err}")
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({"status": "FAILED", "updated_at": datetime.now(timezone.utc)})
+                    _log_action_event(db, action_id, user_id, "EXECUTING", "FAILED", "ACTION_FAILED", "PAYLOAD_VALIDATION_ERROR")
+                    db.commit()
+            except Exception:
+                pass
+            if action_meta: action_meta["status"] = "FAILED"
+            return {
+                "success": False,
+                "status": "FAILED",
+                "action_id": action_id,
+                "message": f"Validation échouée : {val_err}",
+                "speech_text": "Impossible d'exécuter l'action car les données sont incorrectes.",
+                "should_speak": True
+            }
+        except requests.exceptions.RequestException as net_exc:
             logger.error(f"[PAYMECHAP INCERTAIN] Erreur réseau lors de la communication avec PayMeChap: {net_exc}")
             try:
                 with Session(engine) as db:
@@ -497,6 +586,27 @@ class SikaAgentOrchestrator:
                 "action_id": action_id,
                 "message": "Le statut du virement sur PayMeChap n'a pas pu être confirmé en raison d'un délai réseau. Aucune nouvelle tentative n'a été effectuée par sécurité.",
                 "speech_text": "Le résultat du transfert est incertain à cause du réseau. Aucune nouvelle tentative n'a été lancée par sécurité.",
+                "should_speak": True
+            }
+        except Exception as unk_exc:
+            logger.error(f"[PAYMECHAP INATTENDU] Erreur interne après verrouillage: {unk_exc}")
+            try:
+                with Session(engine) as db:
+                    db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).update({
+                        "status": "UNKNOWN_RESULT",
+                        "cancelled_reason": f"UNEXPECTED_ERROR: {str(unk_exc)[:200]}",
+                        "updated_at": datetime.now(timezone.utc)
+                    })
+                    _log_action_event(db, action_id, user_id, "EXECUTING", "UNKNOWN_RESULT", "ACTION_UNKNOWN_RESULT", "UNEXPECTED_ERROR")
+                    db.commit()
+            except Exception:
+                pass
+            return {
+                "success": False,
+                "status": "UNKNOWN_RESULT",
+                "action_id": action_id,
+                "message": "Une erreur inattendue est survenue pendant le traitement. La transaction nécessite une vérification manuelle.",
+                "speech_text": "Une erreur inattendue s'est produite. La transaction nécessite une vérification manuelle.",
                 "should_speak": True
             }
 
@@ -528,7 +638,10 @@ class SikaAgentOrchestrator:
                 w["balance"] = real_bal
 
         if "transfer" in action_id or "act_tr" in action_id:
-            msg = f"Le transfert de 20 000 francs CFA vers Kouamé Jean a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
+            # Récupération sécurisée du montant et du destinataire depuis le payload qui a déjà été validé plus haut
+            amount_str = f"{int(amount):,}".replace(",", " ") if 'amount' in locals() else "le montant"
+            recipient_str = recipient_phone if 'recipient_phone' in locals() else "le destinataire"
+            msg = f"Le transfert de {amount_str} francs CFA vers {recipient_str} a été effectué avec succès. Votre nouveau solde PayMeChap est de {int(real_bal):,} FCFA.".replace(",", " ")
         else:
             msg = "Opération confirmée et exécutée avec succès via PayMeChap."
 
@@ -562,174 +675,133 @@ class SikaAgentOrchestrator:
         return res_dict
 
     async def reconcile_action(self, action_id: str, user_id: int = 1) -> Dict[str, Any]:
-        """Interroge directement l'API PayMeChap pour réconcilier une transaction (UNKNOWN_RESULT, REQUIRES_RECONCILIATION, EXECUTING bloquée) sans JAMAIS la ré-exécuter."""
+        """Interroge directement l'API PayMeChap pour réconcilier une transaction sans JAMAIS la ré-exécuter."""
         logger.info(f"[RECONCILIATION] Demande de réconciliation pour action_id={action_id} (user_id={user_id})")
 
         from sqlalchemy.orm import Session
+        from sqlalchemy.exc import OperationalError
         from ..database import engine
         from ..models.sika_action import SikaActionModel
+        from ..models.user import UserModel
         from ..services.wallet_integrations.paymechap_api_service import paymechap_api_service
-        from ..routes.wallet_router import CONNECTED_USER_WALLETS
 
-        # 1. VÉRIFICATION D'APPARTENANCE ET D'ÉTAT TERMINAL
-        db_action = None
+        account_number = None
+
+        # 1. VÉRIFICATION D'APPARTENANCE ET ACQUISITION DU VERROU
         try:
             with Session(engine) as db:
                 db_action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
-                if db_action:
-                    if str(db_action.user_id) != str(user_id):
-                        logger.warning(f"[RECONCILIATION REJECT] User {user_id} ne possède pas l'action {action_id}")
-                        return {
-                            "success": False,
-                            "status": "UNAUTHORIZED_USER",
-                            "action_id": action_id,
-                            "message": "Vous n'êtes pas autorisé à réconcilier cette transaction.",
-                            "speech_text": "Vous n'êtes pas autorisé à réconcilier cette transaction.",
-                            "should_speak": True
-                        }
+                if not db_action:
+                    return {"success": False, "status": "NOT_FOUND", "message": "Action introuvable."}
+                
+                if str(db_action.user_id) != str(user_id):
+                    logger.warning(f"[RECONCILIATION REJECT] User {user_id} ne possède pas l'action {action_id}")
+                    return {"success": False, "status": "UNAUTHORIZED_USER", "message": "Non autorisé."}
 
-                    # Si l'action est déjà dans un état terminal, retourner la confirmation directement
-                    if db_action.status == "EXECUTED":
-                        return {
-                            "success": True,
-                            "status": "EXECUTED",
-                            "reconciled": True,
-                            "action_id": action_id,
-                            "message": "La réconciliation confirme que ce transfert a déjà été exécuté avec succès sur PayMeChap.",
-                            "speech_text": "PayMeChap confirme que le transfert a bien été effectué avec succès.",
-                            "should_speak": True
-                        }
-                    if db_action.status in ["FAILED", "CANCELLED", "EXPIRED"]:
-                        return {
-                            "success": False,
-                            "status": db_action.status,
-                            "reconciled": True,
-                            "action_id": action_id,
-                            "message": f"La réconciliation confirme que cette transaction a le statut terminal : {db_action.status}.",
-                            "speech_text": f"PayMeChap confirme que la transaction est {db_action.status.lower()}.",
-                            "should_speak": True
-                        }
+                # Actions déjà résolues
+                if db_action.status in ["EXECUTED", "FAILED", "CANCELLED", "EXPIRED"]:
+                    return {"success": db_action.status == "EXECUTED", "status": db_action.status, "message": f"Action déjà {db_action.status}."}
+
+                # Gestion de la reprise après crash
+                if db_action.status == "RECONCILIATION_IN_PROGRESS":
+                    if db_action.reconciliation_started_at:
+                        now_utc = datetime.now(timezone.utc)
+                        started_at = db_action.reconciliation_started_at
+                        if started_at.tzinfo is None:
+                            started_at = started_at.replace(tzinfo=timezone.utc)
+                        elapsed = (now_utc - started_at).total_seconds()
+                        if elapsed < 300:
+                            return {"success": False, "status": "RECONCILIATION_IN_PROGRESS", "message": "Réconciliation déjà en cours."}
+                        else:
+                            logger.info(f"[RECONCILIATION] Reprise du verrou expiré pour {action_id}")
+                    else:
+                        # Fallback if null
+                        return {"success": False, "status": "RECONCILIATION_IN_PROGRESS", "message": "Réconciliation en cours."}
+                
+                elif db_action.status not in ["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION"]:
+                    return {"success": False, "status": db_action.status, "message": f"Statut inéligible : {db_action.status}."}
+
+                # Tentative d'acquisition du verrou SQL
+                try:
+                    locked_action = db.query(SikaActionModel).filter(
+                        SikaActionModel.action_id == action_id
+                    ).with_for_update(nowait=True).first()
+                    
+                    if not locked_action:
+                        return {"success": False, "status": "RECONCILIATION_IN_PROGRESS", "message": "En cours par un autre processus."}
+                    
+                    locked_action.status = "RECONCILIATION_IN_PROGRESS"
+                    locked_action.reconciliation_started_at = datetime.now(timezone.utc)
+                    db.commit()
+                except OperationalError:
+                    db.rollback()
+                    return {"success": False, "status": "RECONCILIATION_IN_PROGRESS", "message": "En cours (verrouillé)."}
+
+                # Récupération des informations de compte
+                user = db.query(UserModel).filter(UserModel.id == user_id).first()
+                if user:
+                    account_number = user.phone
+
         except Exception as e:
-            logger.warning(f"[DB WARN] Erreur lors de la vérification DB reconciliation: {e}")
+            logger.error(f"[RECONCILIATION] Erreur DB lors de l'acquisition du verrou: {e}")
+            return {"success": False, "status": "UNKNOWN_RESULT", "message": "Erreur DB."}
 
-        action_meta = self.action_store.get(action_id)
-        if action_meta and str(action_meta.get("user_id")) != str(user_id):
-            return {
-                "success": False,
-                "status": "UNAUTHORIZED_USER",
-                "action_id": action_id,
-                "message": "Vous n'êtes pas autorisé à réconcilier cette transaction.",
-                "speech_text": "Vous n'êtes pas autorisé à réconcilier cette transaction.",
-                "should_speak": True
-            }
-
-        # 2. INTERROGATION EN DIRECT DE PAYMECHAP (SOURCE UNIQUE DE VÉRITÉ FINANCIÈRE)
-        live_txs = paymechap_api_service.fetch_live_transactions(access_token="", account_number="0799053977", limit=20)
-        fetched_bal = paymechap_api_service.fetch_live_balance(access_token="", account_number="0799053977")
-        real_bal = float(fetched_bal.get("balance", 80000.0)) if fetched_bal.get("success") else 80000.0
-
-        for w in CONNECTED_USER_WALLETS:
-            if w.get("is_active", True):
-                w["balance"] = real_bal
-
+        # 2. INTERROGATION EN DIRECT DE PAYMECHAP HORS TRANSACTION SQL
         matching_tx = None
-        for tx in live_txs:
-            tx_id_str = str(tx.get("id", ""))
-            tx_desc = str(tx.get("description", ""))
-            tx_ref = str(tx.get("reference", ""))
-            if action_id in tx_id_str or action_id in tx_ref or action_id in tx_desc:
-                matching_tx = tx
-                break
+        try:
+            live_txs = paymechap_api_service.fetch_live_transactions(access_token="", account_number=account_number, limit=50)
+            
+            for tx in live_txs:
+                tx_id_str = str(tx.get("id", ""))
+                tx_ref = str(tx.get("reference", ""))
+                tx_idem = str(tx.get("idempotency_key", ""))
+                
+                if action_id == tx_id_str or action_id == tx_ref or action_id == tx_idem:
+                    matching_tx = tx
+                    break
+        except Exception as e:
+            logger.error(f"[RECONCILIATION] Erreur réseau lors de la consultation: {e}")
+            # En cas d'erreur réseau (Timeout, ConnectionError...), ça reste UNKNOWN_RESULT
+            matching_tx = None
 
-        # 3. VERROUILLAGE ATOMIQUE ET MISE À JOUR SÉCURISÉE D'ÉTAT
+        final_status = "UNKNOWN_RESULT"
         if matching_tx:
             tx_stat = str(matching_tx.get("status", "")).upper()
             if tx_stat in ["COMPLETED", "EFFECTUÉ", "SUCCESS", "SUCCES"]:
-                msg = f"PayMeChap confirme que le transfert de 20 000 FCFA vers Kouamé Jean a bien été effectué. Votre solde réel actuel est de {int(real_bal):,} FCFA.".replace(",", " ")
-                try:
-                    with Session(engine) as db:
-                        db.query(SikaActionModel).filter(
-                            SikaActionModel.action_id == action_id,
-                            SikaActionModel.user_id == user_id,
-                            SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
-                        ).update({
-                            "status": "EXECUTED",
-                            "updated_at": datetime.now(timezone.utc)
-                        }, synchronize_session=False)
-                        _log_action_event(db, action_id, user_id, "UNKNOWN_RESULT", "EXECUTED", "ACTION_RECONCILED", "PAYMECHAP_CONFIRMED")
-                        db.commit()
-                except Exception as e:
-                    logger.warning(f"[DB WARN] Erreur mise à jour réconciliation EXECUTED: {e}")
-
-                if action_id in self.action_store:
-                    self.action_store[action_id]["status"] = "EXECUTED"
-
-                return {
-                    "success": True,
-                    "status": "EXECUTED",
-                    "reconciled": True,
-                    "action_id": action_id,
-                    "message": msg,
-                    "speech_text": msg,
-                    "new_balance": real_bal,
-                    "should_speak": True
-                }
-            else:
-                msg = f"PayMeChap confirme que le transfert est en échec. Votre solde est de {int(real_bal):,} FCFA.".replace(",", " ")
-                try:
-                    with Session(engine) as db:
-                        db.query(SikaActionModel).filter(
-                            SikaActionModel.action_id == action_id,
-                            SikaActionModel.user_id == user_id,
-                            SikaActionModel.status.in_(["UNKNOWN_RESULT", "REQUIRES_RECONCILIATION", "EXECUTING", "WAITING_CONFIRMATION", "PREPARED"])
-                        ).update({
-                            "status": "FAILED",
-                            "updated_at": datetime.now(timezone.utc)
-                        }, synchronize_session=False)
-                        _log_action_event(db, action_id, user_id, "UNKNOWN_RESULT", "FAILED", "ACTION_RECONCILED", "PAYMECHAP_FAILED")
-                        db.commit()
-                except Exception as e:
-                    logger.warning(f"[DB WARN] Erreur mise à jour réconciliation FAILED: {e}")
-
-                if action_id in self.action_store:
-                    self.action_store[action_id]["status"] = "FAILED"
-
-                return {
-                    "success": False,
-                    "status": "FAILED",
-                    "reconciled": True,
-                    "action_id": action_id,
-                    "message": msg,
-                    "speech_text": msg,
-                    "new_balance": real_bal,
-                    "should_speak": True
-                }
+                final_status = "EXECUTED"
+            elif tx_stat in ["FAILED", "ÉCHOUÉ"]:
+                final_status = "FAILED"
+            else: # PENDING, etc.
+                final_status = "UNKNOWN_RESULT"
         else:
-            # Aucune transaction trouvée sur PayMeChap
-            try:
-                with Session(engine) as db:
-                    db.query(SikaActionModel).filter(
-                        SikaActionModel.action_id == action_id,
-                        SikaActionModel.status == "EXECUTING"
-                    ).update({
-                        "status": "REQUIRES_RECONCILIATION",
-                        "cancelled_reason": "NO_MATCHING_TRANSACTION_FOUND",
-                        "updated_at": datetime.now(timezone.utc)
-                    }, synchronize_session=False)
-                    db.commit()
-            except Exception:
-                pass
+            # Si non trouvée (ou exception), reste UNKNOWN_RESULT
+            final_status = "UNKNOWN_RESULT"
 
-            msg = "Je ne peux pas encore confirmer le statut de cette opération sur PayMeChap. Aucun nouveau transfert ne sera lancé automatiquement."
-            return {
-                "success": False,
-                "status": "UNKNOWN_RESULT",
-                "reconciled": False,
-                "action_id": action_id,
-                "message": msg,
-                "speech_text": msg,
-                "should_speak": True
-            }
+        # 3. MISE À JOUR SÉCURISÉE D'ÉTAT
+        try:
+            with Session(engine) as db:
+                action = db.query(SikaActionModel).filter(SikaActionModel.action_id == action_id).first()
+                if action:
+                    action.status = final_status
+                    action.updated_at = datetime.now(timezone.utc)
+                    if final_status == "EXECUTED":
+                        _log_action_event(db, action_id, user_id, "RECONCILIATION_IN_PROGRESS", "EXECUTED", "ACTION_RECONCILED", "PAYMECHAP_CONFIRMED")
+                    elif final_status == "FAILED":
+                        _log_action_event(db, action_id, user_id, "RECONCILIATION_IN_PROGRESS", "FAILED", "ACTION_RECONCILED", "PAYMECHAP_FAILED")
+                    # Si UNKNOWN_RESULT, on le remet en UNKNOWN_RESULT pour annuler le RECONCILIATION_IN_PROGRESS
+                    db.commit()
+                    
+                    if action_id in self.action_store:
+                        self.action_store[action_id]["status"] = final_status
+        except Exception as e:
+            logger.error(f"[RECONCILIATION] Erreur mise à jour réconciliation {final_status}: {e}")
+
+        return {
+            "success": final_status == "EXECUTED",
+            "status": final_status,
+            "reconciled": True,
+            "action_id": action_id
+        }
 
 
     async def process_financial_event(self, user_id: int, event_data: dict) -> Dict[str, Any]:
