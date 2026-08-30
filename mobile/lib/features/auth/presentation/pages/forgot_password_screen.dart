@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
-import '../../../../core/widgets/sika_glass_card.dart';
+import '../../../../core/widgets/sika_surface.dart';
 import '../../../../core/widgets/sika_glass_text_field.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
 import 'reset_password_screen.dart';
@@ -38,7 +40,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Code reçu (mode dev) : $otp'),
-          backgroundColor: AppColors.brandPrimary,
+          backgroundColor: AppColors.primary,
           duration: const Duration(seconds: 5),
         ),
       );
@@ -63,131 +65,113 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
+              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Stack(
-        children: [
-          // Background Gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: isDark
-                    ? [AppColors.darkBackground, AppColors.darkSurface]
-                    : [const Color(0xFFF8F9FA), Colors.white],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // LOGO
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.brandPrimary.withValues(alpha: 0.3),
-                            blurRadius: 40,
-                            spreadRadius: 10,
-                          ),
-                        ],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // LOGO
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: isDark ? 0.3 : 0.15),
+                        blurRadius: 40,
+                        spreadRadius: 8,
                       ),
-                      child: Image.asset(AppImages.logo, width: 90),
-                    ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
-                    const SizedBox(height: 32),
+                    ],
+                  ),
+                  child: Image.asset(AppImages.logo, width: 80),
+                ).animate().fade(duration: 600.ms).scale(delay: 200.ms, duration: 400.ms),
+                const SizedBox(height: AppSpacing.xl),
 
-                    // TITRE
-                    Text(
-                      langNotifier.tr('Mot de passe oublié ?', 'Forgot Password?'),
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                    ).animate().fade(delay: 300.ms).slideY(begin: 0.2, end: 0),
-                    const SizedBox(height: 8),
-
-                    // SOUS-TITRE
-                    Text(
-                      langNotifier.tr(
-                        'Entrez votre adresse email pour recevoir un code de réinitialisation.',
-                        'Enter your email address to receive a reset code.',
+                // TITRE
+                Text(
+                  langNotifier.tr('Mot de passe oublié ?', 'Forgot Password?'),
+                  textAlign: TextAlign.center,
+                  style: AppTypography.h1.copyWith(
+                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       ),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.6),
-                          ),
-                    ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
-                    const SizedBox(height: 40),
+                ).animate().fade(delay: 300.ms).slideY(begin: 0.1, end: 0),
+                const SizedBox(height: AppSpacing.xs),
 
-                    // GLASS CARD
-                    SikaGlassCard(
-                      child: Column(
-                        children: [
-                          if (authState.errorMessage != null)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 20),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                    color: AppColors.error.withValues(alpha: 0.3)),
+                // SOUS-TITRE
+                Text(
+                  langNotifier.tr(
+                    'Entrez votre adresse email pour recevoir un code de réinitialisation.',
+                    'Enter your email address to receive a reset code.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodyMedium.copyWith(
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                ).animate().fade(delay: 400.ms).slideY(begin: 0.1, end: 0),
+                const SizedBox(height: AppSpacing.xxl),
+
+                // SIKA SURFACE
+                SikaSurface(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    children: [
+                      if (authState.errorMessage != null)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.errorSoftDark : AppColors.errorSoft,
+                            borderRadius: AppSpacing.borderRadiusSm,
+                            border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline,
+                                  color: AppColors.error, size: 20),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  authState.errorMessage!,
+                                  style: AppTypography.caption.copyWith(color: AppColors.error),
+                                ),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline,
-                                      color: AppColors.error, size: 20),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      authState.errorMessage!,
-                                      style: const TextStyle(
-                                          color: AppColors.error, fontSize: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ).animate().fade().slideY(begin: -0.1, end: 0),
+                            ],
+                          ),
+                        ).animate().fade().slideY(begin: -0.1, end: 0),
 
-                          SikaGlassTextField(
-                            controller: _emailController,
-                            hintText: 'Email',
-                            prefixIcon: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                          ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
-                          const SizedBox(height: 32),
+                      SikaGlassTextField(
+                        controller: _emailController,
+                        hintText: 'Email',
+                        prefixIcon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                      ).animate().fade(delay: 500.ms).slideY(begin: 0.1, end: 0),
+                      const SizedBox(height: AppSpacing.lg),
 
-                          SikaPremiumButton(
-                            onPressed: () => _onSendPressed(authNotifier, langNotifier),
-                            text: langNotifier.tr('Envoyer le code', 'Send Code'),
-                            isLoading: authState.isLoading,
-                          ).animate().fade(delay: 600.ms).scale(delay: 600.ms, duration: 200.ms),
-                        ],
-                      ),
-                    ),
-                  ],
+                      SikaPremiumButton(
+                        onPressed: () => _onSendPressed(authNotifier, langNotifier),
+                        text: langNotifier.tr('Envoyer le code', 'Send Code'),
+                        isLoading: authState.isLoading,
+                      ).animate().fade(delay: 600.ms).scale(delay: 600.ms, duration: 200.ms),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

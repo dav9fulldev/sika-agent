@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,6 +5,12 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../wallet/providers/wallet_provider.dart';
+import '../widgets/sika_period_selector.dart';
+import '../widgets/sika_trend_indicator.dart';
+import '../widgets/sika_donut_chart.dart';
+import '../widgets/sika_budget_progress.dart';
+import '../widgets/sika_insight_card.dart';
+import '../../../../core/widgets/sika_empty_state.dart';
 
 class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
@@ -15,7 +20,7 @@ class InsightsScreen extends ConsumerStatefulWidget {
 }
 
 class _InsightsScreenState extends ConsumerState<InsightsScreen> {
-  String _selectedPeriodKey = 'Ce mois';
+  String _selectedPeriodKey = 'Mois';
 
   @override
   void initState() {
@@ -36,63 +41,97 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final currNotifier = ref.read(currencyProvider.notifier);
 
     final walletState = ref.watch(walletProvider);
-    final movements = walletState.movements;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Filter expense movements only (exclude deposits / income)
-    final expenseMovements = movements.where((m) {
+    // Filter properties
+    final now = DateTime.now();
+    DateTime currentPeriodStart;
+    DateTime previousPeriodStart;
+    DateTime previousPeriodEnd;
+
+    switch (_selectedPeriodKey) {
+      case 'Semaine':
+        currentPeriodStart = now.subtract(const Duration(days: 7));
+        previousPeriodEnd = currentPeriodStart.subtract(const Duration(seconds: 1));
+        previousPeriodStart = previousPeriodEnd.subtract(const Duration(days: 7));
+        break;
+      case '3 Mois':
+        currentPeriodStart = DateTime(now.year, now.month - 3, now.day);
+        previousPeriodEnd = currentPeriodStart.subtract(const Duration(seconds: 1));
+        previousPeriodStart = DateTime(previousPeriodEnd.year, previousPeriodEnd.month - 3, previousPeriodEnd.day);
+        break;
+      case 'Mois':
+      default:
+        currentPeriodStart = DateTime(now.year, now.month - 1, now.day);
+        previousPeriodEnd = currentPeriodStart.subtract(const Duration(seconds: 1));
+        previousPeriodStart = DateTime(previousPeriodEnd.year, previousPeriodEnd.month - 1, previousPeriodEnd.day);
+        break;
+    }
+
+    // Process movements
+    final expenseMovements = walletState.movements.where((m) {
       final t = m.type.toLowerCase();
       final cat = m.category.toLowerCase();
       return t != 'deposit' &&
           cat != 'dépôt' &&
           cat != 'depot' &&
-          (t == 'payment' ||
-              t == 'transfer' ||
-              t == 'withdrawal' ||
-              t == 'expense');
+          (t == 'payment' || t == 'transfer' || t == 'withdrawal' || t == 'expense');
     }).toList();
 
-    final double totalExpenseFcfa =
-        expenseMovements.fold(0.0, (sum, m) => sum + m.amount);
-
-    // Dynamic category breakdown if real movements exist
+    double currentTotal = 0.0;
+    double previousTotal = 0.0;
     Map<String, double> categoryTotals = {};
-    if (totalExpenseFcfa > 0) {
-      for (var m in expenseMovements) {
+
+    for (var m in expenseMovements) {
+      DateTime mDate;
+      try {
+        mDate = DateTime.parse(m.timestamp);
+      } catch (e) {
+        continue;
+      }
+
+      if (mDate.isAfter(currentPeriodStart) && mDate.isBefore(now.add(const Duration(days: 1)))) {
+        currentTotal += m.amount;
         final cat = m.category.isEmpty ? 'Autres' : m.category;
         categoryTotals[cat] = (categoryTotals[cat] ?? 0.0) + m.amount;
+      } else if (mDate.isAfter(previousPeriodStart) && mDate.isBefore(previousPeriodEnd)) {
+        previousTotal += m.amount;
       }
     }
 
+    // Chart Data Preparation
     final List<Map<String, dynamic>> categoryDisplay = [];
     final List<Color> categoryColors = [
-      const Color(0xFF38BDF8), // Food / Blue
-      const Color(0xFF10B981), // Transport / Green
-      const Color(0xFFF59E0B), // Leisure / Orange
-      const Color(0xFF635BFF), // Others / Purple
+      AppColors.chartIndigo,
+      AppColors.chartCyan,
+      AppColors.chartEmerald,
+      AppColors.chartAmber,
+      AppColors.chartCoral,
+      AppColors.chartPurple,
     ];
 
-    if (totalExpenseFcfa > 0) {
+    if (currentTotal > 0) {
+      // Sort categories by amount descending
+      var sortedKeys = categoryTotals.keys.toList(growable: false)
+        ..sort((k1, k2) => categoryTotals[k2]!.compareTo(categoryTotals[k1]!));
+      
       int colorIdx = 0;
-      categoryTotals.forEach((cat, amt) {
-        final double pct = amt / totalExpenseFcfa;
+      for (var cat in sortedKeys) {
+        final double amt = categoryTotals[cat]!;
+        final double pct = amt / currentTotal;
         categoryDisplay.add({
           'name': cat,
+          'amount': amt,
           'pctValue': pct,
           'pctString': '${(pct * 100).toStringAsFixed(0)}%',
           'color': categoryColors[colorIdx % categoryColors.length],
         });
         colorIdx++;
-      });
+      }
     }
 
-    final Map<String, String> periodLabels = {
-      'Ce mois': langNotifier.tr('Ce mois', 'This month'),
-      'Mois dernier': langNotifier.tr('Mois dernier', 'Last month'),
-      '3 mois': langNotifier.tr('3 mois', '3 months'),
-    };
-
     return Scaffold(
-      backgroundColor: Colors.transparent, // Laisse voir le gradient global
+      backgroundColor: Colors.transparent, // Uses global gradient
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -101,52 +140,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           'Insights',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 letterSpacing: -0.5,
               ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0, top: 10, bottom: 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedPeriodKey,
-                  dropdownColor: Theme.of(context).cardColor,
-                  icon: Icon(Icons.keyboard_arrow_down_rounded,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.7),
-                      size: 18),
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
-                  items: periodLabels.keys.map((String key) {
-                    return DropdownMenuItem<String>(
-                      value: key,
-                      child: Text(periodLabels[key]!),
-                    );
-                  }).toList(),
-                  onChanged: (newValue) {
-                    if (newValue != null) {
-                      setState(() => _selectedPeriodKey = newValue);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -158,19 +155,66 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. DÉPENSES TOTALES DYNAMIQUES
+              // Hero Analytics Area (Étape 1 - Où en suis-je ?)
+              Center(
+                child: SikaPeriodSelector(
+                  selectedPeriod: _selectedPeriodKey,
+                  periods: const ['Semaine', 'Mois', '3 Mois'],
+                  periodLabels: {
+                    'Semaine': langNotifier.tr('Semaine', 'Week'),
+                    'Mois': langNotifier.tr('Mois', 'Month'),
+                    '3 Mois': langNotifier.tr('3 Mois', '3 Months'),
+                  },
+                  onPeriodChanged: (p) => setState(() => _selectedPeriodKey = p),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      langNotifier.tr('Dépenses totales', 'Total Expenses'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      currNotifier.format(currentTotal),
+                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            letterSpacing: -1,
+                            fontSize: 42,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    SikaTrendIndicator(
+                      currentAmount: currentTotal,
+                      previousAmount: previousTotal,
+                    ),
+                  ],
+                ),
+              ).animate().fade(duration: 500.ms, delay: 100.ms).slideY(begin: 0.05, curve: Curves.easeOutCubic),
+              
+              const SizedBox(height: 32),
+
+              // Spending Breakdown (Étape 2 - Où va mon argent ?)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
+                  color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
                   borderRadius: BorderRadius.circular(32),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
                   ),
-                  boxShadow: [
+                  boxShadow: isDark ? null : [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     ),
@@ -184,413 +228,244 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF635BFF).withValues(alpha: 0.15),
+                            color: AppColors.chartIndigo.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.show_chart_rounded,
-                              color: Color(0xFF635BFF), size: 18),
+                          child: const Icon(Icons.pie_chart_rounded, color: AppColors.chartIndigo, size: 18),
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          langNotifier.tr('Dépenses totales', 'Total Expenses'),
+                          langNotifier.tr('Répartition', 'Breakdown'),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 24),
+                    if (currentTotal > 0 && categoryDisplay.isNotEmpty) ...[
+                      // Chart
+                      Center(
+                        child: SikaDonutChart(
+                          percentages: categoryDisplay.map((e) => e['pctValue'] as double).toList(),
+                          colors: categoryDisplay.map((e) => e['color'] as Color).toList(),
+                          size: 160,
+                          strokeWidth: 20,
+                          centerContent: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                currNotifier.format(totalExpenseFcfa),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: -1,
-                                    ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                totalExpenseFcfa > 0
-                                    ? langNotifier.tr('Analyse de ce mois',
-                                        'This month analysis')
-                                    : langNotifier.tr(
-                                        'Aucune dépense', 'No expenses'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: totalExpenseFcfa > 0
-                                          ? AppColors.success
-                                          : Colors.white.withValues(alpha: 0.4),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              const SizedBox(height: 28),
-                              if (categoryDisplay.isNotEmpty) ...[
-                                for (var cat in categoryDisplay) ...[
-                                  _buildCategoryRow(
-                                    cat['name'] as String,
-                                    cat['pctString'] as String,
-                                    cat['color'] as Color,
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                              ] else ...[
-                                Text(
-                                  langNotifier.tr('Aucune donnée', 'No data'),
-                                  style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.4),
-                                      fontSize: 13),
+                                categoryDisplay.first['pctString'] as String,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
                                 ),
-                              ],
+                              ),
+                              Text(
+                                categoryDisplay.first['name'] as String,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                         ),
-                        Expanded(
-                          flex: 5,
-                          child: Center(
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Lueur derrière le donut
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF635BFF)
-                                            .withValues(alpha: 0.2),
-                                        blurRadius: 40,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 120,
-                                  height: 120,
-                                  child: CustomPaint(
-                                    painter: _BuildCustomDonut(
-                                      percentages: categoryDisplay
-                                          .map((e) => e['pctValue'] as double)
-                                          .toList(),
-                                      colors: categoryDisplay
-                                          .map((e) => e['color'] as Color)
-                                          .toList(),
-                                      backgroundColor:
-                                          Colors.white.withValues(alpha: 0.02),
+                      ),
+                      const SizedBox(height: 32),
+                      // Legend List
+                      ...categoryDisplay.map((cat) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: cat['color'] as Color,
+                                      shape: BoxShape.circle,
                                     ),
                                   ),
-                                ),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      categoryDisplay.isNotEmpty
-                                          ? categoryDisplay.first['pctString']
-                                              as String
-                                          : '0%',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    cat['name'] as String,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    currNotifier.format(cat['amount'] as double),
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    cat['pctString'] as String,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
+                        );
+                      }),
+                    ] else ...[
+                      // Empty state for chart
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32.0),
+                        child: SikaEmptyState(
+                          icon: Icons.query_stats_rounded,
+                          title: langNotifier.tr('Aucune dépense', 'No expenses'),
+                          message: langNotifier.tr('Aucune dépense sur cette période.', 'No expenses for this period.'),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
-              )
-                  .animate()
-                  .fade(duration: 500.ms, delay: 100.ms)
-                  .slideY(begin: 0.05, curve: Curves.easeOutCubic),
+              ).animate().fade(duration: 500.ms, delay: 200.ms).slideY(begin: 0.05, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // 2. OBJECTIF D'ÉPARGNE DYNAMIQUE (COFFRES D'ÉPARGNE)
+              // SIKA Insights Area (Étape 4 - Qu'est-ce que SIKA me recommande ?)
               Builder(
                 builder: (context) {
-                  final firstCoffre = walletState.coffres.isNotEmpty
-                      ? walletState.coffres.first
-                      : null;
-                  final String coffreNom =
-                      firstCoffre?.nom ?? langNotifier.tr("Épargne", "Savings");
-                  final double targetSavingsGoal = firstCoffre?.objectif ?? 0.0;
-                  final double currentSaved = firstCoffre?.solde ?? 0.0;
-                  final double progressRatio = targetSavingsGoal > 0
-                      ? (currentSaved / targetSavingsGoal).clamp(0.0, 1.0)
-                      : 0.0;
-                  final String pctString =
-                      (progressRatio * 100).toStringAsFixed(1);
+                  String insightTitle = langNotifier.tr('Analyse SIKA', 'SIKA Analysis');
+                  String insightMessage = langNotifier.tr(
+                    'Vos données sont en cours de consolidation. Continuez à utiliser SIKA pour obtenir des recommandations personnalisées.',
+                    'Your data is being consolidated. Keep using SIKA to get personalized recommendations.'
+                  );
+                  IconData insightIcon = Icons.auto_awesome_rounded;
 
-                  return Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.06),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981)
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.savings_rounded,
-                                      color: Color(0xFF10B981), size: 18),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '${langNotifier.tr("Objectif d'épargne", "Savings Goal")} • $coffreNom',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                langNotifier.tr('Actif', 'Active'),
-                                style: const TextStyle(
-                                  color: Color(0xFF10B981),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              currNotifier.format(targetSavingsGoal),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1,
-                              ),
-                            ),
-                            Text(
-                              '$pctString%',
-                              style: const TextStyle(
-                                color: Color(0xFF10B981),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Stack(
-                          children: [
-                            // Piste de progression
-                            Container(
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            // Barre de progression
-                            FractionallySizedBox(
-                              widthFactor: progressRatio,
-                              child: Container(
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFF10B981).withValues(alpha: 0.5),
-                                      const Color(0xFF10B981),
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF10B981)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '${currNotifier.format(currentSaved)} / ${currNotifier.format(targetSavingsGoal)} ${langNotifier.tr('épargnés dans ce coffre', 'saved in this vault')}',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: const Color(0xFF10B981),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate()
-                      .fade(duration: 500.ms, delay: 200.ms)
-                      .slideY(begin: 0.05, curve: Curves.easeOutCubic);
+                  if (currentTotal > 0 && categoryDisplay.isNotEmpty) {
+                    final topCategory = categoryDisplay.first;
+                    final topCatName = topCategory['name'] as String;
+                    final topCatPct = topCategory['pctString'] as String;
+
+                    if (previousTotal > 0) {
+                      final difference = currentTotal - previousTotal;
+                      final double percentage = (difference / previousTotal) * 100;
+                      
+                      if (percentage > 10) {
+                        insightTitle = langNotifier.tr('Attention aux dépenses', 'Watch your spending');
+                        insightMessage = langNotifier.tr(
+                          'Vos dépenses ont augmenté de ${percentage.abs().toStringAsFixed(1)}%. La catégorie $topCatName représente à elle seule $topCatPct du total. Envisagez de revoir ce budget.',
+                          'Your expenses increased by ${percentage.abs().toStringAsFixed(1)}%. $topCatName alone accounts for $topCatPct of the total. Consider reviewing this budget.'
+                        );
+                        insightIcon = Icons.trending_up_rounded;
+                      } else if (percentage < -10) {
+                        insightTitle = langNotifier.tr('Excellente gestion !', 'Great management!');
+                        insightMessage = langNotifier.tr(
+                          'Vos dépenses ont diminué de ${percentage.abs().toStringAsFixed(1)}%. Vous êtes sur la bonne voie. Pensez à placer cet excédent dans un coffre d\'épargne.',
+                          'Your expenses decreased by ${percentage.abs().toStringAsFixed(1)}%. You are on the right track. Consider putting this surplus in a savings vault.'
+                        );
+                        insightIcon = Icons.trending_down_rounded;
+                      } else {
+                        insightTitle = langNotifier.tr('Dépenses maîtrisées', 'Spending controlled');
+                        insightMessage = langNotifier.tr(
+                          'Vos dépenses sont stables. Le poste principal reste $topCatName ($topCatPct).',
+                          'Your expenses are stable. The main category remains $topCatName ($topCatPct).'
+                        );
+                      }
+                    } else {
+                      insightTitle = langNotifier.tr('Tendances de la période', 'Period trends');
+                      insightMessage = langNotifier.tr(
+                        'Vos dépenses principales sont concentrées sur $topCatName ($topCatPct).',
+                        'Your main expenses are concentrated in $topCatName ($topCatPct).'
+                      );
+                    }
+                  } else if (currentTotal == 0 && previousTotal > 0) {
+                     insightTitle = langNotifier.tr('Aucune dépense', 'No expenses');
+                     insightMessage = langNotifier.tr(
+                        'Vous n\'avez encore rien dépensé sur cette période. Continuez comme ça !',
+                        'You haven\'t spent anything this period yet. Keep it up!'
+                      );
+                  }
+
+                  return SikaInsightCard(
+                    title: insightTitle,
+                    message: insightMessage,
+                    icon: insightIcon,
+                  );
                 },
-              ),
+              ).animate().fade(duration: 500.ms, delay: 300.ms).slideY(begin: 0.05, curve: Curves.easeOutCubic),
+
+              const SizedBox(height: 24),
+
+              // Savings Goals (Étape 3 - Est-ce que je progresse ?)
+              if (walletState.coffres.isNotEmpty) ...[
+                Text(
+                  langNotifier.tr('Objectifs d\'épargne', 'Savings Goals'),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                ...walletState.coffres.map((coffre) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                      ),
+                      boxShadow: isDark ? null : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: SikaBudgetProgress(
+                      title: coffre.nom.isEmpty ? langNotifier.tr('Épargne', 'Savings') : coffre.nom,
+                      currentAmount: coffre.solde,
+                      targetAmount: coffre.objectif,
+                      currentAmountFormatted: currNotifier.format(coffre.solde),
+                      targetAmountFormatted: currNotifier.format(coffre.objectif),
+                      icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.savings_rounded, color: AppColors.success, size: 14),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+
+              const SizedBox(height: 100), // Spacing for bottom nav
             ],
           ),
         ),
       ),
     );
   }
-
-  Widget _buildCategoryRow(String name, String percentage, Color dotColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              name,
-              style: TextStyle(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.7),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        Text(
-          percentage,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BuildCustomDonut extends CustomPainter {
-  final List<double> percentages;
-  final List<Color> colors;
-  final Color backgroundColor;
-
-  _BuildCustomDonut({
-    required this.percentages,
-    required this.colors,
-    required this.backgroundColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Offset center = Offset(size.width / 2, size.height / 2);
-    final double radius = size.width / 2;
-    const double thickness = 8.0;
-
-    final Paint backgroundPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = thickness
-      ..color = backgroundColor;
-
-    canvas.drawCircle(center, radius, backgroundPaint);
-
-    if (percentages.isEmpty || percentages.every((p) => p == 0)) {
-      return;
-    }
-
-    double startAngle = -math.pi / 2;
-
-    for (int i = 0; i < percentages.length; i++) {
-      final sweepAngle = 2 * math.pi * percentages[i];
-      if (sweepAngle > 0) {
-        final paint = Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = thickness
-          ..strokeCap = StrokeCap.round
-          ..color = colors[i % colors.length];
-
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
-          startAngle,
-          sweepAngle,
-          false,
-          paint,
-        );
-        startAngle += sweepAngle;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BuildCustomDonut oldDelegate) => true;
 }

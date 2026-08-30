@@ -7,11 +7,34 @@ Consultation des transactions, préparation d'action (Human-in-the-loop) et simu
 from typing import Dict, Any, Optional
 import uuid
 from .tool_models import RiskLevel, ToolResult
-from .mock_data import MOCK_TRANSACTIONS
+from ...repositories.financial_repository import financial_repository
+from ...services.wallet_integrations.paymechap_api_service import paymechap_api_service
+from ...services.wallet_integrations.wave_api_service import wave_api_service
+from ...services.wallet_integrations.orange_money_api_service import orange_money_api_service
+from ...services.wallet_integrations.mtn_momo_api_service import mtn_momo_api_service
 
 def get_recent_transactions(limit: int = 5, provider: Optional[str] = None) -> ToolResult:
     """Retourne les dernières opérations financières observées."""
-    txs = MOCK_TRANSACTIONS
+    # Fetch real transactions from connected wallets
+    txs = []
+    try:
+        wallets = financial_repository.get_wallets()
+    except Exception:
+        wallets = []
+    for w in wallets:
+        prov = (w.get("provider") or "").lower()
+        if "paymechap" in prov:
+            fetched = paymechap_api_service.fetch_live_transactions("", limit=100)
+            txs.extend(fetched)
+        elif "wave" in prov:
+            fetched = wave_api_service.fetch_live_transactions("", limit=100)
+            txs.extend(fetched)
+        elif "orange" in prov:
+            fetched = orange_money_api_service.fetch_live_transactions("", limit=100)
+            txs.extend(fetched)
+        elif "mtn" in prov:
+            fetched = mtn_momo_api_service.fetch_live_transactions("", limit=100)
+            txs.extend(fetched)
     if provider:
         clean_p = provider.lower().strip()
         txs = [t for t in txs if t["provider"] == clean_p]
@@ -60,6 +83,17 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
             error_message="Le destinataire du transfert est obligatoire."
         )
 
+    # Provider MUST be explicit and come from the enrolled wallet. Do not
+    # silently default to 'wave' here — require the caller to provide provider.
+    if not provider or not str(provider).strip():
+        return ToolResult(
+            success=False,
+            tool_name="prepare_transfer",
+            risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+            data={},
+            error_message="Le provider source du transfert est obligatoire et doit provenir d'un portefeuille enrôlé."
+        )
+
     action_id = f"act_{uuid.uuid4().hex[:8]}"
     return ToolResult(
         success=True,
@@ -69,7 +103,7 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
         data={
             "action_id": action_id,
             "status": "confirmation_required",
-            "provider": provider.lower() if provider else "wave",
+            "provider": provider.lower(),
             "amount": float(amount),
             "currency": currency,
             "recipient": str(recipient).strip(),

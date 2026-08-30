@@ -1,8 +1,4 @@
-"""
-Données de Test (Mock Data) pour l'Agent SIKA
-
-Données financières de simulation neutres et isolées de GèrTonArgent.
-"""
+# Mock data for tests
 
 MOCK_WALLETS = [
     {
@@ -36,7 +32,7 @@ MOCK_TRANSACTIONS = [
         "amount": 5000.0,
         "currency": "XOF",
         "recipient": "Kouamé",
-        "sender": None,
+        "sender": null,
         "timestamp": "2026-08-15T14:30:00Z",
         "status": "completed",
         "category": "Transfert",
@@ -48,7 +44,7 @@ MOCK_TRANSACTIONS = [
         "type": "received",
         "amount": 10000.0,
         "currency": "XOF",
-        "recipient": None,
+        "recipient": null,
         "sender": "Mamadou",
         "timestamp": "2026-08-15T10:15:00Z",
         "status": "completed",
@@ -62,7 +58,7 @@ MOCK_TRANSACTIONS = [
         "amount": 2500.0,
         "currency": "XOF",
         "recipient": "Boulangerie Abidjan",
-        "sender": None,
+        "sender": null,
         "timestamp": "2026-08-14T18:45:00Z",
         "status": "completed",
         "category": "Alimentation",
@@ -75,7 +71,7 @@ MOCK_TRANSACTIONS = [
         "amount": 20000.0,
         "currency": "XOF",
         "recipient": "Point Cash Yopougon",
-        "sender": None,
+        "sender": null,
         "timestamp": "2026-08-12T09:00:00Z",
         "status": "completed",
         "category": "Retrait",

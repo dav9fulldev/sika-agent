@@ -360,10 +360,12 @@ class PayMeChapAPIService:
             logger.warning(f"[PayMeChap Create Coffre API] Exception: {e}")
         return {"error": "FAILED_TO_CREATE_COFFRE"}
 
-    def deposit_to_coffre(self, access_token: str, coffre_id: int, montant: float, account_number: Optional[str] = None) -> Dict[str, Any]:
+    def deposit_to_coffre(self, access_token: str, coffre_id: int, montant: float, account_number: Optional[str] = None, action_id: Optional[str] = None) -> Dict[str, Any]:
         """Effectue un dépôt de fonds vers un Coffre-fort via l'API Partenaire (POST /api/v1/partners/wallets/{telephone}/coffres/{coffreId}/depot)."""
         tok = self.get_partner_access_token() or access_token
         headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+        if action_id:
+            headers["X-Idempotency-Key"] = action_id
 
         endpoints = []
         if account_number:
@@ -377,9 +379,16 @@ class PayMeChapAPIService:
                 resp = requests.post(ep, json=payload, headers=headers, timeout=150)
                 if resp.status_code in [200, 201]:
                     return resp.json()
-            except Exception as e:
-                logger.warning(f"[PayMeChap Deposit Coffre API] Exception sur {ep}: {e}")
-        return {"error": "FAILED_TO_DEPOSIT_COFFRE"}
+                if resp.status_code >= 500:
+                    logger.error(f"[PayMeChap Deposit Coffre API] Erreur HTTP {resp.status_code} sur {ep} - Résultat inconnu.")
+                    resp.raise_for_status()
+                
+                logger.warning(f"[PayMeChap Deposit Coffre API] Échec métier {resp.status_code} sur {ep}: {resp.text}")
+                return {"success": False, "error": "FAILED_TO_DEPOSIT_COFFRE", "details": resp.text}
+            except requests.exceptions.RequestException as req_exc:
+                logger.error(f"[PayMeChap Deposit Coffre API] Erreur réseau (Timeout/Connexion) sur {ep}: {req_exc}")
+                raise
+        return {"success": False, "error": "FAILED_TO_DEPOSIT_COFFRE"}
 
     def categorize_transaction(self, tx_type: str, recipient: str, description: str, motif: str, amount: float) -> str:
         """Moteur d'Auto-Catégorisation Intelligente SIKA.
@@ -513,15 +522,20 @@ class PayMeChapAPIService:
                     "status": (res_data.get("status") or "COMPLETED").lower(),
                     "created_at": res_data.get("created_at") or datetime.utcnow().isoformat(),
                 }
-            logger.warning(f"[PayMeChap Payout API] Échec HTTP {resp.status_code}: {resp.text}")
-        except Exception as e:
-            logger.warning(f"[PayMeChap Payout API] Exception réseau sur {endpoint}: {e}")
+            if resp.status_code >= 500:
+                logger.error(f"[PayMeChap Payout API] Erreur HTTP {resp.status_code} sur {endpoint} - Résultat inconnu.")
+                resp.raise_for_status()
 
-        return {
-            "success": False,
-            "status": "TEMPORARILY_UNAVAILABLE",
-            "message": "Je n'arrive pas à joindre PayMeChap pour le moment. Aucun transfert n'a été effectué.",
-        }
+            logger.warning(f"[PayMeChap Payout API] Échec HTTP métier {resp.status_code}: {resp.text}")
+            return {
+                "success": False,
+                "status": "FAILED",
+                "message": f"Refus de PayMeChap (Code {resp.status_code})",
+                "details": resp.text
+            }
+        except requests.exceptions.RequestException as req_exc:
+            logger.error(f"[PayMeChap Payout API] Erreur réseau (Timeout/Connexion): {req_exc}")
+            raise
 
 
 

@@ -38,10 +38,6 @@ class SikaQueryDTO(BaseModel):
         sanitized = re.sub(r'script|javascript:|eval\(', '', sanitized, flags=re.IGNORECASE)
         return sanitized[:1000].strip()
 
-class SikaConfirmTransactionDTO(BaseModel):
-    amount: float
-    category: str
-    description: Optional[str] = "Dépense via Sika"
 
 class SikaResponseDTO(BaseModel):
     query: str
@@ -58,3 +54,42 @@ class SikaResponseDTO(BaseModel):
     should_speak: Optional[bool] = True
     speech_text: Optional[str] = None
     action_data: Optional[Dict[str, Any]] = None
+    agent_steps: List[Dict[str, Any]] = []
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class AuthRegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class AuthGoogleRequest(BaseModel):
+    email: Optional[str] = None
+    name: Optional[str] = None
+    id_token: Optional[str] = None
+
+class AuthForgotPasswordRequest(BaseModel):
+    email: str
+
+class AuthResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+class TTSRequest(BaseModel):
+    text: Optional[str] = None
+    speech_text: Optional[str] = None
+    voice_name: str = "fr-FR-Neural2-C"
+    speaking_rate: float = 1.05
+
+class AgentProcessRequest(BaseModel):
+    query: str
+
+class AgentConfirmRequest(BaseModel):
+    action_id: str
+
+class AgentCancelRequest(BaseModel):
+    action_id: str
+    reason: str = "USER_CANCELLED"

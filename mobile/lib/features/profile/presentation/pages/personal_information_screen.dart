@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/sika_glass_card.dart';
@@ -85,7 +87,7 @@ class _PersonalInformationScreenState
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
 
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -96,17 +98,16 @@ class _PersonalInformationScreenState
         ),
         title: Text(
           langNotifier.tr('Informations personnelles', 'Personal Information'),
-          style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.lg),
             // Avatar
             Center(
               child: Stack(
@@ -129,10 +130,8 @@ class _PersonalInformationScreenState
                       backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.1),
                       child: Text(
                         initialLetter,
-                        style: const TextStyle(
+                        style: AppTypography.h1.copyWith(
                           color: AppColors.brandPrimary,
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -141,7 +140,7 @@ class _PersonalInformationScreenState
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                         color: AppColors.brandPrimary,
                         shape: BoxShape.circle,
@@ -157,11 +156,11 @@ class _PersonalInformationScreenState
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: AppSpacing.xxl),
 
             // Form Fields
             SikaGlassCard(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 children: [
                   _buildTextField(
@@ -169,14 +168,14 @@ class _PersonalInformationScreenState
                     controller: _nameController,
                     icon: Icons.person_outline,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.xl),
                   _buildTextField(
                     label: langNotifier.tr('Adresse Email', 'Email Address'),
                     controller: _emailController,
                     icon: Icons.email_outlined,
                     readOnly: true, // Email is non-editable easily
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.xl),
                   _buildTextField(
                     label: langNotifier.tr('Numéro de téléphone', 'Phone Number'),
                     controller: _phoneController,
@@ -185,7 +184,7 @@ class _PersonalInformationScreenState
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: AppSpacing.xxl),
 
             // Save Button
             SikaPremiumButton(
@@ -210,14 +209,15 @@ class _PersonalInformationScreenState
       children: [
         Text(
           label,
-          style: TextStyle(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         if (!readOnly)
           SikaGlassTextField(
             controller: controller,
@@ -228,18 +228,20 @@ class _PersonalInformationScreenState
           Container(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: AppSpacing.borderRadiusMd,
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
               ),
             ),
             child: TextField(
               controller: controller,
               readOnly: true,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                fontSize: 15,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
+                  ),
               decoration: InputDecoration(
                 prefixIcon: Icon(icon,
                     color: Theme.of(context)
@@ -252,7 +254,8 @@ class _PersonalInformationScreenState
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
               ),
             ),
           ),

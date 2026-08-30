@@ -19,12 +19,15 @@ class AgentOrbWidget extends StatelessWidget {
       case SikaState.ambiguityAsked:
         return const Color(0xFF10B981); // Emerald / Teal glowing
       case SikaState.processing:
+      case SikaState.agentWorking:
       case SikaState.executingAction:
         return const Color(0xFF6366F1); // Indigo / Thinking
       case SikaState.speaking:
         return const Color(0xFF38BDF8); // Cyan
       case SikaState.securityValidation:
         return const Color(0xFFF59E0B); // Amber / Lock
+      case SikaState.reconciling:
+        return const Color(0xFF3B82F6); // Blue — reassuring, not error
       case SikaState.error:
         return const Color(0xFFEF4444); // Red error
       case SikaState.completed:
@@ -49,17 +52,21 @@ class AgentOrbWidget extends StatelessWidget {
       case SikaState.executingAction:
         return 'Executing transaction on PayMeChap...';
       case SikaState.processing:
-        return 'Analyzing your financial context...';
+        return 'Analyzing your request...';
+      case SikaState.agentWorking:
+        return 'SIKA is working on your request...';
       case SikaState.speaking:
         return 'SIKA is responding...';
       case SikaState.completed:
         return 'Transaction completed successfully!';
       case SikaState.cancelled:
         return 'Operation cancelled.';
+      case SikaState.reconciling:
+        return 'Verifying transaction status...';
       case SikaState.error:
         return 'Connection issue';
       case SikaState.idle:
-        return 'Tap to speak or say "Sika"';
+        return 'Tap to speak or type your message';
     }
   }
 

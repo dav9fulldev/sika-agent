@@ -14,8 +14,6 @@ import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
 import '../../../wallet/providers/wallet_provider.dart';
-import '../../../../core/widgets/sika_glass_card.dart';
-import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../../core/widgets/sika_glass_text_field.dart';
 
 class AgentHubScreen extends ConsumerStatefulWidget {
@@ -36,7 +34,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     with TickerProviderStateMixin {
   late AnimationController _orbController;
   late AnimationController _shimmerController;
-  late Animation<double> _orbFloat;
   final TextEditingController _inputController = TextEditingController();
   bool _showAlert = false;
   final FocusNode _inputFocus = FocusNode();
@@ -52,9 +49,6 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat();
-    _orbFloat = Tween<double>(begin: -5.0, end: 5.0).animate(
-      CurvedAnimation(parent: _orbController, curve: Curves.easeInOut),
-    );
   }
 
   @override
@@ -98,45 +92,13 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     final walletState = ref.watch(walletProvider);
     final sikaData = ref.watch(sikaProvider);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // FOND GRADIENT MESH PREMIUM
-          Positioned(
-            top: -60,
-            right: -80,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.brandPrimary.withValues(alpha: 0.18),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            left: -60,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.brandSecondary.withValues(alpha: 0.10),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // Fond propre sans gradients lourds pour un style minimaliste.
 
           // CONTENU PRINCIPAL
           SafeArea(
@@ -169,7 +131,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: AppColors.darkTextSecondary,
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                           letterSpacing: 0.3,
                                         ),
                                   ),
@@ -186,23 +148,23 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                   ),
                                 ],
                               ),
-                              // Bouton notifications
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: AppColors.darkSurfaceHighlight,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.06),
+                                // Suppression du bouton notifications lourd
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.notifications_outlined,
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                    size: 20,
                                   ),
                                 ),
-                                child: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: AppColors.darkTextSecondary,
-                                  size: 20,
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -314,6 +276,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                   ? (actionData['amount'] as num).toDouble()
                                   : 0.0;
                               return HumanConfirmationCard(
+                                actionId: sikaData.pendingActionId,
                                 actionTitle: langNotifier.tr(
                                     'Validation requise',
                                     'Confirmation Required'),
@@ -321,11 +284,14 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                 amountText: amountVal > 0
                                     ? currNotifier.format(amountVal)
                                     : '---',
+                                sourceAccount: actionData['source_wallet']?.toString() ?? 'Portefeuille Principal',
+                                feeText: actionData['fee'] != null ? '${actionData['fee']} FCFA' : '0 FCFA',
+                                platformText: actionData['platform']?.toString() ?? 'PayMeChap / Direct',
                                 onConfirm: () => sikaNotifier
                                     .executeSecurityValidationAndConfirm(
                                         sikaData.pendingActionId!),
                                 onCancel: () =>
-                                    sikaNotifier.clearConversation(),
+                                    sikaNotifier.cancelPendingAction(),
                               );
                             }),
                           ).animate().fade().scale(),
@@ -458,84 +424,114 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     dynamic currNotifier,
     dynamic langNotifier,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.darkSurfaceHighlight.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                langNotifier.tr('Solde total consolidé', 'Total Consolidated Balance'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  textBaseline: TextBaseline.alphabetic,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currNotifier.format(walletState.totalBalanceFcfa),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 44,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1.0,
+              height: 1.1,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      walletState.wallets.isEmpty
+                          ? langNotifier.tr('Aucun wallet', 'No wallet')
+                          : langNotifier.tr(
+                              '${walletState.wallets.length} wallet(s)',
+                              '${walletState.wallets.length} wallet(s)',
+                            ),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => ConnectWalletModal.show(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.success,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                          color: AppColors.success.withValues(alpha: 0.5),
-                          blurRadius: 8),
+                    color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.add_rounded,
+                        color: AppColors.brandPrimary,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        langNotifier.tr('Ajouter', 'Add'),
+                        style: const TextStyle(
+                          color: AppColors.brandPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  langNotifier.tr('Solde consolidé', 'Consolidated Balance'),
-                  style: const TextStyle(
-                    color: AppColors.darkTextSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Massive Balance Text
-          Text(
-            currNotifier.format(walletState.totalBalanceFcfa),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48, // Much larger!
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1.5,
-              height: 1.1,
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            walletState.wallets.isEmpty
-                ? langNotifier.tr('Aucun portefeuille', 'No wallets')
-                : langNotifier.tr(
-                    '${walletState.wallets.length} portefeuille(s)',
-                    '${walletState.wallets.length} wallet(s)',
-                  ),
-            style: const TextStyle(
-              color: AppColors.brandPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Connection CTA
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: SikaPremiumButton(
-              onPressed: () => ConnectWalletModal.show(context),
-              text: langNotifier.tr('Ajouter un compte', 'Add Account'),
-              prefixWidget: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -544,238 +540,165 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
   Widget _buildQuickActions(
       BuildContext context, dynamic langNotifier, SikaNotifier notifier) {
-    final actions = [
-      (
-        Icons.send_rounded,
-        langNotifier.tr('Envoyer', 'Send'),
-        AppColors.brandPrimary
-      ),
-      (
-        Icons.download_rounded,
-        langNotifier.tr('Recevoir', 'Receive'),
-        AppColors.success
-      ),
-      (
-        Icons.bar_chart_rounded,
-        langNotifier.tr('Analyser', 'Analyze'),
-        AppColors.brandSecondary
-      ),
-      (
-        Icons.settings_rounded,
-        langNotifier.tr('Réglages', 'Settings'),
-        AppColors.darkTextMuted
-      ),
-    ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          const SizedBox(width: 20),
-          ...actions.asMap().entries.map((entry) {
-            final i = entry.key;
-            final action = entry.value;
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: GestureDetector(
-                onTap: () {
-                  if (i == 2) widget.onOpenInsights();
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.darkSurface.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: AppColors.brandPrimary.withValues(alpha: 0.15),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: (action.$3).withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(action.$1,
-                            color: action.$3, size: 16),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        action.$2 as String,
-                        style: const TextStyle(
-                          color: AppColors.darkTextPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fade(delay: (i * 80).ms).slideX(begin: 0.1, end: 0),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    Widget buildBentoAction(IconData icon, String label, Color color, VoidCallback onTap, int delayMs) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 90,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
               ),
-            );
-          }),
-          const SizedBox(width: 8),
-        ],
-      ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fade(delay: delayMs.ms).scaleXY(begin: 0.95, end: 1.0, curve: Curves.easeOut),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        buildBentoAction(Icons.donut_small_rounded, langNotifier.tr('Analyser', 'Analyze'), AppColors.brandSecondary, widget.onOpenInsights, 200),
+        const SizedBox(width: 12),
+        buildBentoAction(Icons.history_rounded, langNotifier.tr('Activité', 'Activity'), Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), () {}, 250),
+      ],
     );
   }
 
   Widget _buildSikaStatusCard(BuildContext context, dynamic langNotifier,
       SikaNotifier sikaNotifier, SikaData sikaData) {
-    return SikaGlassCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
       padding: const EdgeInsets.all(20),
-      borderRadius: BorderRadius.circular(28),
-      blur: 24.0,
-      opacity: 0.2,
-      child: Stack(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
-          // Background Glow
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.brandPrimary.withValues(alpha: 0.2),
-                    Colors.transparent,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.brandPrimary.withValues(alpha: 0.3),
-                      blurRadius: 40),
-                ],
+          // SIKA AI ICON
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.brandPrimary.withValues(alpha: 0.1),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Image.asset(
+                AppImages.bienv,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
               ),
             ),
           ),
-          Row(
-            children: [
-              // SIKA AI ORB
-              AnimatedBuilder(
-                animation: _orbFloat,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(0, _orbFloat.value),
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                AppColors.brandPrimary.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.asset(
-                          AppImages.bienv,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          langNotifier.tr('SIKA AI', 'SIKA AI'),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.3,
-                                    color: Colors.white,
-                                  ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color:
-                                AppColors.brandPrimary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: AppColors.brandPrimary
-                                    .withValues(alpha: 0.5)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.brandPrimary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'ACTIVE',
-                                style: TextStyle(
-                                  color: AppColors.brandPrimary,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
                     Text(
-                      langNotifier.tr(
-                        'Analyse en temps réel de votre portefeuille.',
-                        'Real-time portfolio analysis active.',
-                      ),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            height: 1.3,
+                      langNotifier.tr('SIKA AI', 'SIKA AI'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'ACTIVE',
+                        style: TextStyle(
+                          color: AppColors.brandPrimary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: widget.onOpenChat,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                const SizedBox(height: 4),
+                Text(
+                  langNotifier.tr(
+                    'Analyse en temps réel de votre portefeuille.',
+                    'Real-time portfolio analysis active.',
                   ),
-                  child: const Icon(Icons.arrow_forward_rounded,
-                      color: Colors.white, size: 20),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: widget.onOpenChat,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurfaceHighlight : AppColors.lightSurfaceHighlight,
+                shape: BoxShape.circle,
               ),
-            ],
+              child: Icon(Icons.arrow_forward_rounded,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), size: 18),
+            ),
           ),
         ],
       ),
@@ -790,50 +713,43 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     required VoidCallback onTap,
     required int delay,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.darkSurface.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(20),
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.brandPrimary.withValues(alpha: 0.1),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
           ),
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: color, size: 16),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      letterSpacing: 0.2,
-                    ),
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9),
+                ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white.withValues(alpha: 0.4),
-                size: 14,
-              ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+              size: 20,
             ),
           ],
         ),

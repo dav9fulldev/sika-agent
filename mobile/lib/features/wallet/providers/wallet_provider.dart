@@ -81,7 +81,9 @@ class WalletMovementItem {
   factory WalletMovementItem.fromJson(Map<String, dynamic> json) {
     return WalletMovementItem(
       id: json['id'] ?? '',
-      walletProvider: json['wallet_provider'] ?? 'Wave',
+      // Do NOT default to 'Wave' when provider is missing — keep empty so
+      // the UI/backends treat missing provider as unknown rather than a vendor.
+      walletProvider: json['wallet_provider'] ?? '',
       type: json['type'] ?? 'payment',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       currency: json['currency'] ?? 'XOF',
@@ -360,15 +362,8 @@ class WalletNotifier extends StateNotifier<WalletState> {
       accountNumber: accountNumber,
       authMethod: authMethod,
     );
-    if (sessId != null) {
-      return await verifyWalletOtp(
-        sessionId: sessId,
-        otpCode: "123456",
-        provider: provider,
-        accountNumber: accountNumber,
-      );
-    }
-    return false;
+    // Return true if OTP session was created; UI will handle OTP verification.
+    return sessId != null;
   }
 
   Future<void> syncAllWallets() async {

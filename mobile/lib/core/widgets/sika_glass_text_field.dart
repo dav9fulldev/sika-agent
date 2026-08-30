@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_spacing.dart';
+import '../constants/app_typography.dart';
 
 class SikaGlassTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -29,13 +31,19 @@ class SikaGlassTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    final bgColor = isDark 
+        ? AppColors.darkSurfaceElevated 
+        : AppColors.lightSurface;
+
+    final borderColor = isDark 
+        ? AppColors.darkBorderStrong
+        : AppColors.lightBorderStrong;
+
     return Container(
       decoration: BoxDecoration(
-        color: (isDark ? AppColors.darkSurface : Theme.of(context).colorScheme.surface).withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: (isDark ? Colors.white : AppColors.brandPrimary).withValues(alpha: 0.1),
-        ),
+        color: bgColor,
+        borderRadius: AppSpacing.borderRadiusSm,
+        border: Border.all(color: borderColor),
       ),
       child: TextField(
             controller: controller,
@@ -44,11 +52,13 @@ class SikaGlassTextField extends StatelessWidget {
             keyboardType: keyboardType,
             maxLines: maxLines,
             onSubmitted: onSubmitted,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            style: AppTypography.bodyMedium.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             decoration: InputDecoration(
               hintText: hintText,
-              hintStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
+              hintStyle: AppTypography.bodyMedium.copyWith(
+                color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
               ),
               prefixIcon: prefixIcon != null 
                   ? Icon(prefixIcon, color: AppColors.brandSecondary) 
@@ -63,3 +73,4 @@ class SikaGlassTextField extends StatelessWidget {
     );
   }
 }
+

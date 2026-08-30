@@ -6,8 +6,12 @@ import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/widgets/sika_surface.dart';
+
 
 class KycVerificationScreen extends ConsumerStatefulWidget {
   const KycVerificationScreen({super.key});
@@ -164,7 +168,7 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
             feedback = 'Visage détecté. Ne bougez pas...';
           }
         } else if (faces.isEmpty) {
-          feedback = 'Aucun visage détecté ou espace sombre.';
+          feedback = 'Aucun visage détecté.';
         } else {
           feedback = 'Un seul visage autorisé.';
         }
@@ -221,11 +225,10 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       return;
     }
 
-    // Stop the image stream before taking a picture
     try {
       await _cameraController!.stopImageStream();
     } catch (e) {
-      // Stream might already be stopped
+      // Ignore
     }
 
     try {
@@ -247,19 +250,17 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
       _isDetecting = false;
 
       if (_currentStep == 2 && _selfieImage == null) {
-        // We just moved to step 2
         int frontIndex = _cameras
             .indexWhere((c) => c.lensDirection == CameraLensDirection.front);
         if (frontIndex != -1) {
           _isCameraInitialized = false;
           await _startCamera(frontIndex);
         } else {
-          await _startCamera(0); // Fallback
+          await _startCamera(0); 
         }
       } else if (_selfieImage != null) {
         _submitKyc();
       } else {
-        // Restart stream for next step
         await _startCamera(_currentCameraIndex);
       }
     } catch (e) {
@@ -271,7 +272,6 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   Future<void> _submitKyc() async {
     setState(() => _isProcessing = true);
 
-    // Simulate API verification
     await Future.delayed(const Duration(seconds: 2));
 
     ref.read(authProvider.notifier).updateKycStatus(true);
@@ -283,12 +283,27 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           content: Text(langNotifier.tr(
               'Identité vérifiée par IA avec succès !',
               'Identity verified by AI successfully!')),
-          backgroundColor: AppColors.emerald,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );
       Navigator.pop(context);
     }
+  }
+
+  Widget _buildProgressSegment(int stepIndex) {
+    bool isActive = _currentStep >= stepIndex;
+    return Expanded(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: 4,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.darkBorderSubtle,
+          borderRadius: AppSpacing.borderRadiusSm,
+        ),
+      ),
+    );
   }
 
   @override
@@ -303,155 +318,161 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
   Widget build(BuildContext context) {
     final langNotifier = ref.watch(languageProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: Colors.black, // Camera screen is dark
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-          onPressed: () => Navigator.pop(context),
+    // Forces dark theme for the camera UI elements for contrast
+    return Theme(
+      data: Theme.of(context).copyWith(brightness: Brightness.dark),
+      child: Scaffold(
+        backgroundColor: Colors.black, // Camera screen is dark
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+            onPressed: () => Navigator.pop(context),
+          ),
+          centerTitle: true,
+          title: Text(
+            langNotifier.tr('Vérification d\'identité', 'Identity Verification'),
+            style: AppTypography.h3.copyWith(color: Colors.white),
+          ),
         ),
-        title: Text(
-          _currentStep == 0
-              ? langNotifier.tr('Scanner Recto (Auto)', 'Scan Front (Auto)')
-              : _currentStep == 1
-                  ? langNotifier.tr('Scanner Verso (Auto)', 'Scan Back (Auto)')
-                  : langNotifier.tr('Selfie (Auto)', 'Selfie (Auto)'),
-          style: const TextStyle(
-              color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: _isProcessing
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.primary)),
-                  const SizedBox(height: 24),
-                  Text(
-                    langNotifier.tr(
-                        'Vérification IA en cours...', 'AI Verifying...'),
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ],
-              )
-            : Column(
-                children: [
-                  // Progress Indicator
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: Row(
+        body: _isProcessing
+            ? Container(
+                width: double.infinity,
+                color: AppColors.darkBackground,
+                child: Center(
+                  child: SikaSurface(
+                    padding: const EdgeInsets.all(AppSpacing.xxl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Expanded(
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: _currentStep >= 0
-                                  ? AppColors.primary
-                                  : Colors.grey[800],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
+                        const CircularProgressIndicator(color: AppColors.primary),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          langNotifier.tr(
+                              'Vérification sécurisée en cours...', 'Secure verification in progress...'),
+                          style: AppTypography.bodyMediumStrong.copyWith(color: AppColors.darkTextPrimary),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: _currentStep >= 1
-                                  ? AppColors.primary
-                                  : Colors.grey[800],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 1. Camera & Overlay
+                  if (_isCameraInitialized && _cameraController != null)
+                    Stack(
+                      alignment: Alignment.center,
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_cameraController!),
+                        CustomPaint(
+                          painter: ScannerOverlayPainter(
+                            isCircle: _currentStep == 2,
+                            isTargetDetected: _isTargetDetected,
                           ),
+                          child: Container(),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: _currentStep >= 2
-                                  ? AppColors.primary
-                                  : Colors.grey[800],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                      ],
+                    )
+                  else
+                    const Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primary)),
+
+                  // 2. Top UI (Progress & Instructions)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + kToolbarHeight + AppSpacing.md,
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    child: Column(
+                      children: [
+                        // Progress Indicator
+                        Row(
+                          children: [
+                            _buildProgressSegment(0),
+                            _buildProgressSegment(1),
+                            _buildProgressSegment(2),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        // Instructions Container
+                        SikaSurface(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                _currentStep == 0
+                                  ? langNotifier.tr('Étape 1 : Recto', 'Step 1: Front')
+                                  : _currentStep == 1
+                                      ? langNotifier.tr('Étape 2 : Verso', 'Step 2: Back')
+                                      : langNotifier.tr('Étape 3 : Selfie', 'Step 3: Selfie'),
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                _currentStep == 0
+                                    ? langNotifier.tr(
+                                        'Placez l\'avant de votre carte d\'identité dans le cadre.',
+                                        'Place the front of your ID in the frame.')
+                                    : _currentStep == 1
+                                        ? langNotifier.tr(
+                                            'Retournez votre pièce et placez le verso dans le cadre.',
+                                            'Turn your ID over and place the back in the frame.')
+                                        : langNotifier.tr(
+                                            'Regardez droit devant vous et maintenez votre visage dans le cercle.',
+                                            'Look straight ahead and keep your face in the circle.'),
+                                textAlign: TextAlign.center,
+                                style: AppTypography.bodyMediumStrong.copyWith(color: AppColors.darkTextPrimary),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  // Instructions
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    child: Text(
-                      _currentStep == 0
-                          ? langNotifier.tr(
-                              'Placez l\'avant de votre carte dans le cadre. L\'IA scannera automatiquement.',
-                              'Place the front of your ID in the frame. AI will scan automatically.')
-                          : _currentStep == 1
-                              ? langNotifier.tr(
-                                  'Placez l\'arrière de votre carte. Le scan est automatique.',
-                                  'Place the back of your ID. Scan is automatic.')
-                              : langNotifier.tr(
-                                  'Placez votre visage dans le cercle. La photo se prendra toute seule.',
-                                  'Place your face in the circle. It will capture automatically.'),
-                      textAlign: TextAlign.center,
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 16),
-                    ),
-                  ),
-
-                  // Camera Preview with Overlay
-                  Expanded(
-                    child: _isCameraInitialized && _cameraController != null
-                        ? Stack(
-                            alignment: Alignment.center,
-                            fit: StackFit.expand,
-                            children: [
-                              CameraPreview(_cameraController!),
-                              CustomPaint(
-                                painter: ScannerOverlayPainter(
-                                  isCircle: _currentStep == 2,
-                                  isTargetDetected: _isTargetDetected,
-                                ),
-                                child: Container(),
-                              ),
-                              if (_feedbackMessage.isNotEmpty)
-                                Positioned(
-                                  bottom: 60,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.7),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      _feedbackMessage,
-                                      style: TextStyle(
-                                          color: _isTargetDetected
-                                              ? AppColors.emerald
-                                              : Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
+                  // 3. Feedback Message
+                  if (_feedbackMessage.isNotEmpty)
+                    Positioned(
+                      bottom: 60,
+                      left: AppSpacing.xl,
+                      right: AppSpacing.xl,
+                      child: SikaSurface(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_isTargetDetected) ...[
+                              const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+                              const SizedBox(width: AppSpacing.xs),
                             ],
-                          )
-                        : const Center(
-                            child: CircularProgressIndicator(
-                                color: AppColors.primary)),
-                  ),
-
-                  // The capture button is hidden since we are using Auto-Scan!
-                  const SizedBox(height: 50),
+                            Flexible(
+                              child: Text(
+                                _feedbackMessage,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.bodyMediumStrong.copyWith(
+                                    color: _isTargetDetected
+                                        ? AppColors.success
+                                        : AppColors.darkTextPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
       ),
@@ -497,9 +518,9 @@ class ScannerOverlayPainter extends CustomPainter {
 
     // Draw a border around the cutout
     final borderPaint = Paint()
-      ..color = isTargetDetected ? AppColors.emerald : AppColors.primary
+      ..color = isTargetDetected ? AppColors.success : AppColors.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = isTargetDetected ? 5.0 : 3.0;
+      ..strokeWidth = isTargetDetected ? 4.0 : 2.0;
     canvas.drawPath(cutoutPath, borderPaint);
   }
 

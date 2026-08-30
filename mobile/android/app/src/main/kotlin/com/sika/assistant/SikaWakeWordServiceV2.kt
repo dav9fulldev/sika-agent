@@ -8,9 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -18,65 +15,81 @@ import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.Locale
 
-class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
+enum class ServiceState {
+    STOPPED,            // Wake Word désactivé ou service arrêté
+    LISTENING,          // Écoute active
+    PAUSED_FOR_FLUTTER  // Suspendu car Flutter utilise le microphone
+}
+
+class SikaWakeWordServiceV2 : Service() {
 
     companion object {
         private const val TAG = "SikaWakeWordServiceV2"
         private const val CHANNEL_ID = "SikaWakeWordChannel"
         private const val NOTIFICATION_ID = 2001
-        private const val SAMPLE_RATE = 16000
-        private const val WAKE_WORD = "sika"
 
         const val ACTION_WAKE_WORD_DETECTED = "com.gertonargent.WAKE_WORD_DETECTED"
         const val ACTION_STOP_LISTENING = "com.gertonargent.STOP_LISTENING"
-
-        var isRunning = false
+        
+        var currentState: ServiceState = ServiceState.STOPPED
             private set
     }
 
-    private var tts: TextToSpeech? = null
     private var speechRecognizer: SpeechRecognizer? = null
-    private var audioRecord: AudioRecord? = null
-    private var isListening = AtomicBoolean(false)
-    private var isProcessingCommand = AtomicBoolean(false)
-    private var recognitionThread: Thread? = null
-    private lateinit var prefs: SharedPreferences
-    private lateinit var mainActivity: Class<*>
+    private lateinit var flutterPrefs: SharedPreferences
+    private lateinit var sikaPrefs: SharedPreferences
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "======== SikaWakeWordServiceV2.onCreate() called ========")
-        prefs = getSharedPreferences("sika_prefs", MODE_PRIVATE)
-        tts = TextToSpeech(this, this)
+        Log.d(TAG, "======== SikaWakeWordServiceV2.onCreate() ========")
+        flutterPrefs = getSharedPreferences("FlutterSharedPreferences", MODE_PRIVATE)
+        sikaPrefs = getSharedPreferences("sika_prefs", MODE_PRIVATE)
         createNotificationChannel()
     }
 
+    private fun isWakeWordEnabled(): Boolean {
+        // Flutter shared_preferences utilizes the "flutter." prefix
+        return flutterPrefs.getBoolean("flutter.wake_word_enabled", true)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!isWakeWordEnabled()) {
+            Log.d(TAG, "Wake Word is disabled in preferences. Stopping service immediately.")
+            stopListening(forceStop = true)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         when (intent?.action) {
             ACTION_STOP_LISTENING -> {
                 Log.d(TAG, "Received ACTION_STOP_LISTENING")
-                stopListening()
+                stopListening(forceStop = true)
                 stopSelf()
                 return START_NOT_STICKY
             }
+            "com.gertonargent.PAUSE_LISTENING" -> {
+                Log.d(TAG, "Received PAUSE_LISTENING -> Pausing Wake Word to free microphone")
+                currentState = ServiceState.PAUSED_FOR_FLUTTER
+                stopListening(forceStop = false)
+                return START_STICKY
+            }
+            "com.gertonargent.RESUME_LISTENING" -> {
+                Log.d(TAG, "Received RESUME_LISTENING -> Resuming Wake Word")
+                if (currentState == ServiceState.PAUSED_FOR_FLUTTER || currentState == ServiceState.STOPPED) {
+                    startWakeWordDetection()
+                }
+                return START_STICKY
+            }
             else -> {
                 startForeground(NOTIFICATION_ID, createNotification())
-                if (!isRunning) {
+                if (currentState == ServiceState.STOPPED) {
                     Log.d(TAG, "Starting service for the first time")
-                    isRunning = true
                     startWakeWordDetection()
-                } else {
-                    Log.d(TAG, "Service already running, ignoring duplicate start request")
                 }
             }
         }
@@ -88,369 +101,123 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy called")
-        stopListening()
-        isRunning = false
-        tts?.shutdown()
-        speechRecognizer?.destroy()
+        stopListening(forceStop = true)
     }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            Log.d(TAG, "✅ TextToSpeech initialized")
-            tts?.language = Locale.FRENCH
-        } else {
-            Log.e(TAG, "❌ TextToSpeech initialization failed")
-        }
-    }
-
-    // ============================================================================
-    // WAKE-WORD DETECTION
-    // ============================================================================
 
     private fun startWakeWordDetection() {
-        Log.d(TAG, "Starting wake-word detection (simple loudness fallback)")
-        if (isListening.getAndSet(true)) return
-
-        try {
-            val bs = AudioRecord.getMinBufferSize(
-                SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-            ) * 2
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, bs
-            )
-
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord initialization failed")
-                return
-            }
-
-            audioRecord?.startRecording()
-            Log.d(TAG, "✅ Wake-word detection started")
-
-            recognitionThread = Thread { wakeWordDetectionLoop(bs) }
-            recognitionThread?.start()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting detection: ${e.message}", e)
-        }
-    }
-
-    private fun wakeWordDetectionLoop(bufferSize: Int) {
-        val buffer = ByteArray(bufferSize)
-        var loudnessCount = 0
-
-        while (isListening.get() && !Thread.interrupted()) {
-            try {
-                val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-                if (read > 0) {
-                    var loudSamples = 0
-                    for (i in 0 until read step 2) {
-                        if (i + 1 < read) {
-                            val sample = ((buffer[i].toInt() and 0xFF) or
-                                    ((buffer[i + 1].toInt() and 0xFF) shl 8)).toShort()
-                            if (kotlin.math.abs(sample.toInt()) > 3000) loudSamples++
-                        }
-                    }
-
-                    if (loudSamples > read / 2.5) {
-                        loudnessCount++
-                    } else {
-                        loudnessCount = Math.max(0, loudnessCount - 1)
-                    }
-
-                    if (loudnessCount > 8) {
-                        Log.d(TAG, "🎤 Wake-word detected (loud sound)")
-                        onWakeWordDetected()
-                        loudnessCount = 0
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error in loop: ${e.message}")
-            }
-        }
-    }
-
-    private fun onWakeWordDetected() {
-        if (!isListening.getAndSet(false)) return
-
-        try {
-            stopAudioRecord()
-            Log.d(TAG, "======== WAKE-WORD DETECTED ========")
-
-            val intent = Intent(ACTION_WAKE_WORD_DETECTED)
-            sendBroadcast(intent)
-
-            val firstname = prefs.getString("user_firstname", "utilisateur") ?: "utilisateur"
-            Log.d(TAG, "Username: $firstname")
-
-            val greeting = "Oui $firstname ?"
-            speakAsync(greeting)
-
-            // Attente asynchrone non-bloquante de 500ms avant de capturer
-            Handler(Looper.getMainLooper()).postDelayed({
-                startCommandCapture()
-            }, 500)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in onWakeWordDetected: ${e.message}", e)
-            restartWakeWordDetection()
-        }
-    }
-
-    // ============================================================================
-    // COMMAND CAPTURE (STT)
-    // ============================================================================
-
-    private fun startCommandCapture() {
-        Log.d(TAG, "Starting command capture...")
-
-        if (isProcessingCommand.getAndSet(true)) {
-            Log.w(TAG, "Already processing a command, skipping")
+        if (!isWakeWordEnabled()) {
+            stopListening(forceStop = true)
+            stopSelf()
             return
         }
-
-        // CORRECTIF SÉCURITÉ CRITICAL THREAD : On instancie le STT sur le thread principal
-        Handler(Looper.getMainLooper()).post {
+        if (currentState == ServiceState.LISTENING) return
+        
+        currentState = ServiceState.LISTENING
+        Log.d(TAG, "Starting continuous SpeechRecognizer for Wake Word detection...")
+        
+        mainHandler.post {
             try {
+                speechRecognizer?.destroy()
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
-                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
-                intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
+                    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)
+                }
 
                 val listener = object : RecognitionListener {
-                    override fun onReadyForSpeech(params: android.os.Bundle?) {
-                        Log.d(TAG, "Ready for speech input")
-                    }
-                    override fun onBeginningOfSpeech() {
-                        Log.d(TAG, "User started speaking")
-                    }
+                    override fun onReadyForSpeech(params: android.os.Bundle?) {}
+                    override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {
-                        Log.d(TAG, "User finished speaking")
-                    }
+                    override fun onEndOfSpeech() {}
+                    
                     override fun onError(error: Int) {
-                        Log.e(TAG, "STT Error code: $error")
-                        isProcessingCommand.set(false)
-                        restartWakeWordDetection()
+                        if (currentState == ServiceState.LISTENING) restartWakeWordDetection(1000)
                     }
+                    
                     override fun onResults(results: android.os.Bundle?) {
                         handleSTTResults(results)
-                        isProcessingCommand.set(false)
                     }
+                    
                     override fun onPartialResults(partialResults: android.os.Bundle?) {}
                     override fun onEvent(eventType: Int, params: android.os.Bundle?) {}
                 }
 
                 speechRecognizer?.setRecognitionListener(listener)
                 speechRecognizer?.startListening(intent)
-                Log.d(TAG, "✅ SpeechRecognizer active on Main Thread")
+                Log.d(TAG, "✅ Wake Word Detector active")
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting STT: ${e.message}", e)
-                isProcessingCommand.set(false)
-                restartWakeWordDetection()
+                if (currentState == ServiceState.LISTENING) restartWakeWordDetection(2000)
             }
         }
     }
-    // ============================================================================
-    // STT RESULTS PROCESSING
-    // ============================================================================
 
     private fun handleSTTResults(results: android.os.Bundle?) {
-        try {
-            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            if (matches.isNullOrEmpty()) {
-                Log.w(TAG, "No speech recognized")
-                restartWakeWordDetection()
-                return
-            }
+        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        if (matches.isNullOrEmpty()) {
+            if (currentState == ServiceState.LISTENING) restartWakeWordDetection(500)
+            return
+        }
 
-            val command = matches[0].lowercase(Locale.getDefault())
-            Log.d(TAG, "📝 STT result: \"$command\"")
+        val command = matches[0].lowercase(Locale.getDefault())
+        Log.d(TAG, "🎤 Recognized: \"$command\"")
 
-            // Parser la commande via vos règles Regex
-            val (intention, entities) = parseCommand(command)
-            Log.d(TAG, "Parsed intention: $intention, entities: $entities")
+        val universalWakeWord = "sika"
+        // Le nom de l'assistant enregistré depuis Flutter via MethodChannel -> sika_prefs
+        val customWakeWord = sikaPrefs.getString("sika_assistant_name", "sika")?.lowercase(Locale.getDefault()) ?: "sika"
 
-            when (intention) {
-                "add_expense" -> {
-                    handleAddExpense(entities)
-                }
-                "unknown" -> {
-                    speakAsync("Désolé, je n'ai pas compris votre demande.")
-                    // CORRECTIF NON-BLOQUANT : Attente asynchrone pour laisser parler le TTS sans figer l'écran
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        restartWakeWordDetection()
-                    }, 2000)
-                }
-                else -> {
-                    Log.d(TAG, "Intention not yet handled: $intention")
-                    restartWakeWordDetection()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling STT results: ${e.message}", e)
-            restartWakeWordDetection()
+        if (command.contains(universalWakeWord) || command.contains(customWakeWord)) {
+            Log.d(TAG, "======== WAKE-WORD DETECTED: $command ========")
+            onWakeWordDetected(if (command.contains(customWakeWord)) customWakeWord else universalWakeWord)
+        } else {
+            if (currentState == ServiceState.LISTENING) restartWakeWordDetection(500)
         }
     }
 
-    // ============================================================================
-    // COMMAND PARSING (VOTRE ENGINE REGEX)
-    // ============================================================================
+    private fun onWakeWordDetected(detectedAlias: String) {
+        // Mettre en pause car Flutter va prendre le relais
+        currentState = ServiceState.PAUSED_FOR_FLUTTER
+        stopListening(forceStop = false)
 
-    private data class ParseResult(val intention: String, val entities: Map<String, String>)
-
-    private fun parseCommand(command: String): ParseResult {
-        val entities = mutableMapOf<String, String>()
-
-        if (command.contains(Regex("ajoute|enregistre|ajouter|dépen|expense", RegexOption.IGNORE_CASE))) {
-            val amountMatch = Regex("""(\d+)\s*(?:mille|k|fcfa|cfa)?""").find(command)
-            if (amountMatch != null) {
-                var amount = amountMatch.groupValues[1].toInt()
-                if (command.contains(Regex("mille|k", RegexOption.IGNORE_CASE))) {
-                    amount *= 1000
-                }
-                entities["amount"] = amount.toString()
-            }
-
-            val categoryMatch = Regex(
-                """(transport|taxi|bus|essence|food|repas|manger|eat|café|cofee|santé|health|médecin|shopping|course|loisir|divertissement)""",
-                RegexOption.IGNORE_CASE
-            ).find(command)
-            if (categoryMatch != null) {
-                entities["category"] = categoryMatch.groupValues[0].lowercase()
-            }
-
-            entities["description"] = command
-
-            if (entities.containsKey("amount")) {
-                return ParseResult("add_expense", entities)
-            }
-        }
-
-        return ParseResult("unknown", emptyMap())
+        val intent = Intent(ACTION_WAKE_WORD_DETECTED)
+        intent.putExtra("detectedAlias", detectedAlias)
+        sendBroadcast(intent)
     }
 
-    // ============================================================================
-    // HANDLE EXPENSE & FLUTTER SYNCHRONIZATION
-    // ============================================================================
-
-    private fun handleAddExpense(entities: Map<String, String>) {
-        try {
-            val amount = entities["amount"]?.toIntOrNull() ?: run {
-                speakAsync("Je n'ai pas compris le montant.")
-                restartWakeWordDetection()
-                return
-            }
-            val category = entities["category"] ?: "autre"
-            val description = entities["description"] ?: ""
-            val firstname = prefs.getString("user_firstname", "utilisateur") ?: "utilisateur"
-
-            // Créer l'objet JSON de transaction
-            val transaction = JSONObject().apply {
-                put("amount", amount)
-                put("category", category)
-                put("description", description)
-                put("date", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).format(Date()))
-                put("source", "sika_voice")
-                put("status", "pending")
-            }
-
-            // Mettre en cache locale Android
-            addPendingTransaction(transaction)
-
-            // Confirmation vocale (TTS)
-            val confirmation = "Très bien $firstname, j'ai enregistré $amount FCFA en $category."
-            speakAsync(confirmation)
-            Log.d(TAG, "✅ Expense added and confirmed via TTS")
-
-            // CORRECTIF SÉCURITÉ NON-BLOQUANT : Laisse 3 secondes au TTS pour parler, puis relance l'écoute
-            Handler(Looper.getMainLooper()).postDelayed({
-                restartWakeWordDetection()
-            }, 3000)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling expense: ${e.message}", e)
-            speakAsync("Une erreur s'est produite.")
-            restartWakeWordDetection()
+    private fun stopListening(forceStop: Boolean) {
+        if (forceStop) {
+            currentState = ServiceState.STOPPED
         }
-    }
-
-    private fun addPendingTransaction(transaction: JSONObject) {
-        try {
-            val existing = prefs.getString("pending_transactions", "[]") ?: "[]"
-            val array = JSONArray(existing)
-            array.put(transaction)
-            prefs.edit().putString("pending_transactions", array.toString()).apply()
-            Log.d(TAG, "📌 Pending transaction saved (total: ${array.length()})")
-
-            // Notifier Flutter via un Broadcast global intercepté par MainActivity
-            val intent = Intent("com.gertonargent.PENDING_TRANSACTION_ADDED")
-            intent.putExtra("transaction", transaction.toString())
-            sendBroadcast(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error adding pending transaction: ${e.message}", e)
-        }
-    }
-
-    // ============================================================================
-    // TTS HELPERS
-    // ============================================================================
-
-    private fun speakAsync(text: String) {
-        Thread {
+        // CLEANUP: suppression inconditionnelle de tout callback retardé qui relancerait l'écoute
+        mainHandler.removeCallbacksAndMessages(null)
+        
+        mainHandler.post {
             try {
-                if (tts?.isSpeaking == true) {
-                    tts?.stop()
-                    Thread.sleep(500)
-                }
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
-                Log.d(TAG, "🔊 TTS: $text")
+                speechRecognizer?.stopListening()
+                speechRecognizer?.destroy()
+                speechRecognizer = null
             } catch (e: Exception) {
-                Log.e(TAG, "TTS Error: ${e.message}", e)
+                Log.e(TAG, "Error destroying recognizer", e)
             }
-        }.start()
-    }
-
-    // ============================================================================
-    // CLEANUP & RESTART (ZONE DE NETTOYAGE AUDIO)
-    // ============================================================================
-
-    private fun stopListening() {
-        isListening.set(false)
-        recognitionThread?.interrupt()
-        recognitionThread = null
-        stopAudioRecord()
-    }
-
-    private fun stopAudioRecord() {
-        try {
-            audioRecord?.stop()
-            audioRecord?.release()
-            audioRecord = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping audioRecord: ${e.message}")
         }
     }
 
-    private fun restartWakeWordDetection() {
-        Log.d(TAG, "Restarting wake-word detection...")
-        isListening.set(false)
-        stopAudioRecord()
-
-        // Relance de la détection de bruit de fond de manière propre et asynchrone
-        Handler(Looper.getMainLooper()).postDelayed({
-            startWakeWordDetection()
-        }, 500)
+    private fun restartWakeWordDetection(delayMs: Long) {
+        if (currentState != ServiceState.LISTENING || !isWakeWordEnabled()) return
+        mainHandler.post {
+            try {
+                speechRecognizer?.destroy()
+                speechRecognizer = null
+            } catch (e: Exception) {}
+        }
+        mainHandler.postDelayed({
+            if (currentState == ServiceState.LISTENING) startWakeWordDetection()
+        }, delayMs)
     }
-
-    // ============================================================================
-    // FOREGROUND NOTIFICATION MANAGEMENT
-    // ============================================================================
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -458,7 +225,7 @@ class SikaWakeWordServiceV2 : Service(), TextToSpeech.OnInitListener {
                 CHANNEL_ID, "Sika Assistant",
                 NotificationManager.IMPORTANCE_LOW
             )
-            channel.description = "Écoute continue pour Sika"
+            channel.description = "Écoute du Wake Word"
             channel.setShowBadge(false)
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }

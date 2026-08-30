@@ -115,6 +115,14 @@ class SikaToolRegistry:
                 error_message=f"Erreur interne lors de l'exécution du tool: {e}"
             )
 
+    def get_gemini_tools(self) -> list:
+        """Returns a list of callable tools safe for Gemini (READ_ONLY and CONFIRMATION_REQUIRED)."""
+        safe_tools = []
+        for name, def_item in self._definitions.items():
+            if def_item.risk_level in [RiskLevel.READ_ONLY, RiskLevel.CONFIRMATION_REQUIRED]:
+                safe_tools.append(self._tools[name])
+        return safe_tools
+
 # Instance globale du registre
 tool_registry = SikaToolRegistry()
 

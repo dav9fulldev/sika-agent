@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/payment_provider.dart';
+import '../../../../core/widgets/sika_glass_text_field.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
 
 class AddPaymentMethodModal extends ConsumerStatefulWidget {
   const AddPaymentMethodModal({super.key});
@@ -11,10 +13,7 @@ class AddPaymentMethodModal extends ConsumerStatefulWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom,
@@ -85,13 +84,38 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
   @override
   Widget build(BuildContext context) {
     final langNotifier = ref.watch(languageProvider.notifier);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBackground : Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : AppColors.border,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -172,33 +196,13 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
             ),
           ],
           const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
-              child: _isSaving
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          strokeWidth: 2))
-                  : Text(
-                      langNotifier.tr('Ajouter', 'Add'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-            ),
+          SikaPremiumButton(
+            onPressed: _isSaving ? null : _handleSave,
+            text: langNotifier.tr('Ajouter', 'Add'),
+            isLoading: _isSaving,
           ),
         ],
+      ),
       ),
     );
   }
@@ -206,24 +210,28 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
   Widget _buildTypeSelector(
       {required int index, required IconData icon, required String title}) {
     final isSelected = _selectedType == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () => setState(() => _selectedType = index),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : Theme.of(context).cardColor,
+              ? AppColors.brandPrimary.withValues(alpha: 0.15)
+              : (isDark ? AppColors.darkSurface : Theme.of(context).colorScheme.surface).withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
+            color: isSelected 
+                ? AppColors.brandPrimary 
+                : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
             Icon(icon,
-                color: isSelected ? AppColors.primary : AppColors.textMuted,
+                color: isSelected ? AppColors.brandPrimary : AppColors.brandSecondary.withValues(alpha: 0.6),
                 size: 28),
             const SizedBox(height: 8),
             Text(
@@ -231,7 +239,7 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: isSelected
                         ? Theme.of(context).colorScheme.onSurface
-                        : AppColors.textMuted,
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   ),
             ),
@@ -247,26 +255,11 @@ class _AddPaymentMethodModalState extends ConsumerState<AddPaymentMethodModal> {
     required IconData icon,
     TextInputType? keyboardType,
   }) {
-    return TextField(
+    return SikaGlassTextField(
       controller: controller,
-      keyboardType: keyboardType,
-      style: Theme.of(context).textTheme.bodyMedium,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: AppColors.textMuted),
-        prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
-        filled: true,
-        fillColor: Theme.of(context).cardColor,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: AppColors.primary, width: 1)),
-      ),
+      hintText: label,
+      prefixIcon: icon,
+      keyboardType: keyboardType ?? TextInputType.text,
     );
   }
 }

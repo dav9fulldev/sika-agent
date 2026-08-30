@@ -15,7 +15,7 @@ class SikaActionModel(Base):
     __tablename__ = "sika_actions"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('WAITING_CONFIRMATION', 'EXECUTING', 'EXECUTED', 'CANCELLED', 'EXPIRED', 'FAILED', 'UNKNOWN_RESULT')",
+            "status IN ('WAITING_CONFIRMATION', 'EXECUTING', 'EXECUTED', 'CANCELLED', 'EXPIRED', 'FAILED', 'UNKNOWN_RESULT', 'RECONCILIATION_IN_PROGRESS', 'REQUIRES_RECONCILIATION')",
             name="chk_sika_action_status_valid"
         ),
         Index("ix_sika_actions_user_status", "user_id", "status"),
@@ -50,7 +50,7 @@ class SikaActionModel(Base):
     status = Column(
         String(50),
         nullable=False,
-        default="WAITING_CONFIRMATION"  # WAITING_CONFIRMATION, EXECUTING, EXECUTED, CANCELLED, EXPIRED, FAILED, UNKNOWN_RESULT
+        default="WAITING_CONFIRMATION"  # WAITING_CONFIRMATION, EXECUTING, EXECUTED, CANCELLED, EXPIRED, FAILED, UNKNOWN_RESULT, RECONCILIATION_IN_PROGRESS, REQUIRES_RECONCILIATION
     )
 
     payload_json = Column(
@@ -65,6 +65,11 @@ class SikaActionModel(Base):
 
     cancelled_reason = Column(
         String(255),
+        nullable=True
+    )
+
+    reconciliation_started_at = Column(
+        DateTime,
         nullable=True
     )
 

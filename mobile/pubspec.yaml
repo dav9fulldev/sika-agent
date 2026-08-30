@@ -18,6 +18,7 @@ dependencies:
   http: ^1.2.0
 
   # Storage & Preferences
+  flutter_contacts: ^2.3.1
   shared_preferences: ^2.2.2
 
   # Google Authentication

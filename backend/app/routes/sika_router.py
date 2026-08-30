@@ -4,7 +4,12 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import UserModel
 from typing import Dict, Any, Optional
-from ..schemas.sika_dto import SikaQueryDTO, SikaConfirmTransactionDTO, SikaResponseDTO
+from ..schemas.sika_dto import (
+    SikaQueryDTO, SikaResponseDTO,
+    AuthLoginRequest, AuthRegisterRequest, AuthGoogleRequest,
+    AuthForgotPasswordRequest, AuthResetPasswordRequest,
+    TTSRequest, AgentProcessRequest, AgentConfirmRequest, AgentCancelRequest
+)
 from ..services.sika_ai import SikaAI
 from ..services.sika_nlp import SikaNLP
 from ..services.user_learning_service import user_learning_service
@@ -31,7 +36,7 @@ router = APIRouter(prefix="/api/v1/sika", tags=["sika"])
 sika_ai = SikaAI()
 sika_nlp = SikaNLP()
 
-@router.get("/health")
+@router.get("/health", summary="Health Check", description="Vérifie si le service est actif.")
 def sika_health_check():
     """Route technique pour le monitoring SIKA AI"""
     return {
@@ -45,36 +50,29 @@ def sika_health_check():
 # ENDPOINTS OAUTH2 BEARER JWT AUTHENTICATION
 # ============================================================================
 
-@router.post("/auth/login")
-def auth_login(data: Dict[str, Any]):
+@router.post("/auth/login", summary="Login via Email/Password", description="Connexion OAuth2 avec génération de jeton Bearer JWT.")
+def auth_login(data: AuthLoginRequest):
     """Connexion OAuth2 avec génération de jeton Bearer JWT."""
-    email = data.get("email", "")
-    password = data.get("password", "")
-    if not email or not password:
+    if not data.email or not data.password:
         raise HTTPException(status_code=400, detail="Email et mot de passe requis.")
-    return oauth2_auth_service.login(email, password)
+    return oauth2_auth_service.login(data.email, data.password)
 
-@router.post("/auth/register")
-def auth_register(data: Dict[str, Any]):
+@router.post("/auth/register", summary="Register Account", description="Inscription d'un nouvel utilisateur avec jeton OAuth2.")
+def auth_register(data: AuthRegisterRequest):
     """Inscription d'un nouvel utilisateur avec jeton OAuth2."""
-    name = data.get("name", "")
-    email = data.get("email", "")
-    password = data.get("password", "")
-    if not name or not email or not password:
+    if not data.name or not data.email or not data.password:
         raise HTTPException(status_code=400, detail="Tous les champs sont requis.")
-    return oauth2_auth_service.register(name, email, password)
+    return oauth2_auth_service.register(data.name, data.email, data.password)
 
-@router.post("/auth/google")
-def auth_google(data: Dict[str, Any]):
+@router.post("/auth/google", summary="Login via Google", description="Authentification OAuth2 via Google Sign-In.")
+def auth_google(data: AuthGoogleRequest):
     """Authentification OAuth2 via Google Sign-In officiel."""
-    email = data.get("email")
-    name = data.get("name") or "Utilisateur Google"
-    id_token = data.get("id_token")
-    if not email and not id_token:
+    name = data.name or "Utilisateur Google"
+    if not data.email and not data.id_token:
         raise HTTPException(status_code=400, detail="Adresse email ou id_token Google requis.")
-    return oauth2_auth_service.google_login(email=email, name=name, id_token=id_token)
+    return oauth2_auth_service.google_login(email=data.email, name=name, id_token=data.id_token)
 
-@router.get("/auth/me")
+@router.get("/auth/me", summary="Get current user", description="Route protégée vérifiant le jeton OAuth2 Bearer.")
 def auth_me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     """Route protégée vérifiant le jeton OAuth2 Bearer."""
     if not authorization or not authorization.startswith("Bearer "):
@@ -112,23 +110,19 @@ def auth_logout(authorization: Optional[str] = Header(None)):
         "message": "Déconnexion réussie et jeton révoqué côté serveur."
     }
 
-@router.post("/auth/forgot-password")
-def auth_forgot_password(data: Dict[str, Any]):
+@router.post("/auth/forgot-password", summary="Forgot Password", description="Demande de réinitialisation de mot de passe (génère un OTP).")
+def auth_forgot_password(data: AuthForgotPasswordRequest):
     """Demande de réinitialisation de mot de passe (génère un OTP)."""
-    email = data.get("email", "")
-    if not email:
+    if not data.email:
         raise HTTPException(status_code=400, detail="L'adresse email est requise.")
-    return oauth2_auth_service.generate_password_reset_otp(email)
+    return oauth2_auth_service.generate_password_reset_otp(data.email)
 
-@router.post("/auth/reset-password")
-def auth_reset_password(data: Dict[str, Any]):
+@router.post("/auth/reset-password", summary="Reset Password", description="Réinitialise le mot de passe avec un OTP valide.")
+def auth_reset_password(data: AuthResetPasswordRequest):
     """Réinitialise le mot de passe avec un OTP valide."""
-    email = data.get("email", "")
-    otp = data.get("otp", "")
-    new_password = data.get("new_password", "")
-    if not email or not otp or not new_password:
+    if not data.email or not data.otp or not data.new_password:
         raise HTTPException(status_code=400, detail="Tous les champs (email, otp, new_password) sont requis.")
-    return oauth2_auth_service.reset_password_with_otp(email, otp, new_password)
+    return oauth2_auth_service.reset_password_with_otp(data.email, data.otp, data.new_password)
 
 # ============================================================================
 # ENDPOINTS SIKA CHAT & AGENT
@@ -137,18 +131,11 @@ def auth_reset_password(data: Dict[str, Any]):
 @router.post("/chat", response_model=SikaResponseDTO)
 async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optional[str] = Header(None)):
     """Endpoint principal SIKA AI."""
+    # Authentification stricte obligatoire
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    
     # Protection Rate Limiting pour l'IA
-    if authorization:
-        user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-        security_rate_limiter.check_ai_rate_limit(str(user_id))
-    else:
-        # Fallback to IP address for unauthenticated requests
-        forwarded_for = request.headers.get("X-Forwarded-For")
-        if forwarded_for:
-            client_ip = forwarded_for.split(",")[0].strip()
-        else:
-            client_ip = request.client.host if request.client else "unknown"
-        security_rate_limiter.check_ai_rate_limit(f"ip_{client_ip}")
+    security_rate_limiter.check_ai_rate_limit(str(user_id))
         
     ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
     firstname = ctx_dict.get("user_firstname", "David")
@@ -156,21 +143,30 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
     # Fetch user wallets to provide context to the AI
     from .wallet_router import get_my_wallets
     active_wallets = []
-    if authorization:
-        try:
-            wallets_res = get_my_wallets(authorization=authorization)
-            active_wallets = wallets_res.get("wallets", [])
-        except Exception:
-            pass
+    try:
+        wallets_res = get_my_wallets(authorization=authorization)
+        active_wallets = wallets_res.get("wallets", [])
+    except Exception:
+        pass
             
     ctx_dict["wallets"] = active_wallets
+
+    from ..agent.session_manager import sika_session_manager
+    session = sika_session_manager.get_user_session(str(user_id))
+    history = session.get("history", [])
 
     result = await sika_ai.chat(
         user_message=data.query,
         financial_context=ctx_dict,
-        conversation_history=[],
-        user_firstname=firstname
+        conversation_history=history,
+        user_firstname=firstname,
+        user_id=str(user_id)
     )
+
+    history.append({"role": "user", "content": data.query})
+    history.append({"role": "model", "content": result.get("response", "")})
+    session["history"] = history[-10:]
+    sika_session_manager.save_user_session(str(user_id), session)
 
     raw_speech = strip_markdown(result.get("speech_text", result.get("response", "")))
     # Transformation des nombres avec espaces (ex: "1 800 000" -> "1800000") pour un rendu vocal fluide
@@ -191,32 +187,19 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
         requires_security_validation=result.get("requires_security_validation", result.get("requires_biometric", False)),
         should_speak=result.get("should_speak", True),
         speech_text=cleaned_speech,
-        action_data=result.get("action_data")
+        action_data=result.get("action_data"),
+        agent_steps=result.get("agent_steps", []),
     )
-
-@router.post("/confirm")
-def sika_confirm_transaction(data: SikaConfirmTransactionDTO):
-    """Valide et enregistre une dépense confirmée par Sika."""
-    speech_amount = sika_nlp.format_amount_for_speech(data.amount)
-    return {
-        "success": True,
-        "message": f"✅ Dépense de {speech_amount} en {data.category} enregistrée avec succès !",
-        "transaction": {
-            "amount": data.amount,
-            "category": data.category,
-            "description": data.description
-        }
-    }
 
 from ..services.gcp_tts_service import gcp_tts_service
 
 
-@router.post("/tts")
-def sika_text_to_speech(data: Dict[str, Any]):
+@router.post("/tts", summary="Generate TTS", description="Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS).")
+def sika_text_to_speech(data: TTSRequest):
     """Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS)."""
-    text = data.get("text") or data.get("speech_text") or ""
-    voice_name = data.get("voice_name", "fr-FR-Neural2-C")
-    speaking_rate = float(data.get("speaking_rate", 1.05))
+    text = data.text or data.speech_text or ""
+    voice_name = data.voice_name
+    speaking_rate = float(data.speaking_rate)
 
     if not text:
         raise HTTPException(status_code=400, detail="Le champ 'text' est obligatoire.")
@@ -232,27 +215,27 @@ def sika_text_to_speech(data: Dict[str, Any]):
     return res
 
 
-@router.get("/tts/voices")
+@router.get("/tts/voices", summary="List TTS Voices", description="Liste les voix françaises de haute qualité disponibles sur Google Cloud Text-to-Speech.")
 def sika_list_tts_voices():
     """Liste les voix françaises de haute qualité disponibles sur Google Cloud Text-to-Speech."""
     return gcp_tts_service.list_french_voices()
 
 
-@router.post("/agent/process")
-async def sika_agent_process(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+@router.post("/agent/process", summary="Agent Process", description="Endpoint principal de traitement de la boucle Agent Taskmaster (Exige JWT).")
+async def sika_agent_process(data: AgentProcessRequest, authorization: Optional[str] = Header(None)):
     """Endpoint principal de traitement de la boucle Agent Taskmaster (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     security_rate_limiter.check_ai_rate_limit(str(user_id))
-    query = data.get("query", "")
+    query = data.query
     return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
 
 
-@router.post("/agent/confirm")
-async def sika_agent_confirm(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+@router.post("/agent/confirm", summary="Agent Confirm", description="Endpoint de validation humaine pour l'agent SIKA (Exige JWT + protection anti-flood).")
+async def sika_agent_confirm(data: AgentConfirmRequest, authorization: Optional[str] = Header(None)):
     """Endpoint de validation humaine pour l'agent SIKA (Exige JWT + protection anti-flood)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
     security_rate_limiter.check_confirm_rate_limit(str(user_id))
-    action_id = data.get("action_id", "")
+    action_id = data.action_id
     res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
     if res.get("status") == "UNAUTHORIZED_USER":
         raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
@@ -261,12 +244,12 @@ async def sika_agent_confirm(data: Dict[str, Any], authorization: Optional[str] 
     return res
 
 
-@router.post("/agent/cancel")
-async def sika_agent_cancel(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
+@router.post("/agent/cancel", summary="Agent Cancel", description="Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT).")
+async def sika_agent_cancel(data: AgentCancelRequest, authorization: Optional[str] = Header(None)):
     """Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    action_id = data.get("action_id", "")
-    res = sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.get("reason", "USER_CANCELLED"))
+    action_id = data.action_id
+    res = sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.reason)
     if res.get("status") == "UNAUTHORIZED_USER":
         raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
     if res.get("status") == "NOT_FOUND":

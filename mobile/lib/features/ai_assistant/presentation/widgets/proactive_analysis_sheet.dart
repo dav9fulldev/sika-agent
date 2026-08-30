@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/sika_glass_card.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
+import '../../../../core/constants/app_colors.dart';
 
 class ProactiveAnalysisSheet extends StatelessWidget {
   final VoidCallback onDismiss;
@@ -41,10 +44,12 @@ class ProactiveAnalysisSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor, // Dark slate surface
+        color: isDark ? AppColors.darkBackground : Theme.of(context).scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: const Border(
           top: BorderSide(
@@ -61,7 +66,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF475569),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.24),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -105,7 +110,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                icon: Icon(Icons.close, color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -114,13 +119,9 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           const SizedBox(height: 20),
 
           // DETECTED TRANSACTION METRICS CARD
-          Container(
+          SikaGlassCard(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF334155)),
-            ),
+            borderColor: const Color(0xFF334155),
             child: Column(
               children: [
                 _buildMetricRow(context, '💰 Expense Detected', '30 000 FCFA',
@@ -148,18 +149,13 @@ class ProactiveAnalysisSheet extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 6),
-          Container(
+          SikaGlassCard(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-            ),
+            borderColor: const Color(0xFFF59E0B).withValues(alpha: 0.3),
             child: Text(
               'This single expense consumes about two-thirds of your remaining budget (45,000 FCFA) and threatens your 50,000 FCFA savings target.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFFE2E8F0),
+                    color: Theme.of(context).colorScheme.onSurface,
                     height: 1.4,
                   ),
             ),
@@ -171,59 +167,37 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           Text(
             'What would you like to do?',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF94A3B8),
+                  color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 12),
 
-          Row(
+          Column(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onDismiss,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF94A3B8),
-                    side: const BorderSide(color: Color(0xFF475569)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Ignore'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onViewExpenses,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF38BDF8),
-                    side: const BorderSide(color: Color(0xFF38BDF8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('View Spending',
-                      style: TextStyle(fontSize: 11)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton(
+              SizedBox(
+                width: double.infinity,
+                child: SikaPremiumButton(
                   onPressed: onSetLimit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Définir une limite',
-                      style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  text: 'Définir une limite',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SikaPremiumButton(
+                  onPressed: onViewExpenses,
+                  text: 'View Spending',
+                  isSecondary: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SikaPremiumButton(
+                  onPressed: onDismiss,
+                  text: 'Ignore',
+                  isSecondary: true,
                 ),
               ),
             ],
@@ -244,7 +218,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: isHighlight
                     ? Theme.of(context).colorScheme.onSurface
-                    : const Color(0xFF94A3B8),
+                    : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
               ),
         ),
@@ -262,3 +236,4 @@ class ProactiveAnalysisSheet extends StatelessWidget {
     );
   }
 }
+

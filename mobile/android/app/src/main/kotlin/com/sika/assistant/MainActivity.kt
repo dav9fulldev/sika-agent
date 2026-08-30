@@ -35,9 +35,22 @@ class MainActivity : FlutterActivity() {
 
                 if (intent.action == "com.gertonargent.SIKA_COMMAND" || intent.action == "com.sika.assistant.SIKA_COMMAND") {
                     val cmd = intent.getStringExtra("command") ?: ""
-                    Log.d("SikaReceiver", "Command received: $cmd")
+                    Log.d("SikaReceiver", "Command received: \$cmd")
                     sikaChannel.invokeMethod("onSikaCommand", cmd)
                     sikaChannelV2.invokeMethod("onSikaCommand", cmd)
+                } else if (intent.action == SikaWakeWordServiceV2.ACTION_WAKE_WORD_DETECTED) {
+                    val alias = intent.getStringExtra("detectedAlias") ?: "sika"
+                    Log.d("SikaReceiver", "Wake Word Triggered: \$alias")
+                    
+                    // Ramener l'application au premier plan
+                    val bringToFrontIntent = Intent(context, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    context?.startActivity(bringToFrontIntent)
+                    
+                    // Notifier Flutter
+                    sikaChannel.invokeMethod("onWakeWordTriggered", alias)
+                    sikaChannelV2.invokeMethod("onWakeWordTriggered", alias)
                 }
             }
         }
@@ -45,6 +58,7 @@ class MainActivity : FlutterActivity() {
         val filter = IntentFilter().apply {
             addAction("com.gertonargent.SIKA_COMMAND")
             addAction("com.sika.assistant.SIKA_COMMAND")
+            addAction(SikaWakeWordServiceV2.ACTION_WAKE_WORD_DETECTED)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -61,11 +75,26 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "stopSikaService" -> {
-                    stopSikaServiceV2()
+                    val stopIntent = Intent(this, SikaWakeWordServiceV2::class.java)
+                    stopIntent.action = SikaWakeWordServiceV2.ACTION_STOP_LISTENING
+                    startService(stopIntent)
+                    result.success(true)
+                }
+                "pauseSikaService" -> {
+                    val pauseIntent = Intent(this, SikaWakeWordServiceV2::class.java)
+                    pauseIntent.action = "com.gertonargent.PAUSE_LISTENING"
+                    startService(pauseIntent)
+                    result.success(true)
+                }
+                "resumeSikaService" -> {
+                    val resumeIntent = Intent(this, SikaWakeWordServiceV2::class.java)
+                    resumeIntent.action = "com.gertonargent.RESUME_LISTENING"
+                    startService(resumeIntent)
                     result.success(true)
                 }
                 "isSikaServiceRunning" -> {
-                    result.success(SikaWakeWordServiceV2.isRunning)
+                    val isRunning = SikaWakeWordServiceV2.currentState != ServiceState.STOPPED
+                    result.success(isRunning)
                 }
                 "getUserFirstname" -> {
                     try {
@@ -80,6 +109,24 @@ class MainActivity : FlutterActivity() {
                         val firstname = call.argument<String>("firstname") ?: ""
                         val prefs = getSharedPreferences("sika_prefs", Context.MODE_PRIVATE)
                         prefs.edit().putString("user_firstname", firstname).apply()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("err", e.message, null)
+                    }
+                }
+                "getSikaAlias" -> {
+                    try {
+                        val prefs = getSharedPreferences("sika_prefs", Context.MODE_PRIVATE)
+                        result.success(prefs.getString("sika_assistant_name", "sika"))
+                    } catch (e: Exception) {
+                        result.error("err", e.message, null)
+                    }
+                }
+                "setSikaAlias" -> {
+                    try {
+                        val alias = call.argument<String>("alias") ?: "sika"
+                        val prefs = getSharedPreferences("sika_prefs", Context.MODE_PRIVATE)
+                        prefs.edit().putString("sika_assistant_name", alias).apply()
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("err", e.message, null)

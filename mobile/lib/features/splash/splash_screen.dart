@@ -88,14 +88,14 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: AppColors.splashBackground,
       body: Stack(
         children: [
           // 1. FOND UNIFORME
           Container(
             width: double.infinity,
             height: double.infinity,
-            color: AppColors.darkBackground,
+            color: AppColors.splashBackground,
           ),
 
           // 2. LOGO ET TEXTE ANIMÉ AU CENTRE
@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Transform.scale(
                         scale: _logoScale.value,
                         child: Image.asset(
-                          AppImages.logo,
+                          AppImages.bienv,
                           width: 145,
                           gaplessPlayback: true,
                         ),

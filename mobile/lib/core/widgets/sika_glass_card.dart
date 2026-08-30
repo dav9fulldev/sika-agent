@@ -15,7 +15,7 @@ class SikaGlassCard extends StatelessWidget {
     super.key,
     required this.child,
     this.blur = 20.0,
-    this.opacity = 0.2,
+    this.opacity = 0.2, // Default optimized for Dark Mode
     this.padding = const EdgeInsets.all(16.0),
     this.margin = EdgeInsets.zero,
     this.borderRadius,
@@ -26,7 +26,12 @@ class SikaGlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final defaultRadius = BorderRadius.circular(20);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // In light mode, we need higher opacity for the glass effect to be visible
+    // and provide enough contrast against the background.
+    final effectiveOpacity = isDark ? opacity : (opacity + 0.5).clamp(0.0, 1.0);
     final glassColor = isDark ? AppColors.darkSurface : Theme.of(context).colorScheme.surface;
+    
     final defaultBorderColor = isDark 
         ? AppColors.brandPrimary.withValues(alpha: 0.15) 
         : AppColors.brandPrimary.withValues(alpha: 0.08);
@@ -40,7 +45,7 @@ class SikaGlassCard extends StatelessWidget {
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
-              color: glassColor.withValues(alpha: opacity),
+              color: glassColor.withValues(alpha: effectiveOpacity),
               borderRadius: borderRadius ?? defaultRadius,
               border: Border.all(
                 color: borderColor ?? defaultBorderColor,
@@ -48,9 +53,9 @@ class SikaGlassCard extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -61,3 +66,4 @@ class SikaGlassCard extends StatelessWidget {
     );
   }
 }
+

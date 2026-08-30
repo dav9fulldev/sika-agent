@@ -4,8 +4,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/widgets/sika_surface.dart';
 import '../../providers/wallet_provider.dart';
 import 'connect_wallet_modal.dart';
+import '../../../../core/widgets/sika_empty_state.dart';
 
 class MyWalletsModal extends ConsumerWidget {
   const MyWalletsModal({super.key});
@@ -37,6 +39,7 @@ class MyWalletsModal extends ConsumerWidget {
     final currNotifier = ref.read(currencyProvider.notifier);
 
     final walletState = ref.watch(walletProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final wallets = walletState.wallets;
 
     return Container(
@@ -111,54 +114,21 @@ class MyWalletsModal extends ConsumerWidget {
               'View and manage your connected Mobile Money accounts.',
             ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF94A3B8),
+                  color: isDark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
           ),
           const SizedBox(height: 20),
           Expanded(
             child: wallets.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.account_balance_wallet_outlined,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.38),
-                            size: 48),
-                        const SizedBox(height: 12),
-                        Text(
-                          langNotifier.tr('Aucun portefeuille connecté',
-                              'No wallet connected'),
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.70),
-                                  ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ConnectWalletModal.show(context);
-                          },
-                          icon: Icon(Icons.add,
-                              color: Theme.of(context).colorScheme.onSurface),
-                          label: Text(
-                            langNotifier.tr(
-                                'Connecter un compte', 'Connect Account'),
-                            style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.cyan),
-                        ),
-                      ],
-                    ),
+                ? SikaEmptyState(
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: langNotifier.tr('Aucun portefeuille connecté', 'No wallet connected'),
+                    message: langNotifier.tr('Ajoutez votre premier compte.', 'Add your first account.'),
+                    buttonText: langNotifier.tr('Connecter un compte', 'Connect Account'),
+                    onActionPressed: () {
+                      Navigator.pop(context);
+                      ConnectWalletModal.show(context);
+                    },
                   )
                 : ListView.separated(
                     itemCount: wallets.length,
@@ -167,30 +137,33 @@ class MyWalletsModal extends ConsumerWidget {
                       final item = wallets[index];
                       final logo = _getProviderLogo(item.provider);
 
-                      return Container(
+                      return SikaSurface(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
-                        ),
                         child: Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.asset(
-                                logo,
-                                width: 38,
-                                height: 38,
-                                fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) => const Icon(
-                                  Icons.account_balance_wallet,
-                                  color: AppColors.cyan,
-                                  size: 32,
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  logo,
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, stack) => const Icon(
+                                    Icons.account_balance_wallet,
+                                    color: AppColors.cyan,
+                                    size: 32,
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,7 +184,7 @@ class MyWalletsModal extends ConsumerWidget {
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: const Color(0xFF64748B),
+                                          color: isDark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                         ),
                                   ),
                                 ],
@@ -226,24 +199,24 @@ class MyWalletsModal extends ConsumerWidget {
                                       .textTheme
                                       .titleMedium
                                       ?.copyWith(
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
+                                      horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: AppColors.emerald
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: AppColors.success
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
                                     langNotifier.tr('Actif', 'Active'),
                                     style: const TextStyle(
-                                      color: AppColors.emerald,
+                                      color: AppColors.success,
                                       fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),

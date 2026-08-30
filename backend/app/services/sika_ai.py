@@ -199,11 +199,7 @@ class SikaAIService:
         ):
             return (
                 "prepare_transfer",
-                {
-                    "amount": 10000.0,
-                    "recipient": "Kouamé",
-                    "provider": "Wave",
-                },
+                {},
             )
 
         expense_keywords = [
@@ -226,12 +222,153 @@ class SikaAIService:
 
         return None, None
 
+    # ------------------------------------------------------------------
+    # Providers dont l'intégration est vérifiée et peut être appelée.
+    # Les providers NOT_VERIFIED ne doivent jamais être appelés.
+    # ------------------------------------------------------------------
+    _VERIFIED_PROVIDERS: frozenset = frozenset({"paymechap"})
+
+    def _select_wallet(
+        self,
+        wallets: List[Dict[str, Any]],
+        user_message: str,
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Sélectionne le wallet approprié selon les règles métier SIKA.
+
+        Retourne (wallet, None) si sélection claire.
+        Retourne (None, message_clarification) si clarification nécessaire.
+        Retourne (None, message_indisponibilité) si provider NOT_VERIFIED.
+
+        Règles :
+          - 0 wallet  → Aucun portefeuille connecté.
+          - 1 wallet  → sélection automatique (VERIFIED seulement).
+          - N wallets avec provider mentionné → sélection par provider.
+            Si plusieurs wallets ont le même provider et ne sont pas distingués → clarification.
+          - N wallets sans provider → demande de clarification (ask_wallet).
+          - Provider mentionné mais NOT_VERIFIED → indisponibilité.
+          - Jamais wallets[0] comme fallback arbitraire.
+        """
+        msg_lower = user_message.lower()
+
+        if not wallets:
+            return None, "Aucun portefeuille connecté."
+
+        # 1. Chercher si un compte ou provider spécifique est mentionné dans le message
+        matching_wallets: List[Dict[str, Any]] = []
+        for w in wallets:
+            prov = (w.get("provider") or "").lower()
+            acc = str(w.get("account_number") or w.get("external_wallet_id") or "").lower()
+            if acc and acc in msg_lower:
+                matching_wallets.append(w)
+            elif prov and prov in msg_lower:
+                matching_wallets.append(w)
+
+        if matching_wallets:
+            if len(matching_wallets) == 1:
+                selected = matching_wallets[0]
+                prov_lower = (selected.get("provider") or "").lower()
+                if prov_lower not in self._VERIFIED_PROVIDERS:
+                    provider_display = selected.get("provider", prov_lower)
+                    return None, (
+                        f"Le portefeuille {provider_display} n'est actuellement "
+                        "pas disponible dans SIKA."
+                    )
+                return selected, None
+
+            # Plusieurs wallets correspondent au provider mentionné (ex: 2 PayMeChap sans compte précisé)
+            # Vérifier si l'un d'eux est distingué par son numéro de compte
+            account_matches = [
+                w for w in matching_wallets
+                if str(w.get("account_number") or w.get("external_wallet_id") or "").lower() in msg_lower
+                and str(w.get("account_number") or w.get("external_wallet_id") or "").strip()
+            ]
+            if len(account_matches) == 1:
+                selected = account_matches[0]
+                prov_lower = (selected.get("provider") or "").lower()
+                if prov_lower not in self._VERIFIED_PROVIDERS:
+                    provider_display = selected.get("provider", prov_lower)
+                    return None, (
+                        f"Le portefeuille {provider_display} n'est actuellement "
+                        "pas disponible dans SIKA."
+                    )
+                return selected, None
+
+            first_prov = matching_wallets[0].get("provider", "PayMeChap")
+            accounts = ", ".join([
+                str(w.get("account_number") or w.get("external_wallet_id") or w.get("id"))
+                for w in matching_wallets
+            ])
+            return None, (
+                f"Vous avez plusieurs portefeuilles {first_prov} ({accounts}). "
+                "Quel portefeuille souhaitez\u2011vous utiliser ?"
+            )
+
+        # 2. Aucun provider mentionné dans le message
+        if len(wallets) == 1:
+            prov_lower = (wallets[0].get("provider") or "").lower()
+            if prov_lower not in self._VERIFIED_PROVIDERS:
+                provider_display = wallets[0].get("provider", prov_lower)
+                return None, (
+                    f"Le portefeuille {provider_display} n'est actuellement "
+                    "pas disponible dans SIKA."
+                )
+            return wallets[0], None
+
+        # Plusieurs wallets, aucun provider mentionné → clarification
+        prov_options = ", ".join(
+            sorted({w.get("provider") for w in wallets if w.get("provider")})
+        )
+        return None, (
+            f"Vous avez plusieurs portefeuilles actifs ({prov_options}). "
+            "Quel portefeuille souhaitez\u2011vous utiliser ?"
+        )
+
+    def _extract_transfer_amount(self, message: str) -> float:
+        """
+        Extrait et normalise le montant d'un transfert depuis le message utilisateur.
+        Supporte les formats :
+          - '10 000 FCFA', '10000 FCFA', '10.000 FCFA', '10,000 FCFA'
+          - '10000', '10 000'
+          - Montants négatifs '-100 FCFA'
+        """
+        # 1. Vérifier d'abord les montants explicitement négatifs
+        neg_match = re.search(r"-\s*(\d+[\d\s.,]*)", message)
+        if neg_match:
+            return -1.0
+
+        # 2. Chercher avec devise (FCFA, XOF, F, etc.)
+        match_unit = re.search(r"(\d+[\d\s.,]*)\s*(?:fcfa|xof|f\b|francs?)", message, re.IGNORECASE)
+        if match_unit:
+            raw_str = match_unit.group(1).strip()
+        else:
+            # 3. Chercher le premier groupe numérique
+            match_num = re.search(r"\b(\d+[\d\s.,]*)\b", message)
+            if match_num:
+                raw_str = match_num.group(1).strip()
+            else:
+                return 0.0
+
+        # Nettoyage des espaces
+        cleaned = raw_str.replace(" ", "")
+        # Si format millier 10.000 ou 10,000 (ex: 3 chiffres après le séparateur sans autre décimale)
+        if re.match(r"^\d{1,3}[.,]\d{3}$", cleaned):
+            cleaned = re.sub(r"[.,]", "", cleaned)
+        else:
+            cleaned = cleaned.replace(",", ".")
+
+        try:
+            return float(cleaned)
+        except (ValueError, TypeError):
+            return 0.0
+
     def _chat_basic(
         self,
         user_message: str,
         financial_context: Dict[str, Any],
         user_firstname: str,
         is_english: bool,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Moteur métier local SIKA.
@@ -322,72 +459,77 @@ class SikaAIService:
                         "Aide",
                     ]
 
-            else:
-
-                wallet_details = []
-
-                for wallet in active_wallets:
-
-                    formatted_balance = self._format_currency(
-                        wallet.get("balance", 0.0),
-                        financial_context,
-                    )
-
-                    provider_name = wallet.get(
-                        "provider",
-                        "Wallet"
-                    )
-
-                    account_number = wallet.get(
-                        "account_number",
-                        ""
-                    )
-
-                    account_info = (
-                        f" ({account_number})"
-                        if account_number
-                        else ""
-                    )
-
-                    wallet_details.append(
-                        f"{provider_name}{account_info} : "
-                        f"{formatted_balance}"
-                    )
-
-                details_str = ", ".join(
-                    wallet_details
+            elif len(active_wallets) == 1:
+                # Un seul wallet : sélection automatique
+                selected_w, wallet_clarif = self._select_wallet(active_wallets, user_message)
+                if wallet_clarif:
+                    # Provider NOT_VERIFIED
+                    return {
+                        "response": wallet_clarif,
+                        "action": "wallet_unavailable",
+                        "action_data": {"provider": active_wallets[0].get("provider")},
+                        "sentiment": "neutral",
+                        "suggestions": [],
+                        "provider": "VERTEX_AI",
+                        "model": self.model,
+                    }
+                fmt_bal = self._format_currency(
+                    selected_w.get("balance", 0.0), financial_context
                 )
+                prov_name = selected_w.get("provider", "Wallet")
+                acc = selected_w.get("account_number", "")
+                acc_info = f" ({acc})" if acc else ""
+                response = (
+                    f"Ton solde {prov_name}{acc_info} est de **{fmt_bal}**."
+                    if not is_english
+                    else f"Your {prov_name}{acc_info} balance is **{fmt_bal}**."
+                )
+                suggestions = [
+                    "Voir mes dépenses récentes",
+                    "Effectuer un transfert",
+                ] if not is_english else [
+                    "View recent expenses",
+                    "Make a transfer",
+                ]
 
-                if is_english:
-
-                    response = (
-                        f"Hi {user_firstname}! "
-                        f"You have a total balance of "
-                        f"{fmt_total} across "
-                        f"{len(active_wallets)} connected wallet(s): "
-                        f"{details_str}."
+            else:
+                # Plusieurs wallets
+                selected_w, wallet_clarif = self._select_wallet(active_wallets, user_message)
+                if wallet_clarif:
+                    # Provider NOT_VERIFIED ou clarification nécessaire
+                    action_key = (
+                        "ask_wallet"
+                        if "plusieurs" in wallet_clarif or "multiple" in wallet_clarif.lower()
+                        else "wallet_unavailable"
                     )
-
-                    suggestions = [
-                        "View recent expenses",
-                        "Make a transfer",
-                        "Savings goal",
-                    ]
-
-                else:
-
-                    response = (
-                        f"Salut {user_firstname} ! "
-                        f"Tu as un solde total de "
-                        f"**{fmt_total}** réparti ainsi : "
-                        f"{details_str}."
-                    )
-
-                    suggestions = [
-                        "Voir mes dépenses récentes",
-                        "Effectuer un transfert",
-                        "Objectif d'épargne",
-                    ]
+                    return {
+                        "response": wallet_clarif,
+                        "action": action_key,
+                        "action_data": {"available_wallets": [w.get("provider") for w in active_wallets]},
+                        "sentiment": "neutral",
+                        "suggestions": [],
+                        "provider": "VERTEX_AI",
+                        "model": self.model,
+                    }
+                # Provider sélectionné
+                fmt_bal = self._format_currency(
+                    selected_w.get("balance", 0.0), financial_context
+                )
+                prov_name = selected_w.get("provider", "Wallet")
+                acc = selected_w.get("account_number", "")
+                acc_info = f" ({acc})" if acc else ""
+                response = (
+                    f"Ton solde {prov_name}{acc_info} est de **{fmt_bal}**."
+                    if not is_english
+                    else f"Your {prov_name}{acc_info} balance is **{fmt_bal}**."
+                )
+                suggestions = [
+                    "Voir mes dépenses récentes",
+                    "Effectuer un transfert",
+                ] if not is_english else [
+                    "View recent expenses",
+                    "Make a transfer",
+                ]
 
             return {
                 "response": response,
@@ -914,41 +1056,98 @@ class SikaAIService:
                 "rebalance",
             ]
         ):
-
-            if is_english:
-
-                response = (
-                    "I am preparing the wallet rebalance transfer. "
-                    "Security confirmation is required "
-                    "before execution."
+            # Resolve wallet according to business rules (0/1/multiple)
+            from ..agent.tools import wallet_tools, transaction_tools
+            wallets_result = wallet_tools.get_wallets(user_id=user_id)
+            wallets = wallets_result.data.get("wallets", [])
+            selected_wallet, wallet_msg = self._select_wallet(wallets, user_message)
+            if wallet_msg:
+                return {
+                    "response": wallet_msg,
+                    "action": "ask_wallet",
+                    "action_data": {"available_wallets": [w.get("provider") for w in wallets]},
+                    "sentiment": "neutral",
+                    "suggestions": [],
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
+                }
+            # Resolve recipient contact
+            import re
+            contact_match = re.search(r"(?:à|to)\s+([A-Za-z0-9_\-+]+)", user_message, re.IGNORECASE)
+            contact_name = contact_match.group(1) if contact_match else None
+            if not contact_name:
+                return {
+                    "response": "Veuillez préciser le destinataire du transfert.",
+                    "action": "ask_contact",
+                    "action_data": {},
+                    "sentiment": "neutral",
+                    "suggestions": [],
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
+                }
+            contacts_res = wallet_tools.search_contact(contact_name)
+            contacts = contacts_res.data.get("contacts", [])
+            if not contacts:
+                return {
+                    "response": f"Je ne trouve pas '{contact_name}' dans vos contacts. Pouvez-vous préciser son numéro ou vérifier le nom du bénéficiaire ?",
+                    "action": "ask_contact",
+                    "action_data": {"query": contact_name},
+                    "sentiment": "neutral",
+                    "suggestions": [],
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
+                }
+            if len(contacts) > 1:
+                options = ", ".join([c.get("name", "") for c in contacts])
+                return {
+                    "response": f"Plusieurs contacts correspondent à '{contact_name}'. Veuillez préciser : {options}.",
+                    "action": "ask_contact",
+                    "action_data": {"candidates": contacts},
+                    "sentiment": "neutral",
+                    "suggestions": [],
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
+                }
+            recipient = contacts[0]
+            recipient_value = recipient.get("phone") or recipient.get("id") or recipient.get("name")
+            # Extract amount with robust multi-format support
+            amount = self._extract_transfer_amount(user_message)
+            provider = selected_wallet.get("provider")
+            # Prepare transfer (no execution yet)
+            prepare_res = transaction_tools.prepare_transfer(
+                provider=provider,
+                amount=amount,
+                recipient=recipient_value,
+            )
+            if not prepare_res.success:
+                return {
+                    "response": prepare_res.error_message or "Erreur lors de la préparation du transfert.",
+                    "action": "error",
+                    "action_data": {},
+                    "sentiment": "negative",
+                    "suggestions": [],
+                    "provider": "VERTEX_AI",
+                    "model": self.model,
+                }
+            action_id = prepare_res.data.get("action_id")
+            if action_id:
+                from ..agent.orchestrator import sika_orchestrator
+                numeric_uid = int(user_id) if user_id and str(user_id).isdigit() else 1
+                sika_orchestrator.register_action(
+                    action_id=action_id,
+                    user_id=numeric_uid,
+                    action_type="TRANSFER",
+                    payload=prepare_res.data,
                 )
-
-                suggestions = [
-                    "I confirm the transfer",
-                    "Cancel transfer",
-                ]
-
-            else:
-
-                response = (
-                    "Je prépare le transfert d'équilibrage. "
-                    "Une validation de sécurité est requise "
-                    "avant son exécution."
-                )
-
-                suggestions = [
-                    "Je confirme le transfert",
-                    "Annuler le transfert",
-                ]
-
+            suggestions = ["Je confirme le transfert", "Annuler le transfert"]
             return {
-                "response": response,
+                "response": prepare_res.data.get("summary", "Préparation du transfert prête."),
                 "action": "prepare_transfer",
-                "action_data": {
-                    "amount": 7000,
-                    "recipient": "Wave",
-                    "wallet_provider": "PayMeChap",
-                },
+                "action_id": action_id,
+                "action_data": prepare_res.data,
+                "requires_confirmation": True,
+                "status": "WAITING_CONFIRMATION",
+                "should_speak": True,
                 "sentiment": "neutral",
                 "suggestions": suggestions,
                 "provider": "VERTEX_AI",
@@ -1206,7 +1405,7 @@ class SikaAIService:
         is_english = self._is_english(user_message)
 
         if not self.client:
-            return self._chat_basic(user_message, context, firstname, is_english)
+            return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
 
         from ..agent.tool_registry import tool_registry
         from google.genai import types
@@ -1297,7 +1496,7 @@ RÈGLES STRICTES :
                 )
             except Exception as e:
                 logger.error(f"Gemini error during generation: {e}")
-                return self._chat_basic(user_message, context, firstname, is_english)
+                return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
 
             # Add model response to history
             if getattr(response, 'candidates', None) and len(response.candidates) > 0:

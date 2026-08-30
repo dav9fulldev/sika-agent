@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_images.dart';
+import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/widgets/sika_surface.dart';
+import '../../../../core/widgets/sika_premium_button.dart';
+import '../../../../core/widgets/sika_glass_text_field.dart';
 import '../../providers/wallet_provider.dart';
 
 class ConnectWalletModal extends ConsumerStatefulWidget {
@@ -23,8 +27,8 @@ class ConnectWalletModal extends ConsumerStatefulWidget {
 
 class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   int _currentStep = 1; // 1 = Phone Number, 2 = 6-Digit OTP
-  String _selectedProvider = 'Wave';
-  String _authMethod = 'OAUTH2_WAVE';
+  String _selectedProvider = '';
+  String _authMethod = '';
   String? _sessionId;
 
   final TextEditingController _phoneController = TextEditingController();
@@ -103,7 +107,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
     final phone = _phoneController.text.trim();
 
     final success = await ref.read(walletProvider.notifier).verifyWalletOtp(
-          sessionId: _sessionId ?? 'otp_sess_demo',
+          sessionId: _sessionId!,
           otpCode: otp,
           provider: _selectedProvider,
           accountNumber: phone,
@@ -136,13 +140,14 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   Widget build(BuildContext context) {
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        top: AppSpacing.lg,
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
       ),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -151,15 +156,16 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
           top: BorderSide(color: AppColors.border),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
                 color: Theme.of(context)
                     .colorScheme
                     .onSurface
@@ -187,32 +193,26 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                 'Choose your payment partner and enter your mobile number.',
               ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF94A3B8),
+                    color: isDark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
             ),
 
             if (_localErrorMessage != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.rose.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: AppColors.rose.withValues(alpha: 0.3)),
-                ),
+              const SizedBox(height: AppSpacing.md),
+              SikaSurface(
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 child: Row(
                   children: [
                     const Icon(Icons.error_outline,
                         color: AppColors.rose, size: 20),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
                         _localErrorMessage!,
-                        style: const TextStyle(
-                            color: AppColors.rose,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.rose,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                     ),
                   ],
@@ -220,7 +220,7 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
             ],
 
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.lg),
 
             // SELECTION FOURNISSEUR (WAVE, ORANGE, MTN, PAYMECHAP)
             SizedBox(
@@ -240,22 +240,27 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                         _authMethod = prov['authMethod'] as String;
                       });
                     },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                    child: Container(
                       width: 105,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (prov['brandColor'] as Color)
-                                .withValues(alpha: 0.15)
-                            : Theme.of(context).cardColor,
+                            ? (prov['brandColor'] as Color).withValues(alpha: 0.1)
+                            : isDark ? AppColors.darkSurface : AppColors.lightSurface,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected
                               ? (prov['brandColor'] as Color)
-                              : AppColors.border,
+                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
                           width: isSelected ? 2 : 1,
                         ),
+                        boxShadow: isSelected ? [] : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -299,57 +304,44 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.lg),
 
             // CHAMP NUMERO DE COMPTE
             Text(
               langNotifier.tr(
                   'Numéro de téléphone du compte', 'Account Mobile Number'),
-              style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.70),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.70),
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
-            const SizedBox(height: 8),
-            TextField(
+            const SizedBox(height: AppSpacing.xs),
+            SikaGlassTextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Theme.of(context).cardColor,
-                hintText: '+225 07 00 00 00',
-                hintStyle: const TextStyle(color: Color(0xFF64748B)),
-                prefixIcon: const Icon(Icons.phone, color: AppColors.cyan),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-              ),
+              hintText: '+225 07 00 00 00',
+              prefixIcon: Icons.phone,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             // BADGE DE SÉCURITÉ OTP
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.cyan.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border:
-                    Border.all(color: AppColors.cyan.withValues(alpha: 0.3)),
-              ),
+            SikaSurface(
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
-                  const Icon(Icons.security, color: AppColors.cyan, size: 20),
-                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyan.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.security, color: AppColors.cyan, size: 20),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
                       _selectedProvider == 'PayMeChap'
@@ -361,49 +353,31 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                               'Un code de sécurité OTP à 6 chiffres vous sera envoyé par SMS pour valider votre identité.',
                               'A 6-digit OTP security code will be sent via SMS to verify your identity.',
                             ),
-                      style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.70),
-                          fontSize: 11.5),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.8),
+                            height: 1.3,
+                          ),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // BOUTON ENVOYER OTP
+            const SizedBox(height: AppSpacing.xl),
+            
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _handleInitiateOtp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cyan,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _isSubmitting
-                    ? CircularProgressIndicator(
-                        color: Theme.of(context).colorScheme.onSurface)
-                    : Text(
-                        langNotifier.tr(
-                          'Recevoir le code OTP',
-                          'Receive OTP Code',
-                        ),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+              child: SikaPremiumButton(
+                onPressed: _isSubmitting ? () {} : _handleInitiateOtp,
+                text: langNotifier.tr('Recevoir le code', 'Get Code'),
+                isLoading: _isSubmitting,
               ),
             ),
-          ] else ...[
+          ] else if (_currentStep == 2) ...[
             // ÉTAPE 2 : SAISIE DU CODE OTP À 6 CHIFFRES
             Row(
               children: [
@@ -412,49 +386,43 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                       color: Theme.of(context).colorScheme.onSurface),
                   onPressed: () => setState(() => _currentStep = 1),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Text(
                   langNotifier.tr(
                       'Vérification du code OTP', 'OTP Code Verification'),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               langNotifier.tr(
                 'Entrez le code à 6 chiffres envoyé au ${_phoneController.text}.',
                 'Enter the 6-digit code sent to ${_phoneController.text}.',
               ),
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: isDark ? AppColors.darkTextSecondary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
             ),
 
             if (_localErrorMessage != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.rose.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: AppColors.rose.withValues(alpha: 0.3)),
-                ),
+              const SizedBox(height: AppSpacing.md),
+              SikaSurface(
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 child: Row(
                   children: [
                     const Icon(Icons.error_outline,
                         color: AppColors.rose, size: 20),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
                         _localErrorMessage!,
-                        style: const TextStyle(
-                            color: AppColors.rose,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.rose,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                     ),
                   ],
@@ -462,45 +430,47 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
               ),
             ],
 
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
 
             // CHAMP CODE OTP
             Text(
               langNotifier.tr('Code OTP à 6 chiffres', '6-Digit OTP Code'),
-              style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.70),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.70),
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _otpController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              maxLength: 6,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 8,
-              ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Theme.of(context).cardColor,
-                hintText: '123456',
-                counterText: '',
-                hintStyle:
-                    const TextStyle(color: Color(0xFF64748B), letterSpacing: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.cyan),
+            const SizedBox(height: AppSpacing.xs),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? AppColors.darkBorderSubtle : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.cyan),
+              ),
+              child: TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: 6,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                    ),
+                decoration: InputDecoration(
+                  hintText: 'Entrez le code reçu par SMS',
+                  counterText: '',
+                  hintStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                        letterSpacing: 8,
+                      ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),
@@ -509,36 +479,17 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
 
             const SizedBox(height: 24),
 
-            // BOUTON VALIDER OTP
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _handleVerifyOtp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.emerald,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _isSubmitting
-                    ? CircularProgressIndicator(
-                        color: Theme.of(context).colorScheme.onSurface)
-                    : Text(
-                        langNotifier.tr(
-                          'Valider & Activer le compte',
-                          'Validate & Activate Account',
-                        ),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+              child: SikaPremiumButton(
+                onPressed: _isSubmitting ? () {} : _handleVerifyOtp,
+                text: langNotifier.tr('Valider & Activer le compte', 'Validate & Activate Account'),
+                isLoading: _isSubmitting,
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
 
             // BOUTON RENVOYER OTP
             Center(
@@ -549,25 +500,28 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
                         _otpController.clear();
                         await _handleInitiateOtp();
                         if (context.mounted && _localErrorMessage == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppColors.cyan,
-                              content: Text(langNotifier.tr(
-                                  'Un nouveau code a été envoyé.',
-                                  'A new code has been sent.')),
-                            ),
-                          );
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             SnackBar(
+                               backgroundColor: AppColors.cyan,
+                               content: Text(langNotifier.tr(
+                                   'Un nouveau code a été envoyé.',
+                                   'A new code has been sent.')),
+                             ),
+                           );
                         }
                       },
                 child: Text(
                   langNotifier.tr('Renvoyer le code OTP', 'Resend OTP Code'),
-                  style: const TextStyle(
-                      color: AppColors.cyan, fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.cyan,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
             ),
           ],
         ],
+      ),
       ),
     );
   }

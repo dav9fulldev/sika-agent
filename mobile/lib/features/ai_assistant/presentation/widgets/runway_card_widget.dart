@@ -36,7 +36,7 @@ class RunwayCardWidget extends ConsumerWidget {
     }
 
     final Color badgeColor = totalBalanceFcfa <= 0
-        ? const Color(0xFF94A3B8)
+        ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))
         : estimatedDays > 15
             ? const Color(0xFF10B981) // Safely green
             : estimatedDays > 7
@@ -85,7 +85,7 @@ class RunwayCardWidget extends ConsumerWidget {
                     langNotifier.tr(
                         'Autonomie financière (Runway)', 'Financial Runway'),
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: const Color(0xFF94A3B8),
+                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w600,
                         ),
                   ),
@@ -125,7 +125,7 @@ class RunwayCardWidget extends ConsumerWidget {
                 langNotifier.tr(
                     'jours d\'autonomie restante', 'days remaining'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF94A3B8),
+                      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       fontWeight: FontWeight.w500,
                     ),
               ),

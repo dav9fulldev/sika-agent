@@ -6,6 +6,7 @@ import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/widgets/sika_glass_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -24,6 +25,165 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // États pour les switchs de préférences générales
   bool _notificationPrefEnabled = true;
+  String _currentAlias = 'SIKA';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentAlias();
+  }
+
+  Future<void> _loadCurrentAlias() async {
+    final alias = await SikaNativeService.getSikaAlias();
+    final prefs = await SharedPreferences.getInstance();
+    final isEnabled = prefs.getBool('wake_word_enabled') ?? true;
+    if (alias != null && alias.isNotEmpty) {
+      setState(() {
+        _currentAlias = alias.toUpperCase();
+        _wakeWordEnabled = isEnabled;
+      });
+    } else {
+      setState(() {
+        _wakeWordEnabled = isEnabled;
+      });
+    }
+  }
+
+  void _showAliasBottomSheet(LanguageNotifier langNotifier) {
+    final TextEditingController aliasController = TextEditingController(text: _currentAlias);
+    final formKey = GlobalKey<FormState>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(
+                color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
+              ),
+            ),
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        langNotifier.tr('Nom de l\'assistant', 'Assistant Name'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                            size: 24),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: aliasController,
+                    maxLength: 15,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: langNotifier.tr('Nom personnalisé', 'Custom Name'),
+                      hintText: 'Ex: KIMI',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF10B981)),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return null; // Will default to SIKA
+                      }
+                      if (value.trim().length > 15) {
+                        return 'Maximum 15 caractères';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    langNotifier.tr(
+                      'Information : SIKA reste toujours disponible comme nom de secours.',
+                      'Info: SIKA is always available as a fallback name.',
+                    ),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (formKey.currentState!.validate()) {
+                          String newAlias = aliasController.text.trim().toUpperCase();
+                          if (newAlias.isEmpty) {
+                            newAlias = 'SIKA';
+                          }
+                          Navigator.pop(context);
+                          setState(() => _currentAlias = newAlias);
+                          await SikaNativeService.setSikaAlias(newAlias.toLowerCase());
+                          // Redémarrer le service si actif pour prendre en compte le nouveau nom
+                          if (_wakeWordEnabled) {
+                            await SikaNativeService.stopSikaService();
+                            await Future.delayed(const Duration(milliseconds: 500));
+                            await SikaNativeService.startSikaService();
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.brandPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        langNotifier.tr('Enregistrer', 'Save'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _showLanguageBottomSheet(
       LanguageNotifier langNotifier, String currentLang) {
@@ -34,10 +194,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
-            color: AppColors.darkBackground,
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
             ),
           ),
           child: Column(
@@ -136,10 +296,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
-            color: AppColors.darkBackground,
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
             ),
           ),
           child: Column(
@@ -400,40 +560,55 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SikaGlassCard(
               padding: EdgeInsets.zero,
-              child: SwitchListTile(
-                value: _wakeWordEnabled,
-                onChanged: (val) {
-                  setState(() => _wakeWordEnabled = val);
-                  if (val) {
-                    SikaNativeService.startSikaService();
-                  } else {
-                    SikaNativeService.stopSikaService();
-                  }
-                },
-                title: Text(
-                  langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  langNotifier.tr(
-                    'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
-                    'Allows calling SIKA in background without opening the app.',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
-                        height: 1.3,
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    value: _wakeWordEnabled,
+                    onChanged: (val) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('wake_word_enabled', val);
+                      setState(() => _wakeWordEnabled = val);
+                      if (val) {
+                        SikaNativeService.startSikaService();
+                      } else {
+                        SikaNativeService.stopSikaService();
+                      }
+                    },
+                    title: Text(
+                      langNotifier.tr('Mot-clé "Sika" (Wake Word)', 'Wake Word "Sika"'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      langNotifier.tr(
+                        'Permet d\'appeler SIKA en arrière-plan sans ouvrir l\'application.',
+                        'Allows calling SIKA in background without opening the app.',
                       ),
-                ),
-                activeThumbColor: AppColors.brandPrimary,
-                activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.7),
+                            height: 1.3,
+                          ),
+                    ),
+                    activeThumbColor: AppColors.brandPrimary,
+                    activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  if (_wakeWordEnabled) ...[
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildActionTile(
+                      icon: Icons.record_voice_over_rounded,
+                      title: langNotifier.tr('Nom de l\'assistant', 'Assistant Name'),
+                      trailingText: _currentAlias,
+                      onTap: () => _showAliasBottomSheet(langNotifier),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

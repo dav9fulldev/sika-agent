@@ -30,6 +30,30 @@ class SikaNativeService {
     }
   }
 
+  static Future<bool> pauseSikaService() async {
+    try {
+      final bool result =
+          await platform.invokeMethod<bool>('pauseSikaService') ?? false;
+      debugPrint('[SikaNative] Service paused: $result');
+      return result;
+    } catch (e) {
+      debugPrint('[SikaNative] Error pausing service: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> resumeSikaService() async {
+    try {
+      final bool result =
+          await platform.invokeMethod<bool>('resumeSikaService') ?? false;
+      debugPrint('[SikaNative] Service resumed: $result');
+      return result;
+    } catch (e) {
+      debugPrint('[SikaNative] Error resuming service: $e');
+      return false;
+    }
+  }
+
   static Future<bool> isSikaServiceRunning() async {
     try {
       final bool result =
@@ -64,6 +88,33 @@ class SikaNativeService {
       return result;
     } catch (e) {
       debugPrint('[SikaNative] Error setting firstname: $e');
+      return false;
+    }
+  }
+
+  static Future<String?> getSikaAlias() async {
+    try {
+      final String? result =
+          await platform.invokeMethod<String>('getSikaAlias');
+      debugPrint('[SikaNative] Retrieved Sika alias: $result');
+      return result;
+    } catch (e) {
+      debugPrint('[SikaNative] Error getting Sika alias: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> setSikaAlias(String alias) async {
+    try {
+      final bool result = await platform.invokeMethod<bool>(
+            'setSikaAlias',
+            {'alias': alias},
+          ) ??
+          false;
+      debugPrint('[SikaNative] Sika alias set: $result');
+      return result;
+    } catch (e) {
+      debugPrint('[SikaNative] Error setting Sika alias: $e');
       return false;
     }
   }

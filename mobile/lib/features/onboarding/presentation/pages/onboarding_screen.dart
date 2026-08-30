@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
-import '../../../../core/widgets/sika_glass_card.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
 import '../widgets/sika_robot_animation.dart';
 import '../widgets/financial_animation.dart';
 import '../widgets/security_animation.dart';
 
 /// OnboardingScreen — Fullscreen Immersive Animated Onboarding Experience
+/// Refonte V2 (Product Design)
 class OnboardingScreen extends ConsumerStatefulWidget {
   final VoidCallback onFinish;
 
@@ -32,6 +34,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final List<Map<String, dynamic>> onboardingSteps = [
       {
@@ -64,154 +67,116 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. HALO D'AMBIANCE DE FOND
-          Container(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, 0.3),
-                radius: 1.2,
-                colors: [
-                  Color(0x0a3f8cff),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. HEADER (Skip button could go here, but for now we keep it clean)
+            const SizedBox(height: AppSpacing.lg),
 
-          // 2. CONTENU PRINCIPAL
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() => _currentPage = index);
-                    },
-                    itemCount: onboardingSteps.length,
-                    itemBuilder: (context, index) {
-                      final step = onboardingSteps[index];
+            // 2. MAIN CONTENT (Carousel)
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() => _currentPage = index);
+                },
+                itemCount: onboardingSteps.length,
+                itemBuilder: (context, index) {
+                  final step = onboardingSteps[index];
 
-                      return AnimatedBuilder(
-                        animation: _pageController,
-                        builder: (context, child) {
-                          double value = 1.0;
-                          if (_pageController.position.haveDimensions) {
-                            value = (_pageController.page ?? 0) - index;
-                            value = (1 - (value.abs() * 0.4)).clamp(0.0, 1.0);
-                          }
-
-                          return Opacity(
-                            opacity: value,
-                            child: Padding(
-                              padding: const EdgeInsets.all(24.0),
-                              child: Center(
-                                child: step['widget'] as Widget,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-
-                // 3. PANNEAU INFÉRIEUR EN VERRE
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: SikaGlassCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 32,
-                    ),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // TITRE
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          child: Text(
-                            onboardingSteps[_currentPage]['title'] as String,
-                            key: ValueKey<String>(onboardingSteps[_currentPage]['title'] as String),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
+                        // IMAGE / ANIMATION
+                        Expanded(
+                          flex: 3,
+                          child: Center(
+                            child: step['widget'] as Widget,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.xxl),
                         
-                        // SOUS-TITRE
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          child: Text(
-                            onboardingSteps[_currentPage]['subtitle'] as String,
-                            key: ValueKey<String>(onboardingSteps[_currentPage]['subtitle'] as String),
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: const Color(0xff94a3b8),
-                                  height: 1.45,
+                        // TEXTS
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            children: [
+                              Text(
+                                step['title'] as String,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.h1.copyWith(
+                                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                 ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // INDICATEURS DE PAGE
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            onboardingSteps.length,
-                            (index) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: _currentPage == index ? 24 : 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: _currentPage == index
-                                    ? AppColors.brandPrimary
-                                    : AppColors.brandPrimary.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
                               ),
-                            ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                step['subtitle'] as String,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.bodyLarge.copyWith(
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // BOUTON ACTION
-                        SikaPremiumButton(
-                          onPressed: () {
-                            if (_currentPage < onboardingSteps.length - 1) {
-                              _pageController.nextPage(
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeInOutCubic,
-                              );
-                            } else {
-                              widget.onFinish();
-                            }
-                          },
-                          text: _currentPage == onboardingSteps.length - 1
-                              ? langNotifier.tr('Commencer', 'Get Started')
-                              : langNotifier.tr('Suivant', 'Next'),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+
+            // 3. BOTTOM PANEL (Indicators & Button)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // PAGE INDICATORS
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      onboardingSteps.length,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _currentPage == index ? 24 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _currentPage == index
+                              ? AppColors.primary
+                              : (isDark ? AppColors.darkBorderStrong : AppColors.lightBorderStrong),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // CTA BUTTON
+                  SikaPremiumButton(
+                    onPressed: () {
+                      if (_currentPage < onboardingSteps.length - 1) {
+                        _pageController.nextPage(
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeInOutCubic,
+                        );
+                      } else {
+                        widget.onFinish();
+                      }
+                    },
+                    text: _currentPage == onboardingSteps.length - 1
+                        ? langNotifier.tr('Commencer', 'Get Started')
+                        : langNotifier.tr('Suivant', 'Next'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

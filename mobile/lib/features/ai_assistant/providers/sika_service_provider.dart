@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'sika_provider.dart';
 
 /// Service pour controler Sika en arriere-plan (wake word detection)
 class SikaServiceState {
@@ -34,9 +35,23 @@ class SikaServiceState {
 
 class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
   static const _channel = MethodChannel('com.gertonargent/sika');
+  final Ref _ref;
 
-  SikaServiceNotifier() : super(const SikaServiceState()) {
+  SikaServiceNotifier(this._ref) : super(const SikaServiceState()) {
     _checkStatus();
+    _setupMethodCallHandler();
+  }
+
+  void _setupMethodCallHandler() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onWakeWordTriggered') {
+        debugPrint('🎯 WAKE WORD TRIGGERED: \${call.arguments}');
+        // Ramener l'interface SIKA au premier plan
+        final sikaNotifier = _ref.read(sikaProvider.notifier);
+        // Force l'affichage de l'overlay et démarre l'écoute STT
+        sikaNotifier.startListening();
+      }
+    });
   }
 
   /// Verifier le status du service et des permissions
@@ -126,5 +141,6 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
 /// Provider pour le service Sika en arriere-plan
 final sikaServiceProvider =
     StateNotifierProvider<SikaServiceNotifier, SikaServiceState>((ref) {
-  return SikaServiceNotifier();
+  // Nécessite l'import de sika_provider.dart
+  return SikaServiceNotifier(ref);
 });

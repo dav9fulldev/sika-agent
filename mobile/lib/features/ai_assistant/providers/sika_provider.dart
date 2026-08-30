@@ -4,22 +4,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/api_service.dart';
+import '../../../../core/services/sika_native_service.dart';
 import '../../wallet/providers/wallet_provider.dart';
 
 enum SikaState {
   idle,
   listening,
   processing,
+  agentWorking,  // SIKA executes ReAct steps
   speaking,
   waitingVoiceConfirmation,
   ambiguityAsked,
   securityValidation,
   executingAction,
+  reconciling,   // UNKNOWN_RESULT — transaction status being verified
   completed,
   cancelled,
   error,
@@ -30,12 +34,14 @@ class SikaMessage {
   final bool isUser;
   final Map<String, dynamic>? suggestedTransaction;
   final bool canAddTransaction;
+  final List<Map<String, dynamic>>? agentSteps;
 
   SikaMessage({
     required this.text,
     required this.isUser,
     this.suggestedTransaction,
     this.canAddTransaction = false,
+    this.agentSteps,
   });
 }
 
@@ -49,6 +55,11 @@ class SikaData {
   final SikaState? pendingNextState;
   final String? pendingActionId;
   final Map<String, dynamic>? pendingActionData;
+  // NEW: Track observable agent steps from backend
+  final List<Map<String, dynamic>> agentSteps;
+  // NEW: Track the single active confirmable action and obsolete ones
+  final String? activeActionId;
+  final Set<String> obsoleteActionIds;
 
   SikaData({
     required this.state,
@@ -60,6 +71,9 @@ class SikaData {
     this.pendingNextState,
     this.pendingActionId,
     this.pendingActionData,
+    this.agentSteps = const [],
+    this.activeActionId,
+    this.obsoleteActionIds = const {},
   });
 
   SikaData copyWith({
@@ -73,6 +87,10 @@ class SikaData {
     String? pendingActionId,
     Map<String, dynamic>? pendingActionData,
     bool clearActionData = false,
+    List<Map<String, dynamic>>? agentSteps,
+    String? activeActionId,
+    Set<String>? obsoleteActionIds,
+    bool clearActiveAction = false,
   }) {
     return SikaData(
       state: state ?? this.state,
@@ -87,6 +105,9 @@ class SikaData {
       pendingActionData: clearActionData
           ? null
           : (pendingActionData ?? this.pendingActionData),
+      agentSteps: agentSteps ?? this.agentSteps,
+      activeActionId: clearActiveAction ? null : (activeActionId ?? this.activeActionId),
+      obsoleteActionIds: obsoleteActionIds ?? this.obsoleteActionIds,
     );
   }
 }
@@ -130,10 +151,21 @@ class SikaNotifier extends StateNotifier<SikaData> {
     _speechEnabled = await _speechToText.initialize(
       onError: (val) {
         debugPrint('[SIKA STT] Speech error: ${val.errorMsg}');
-        state = state.copyWith(
-          state: SikaState.error,
-          errorMessage: val.errorMsg,
-        );
+        if (val.errorMsg == 'error_speech_timeout') {
+          // Timeout normal (l'utilisateur n'a rien dit)
+          state = state.copyWith(state: SikaState.idle);
+        } else {
+          String friendlyError = "Erreur de reconnaissance vocale (${val.errorMsg})";
+          if (val.errorMsg.contains('permission')) {
+             friendlyError = "Veuillez autoriser l'accès au microphone.";
+          } else if (val.errorMsg == 'error_network' || val.errorMsg.contains('network')) {
+             friendlyError = "SIKA n'arrive pas à se connecter au réseau.";
+          }
+          state = state.copyWith(
+            state: SikaState.error,
+            errorMessage: friendlyError,
+          );
+        }
       },
       onStatus: (status) {
         debugPrint('[SIKA STT] Speech status changed to: $status');
@@ -196,6 +228,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
         return;
       }
     }
+
+    // Mettre en pause le service Wake Word natif pour libérer le micro
+    await SikaNativeService.pauseSikaService();
 
     final activeSttLocale = sttLocale ?? _ref.read(languageProvider).sttLocale;
     debugPrint('[SIKA VOICE] Using locale: $activeSttLocale');
@@ -269,7 +304,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     }
   }
 
-  void clearConversation() {
+  Future<void> clearConversation() async {
     state = SikaData(
       state: SikaState.idle,
       messages: const [],
@@ -278,6 +313,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
       isInitialized: state.isInitialized,
       isVoiceMode: false,
     );
+    // Relancer le service Wake Word natif en arrière-plan UNIQUEMENT s'il est activé
+    final prefs = await SharedPreferences.getInstance();
+    final isEnabled = prefs.getBool('wake_word_enabled') ?? true;
+    if (isEnabled) {
+      SikaNativeService.resumeSikaService();
+    }
   }
 
   /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec reconnaissance de l'utilisateur et de sa devise active
@@ -341,6 +382,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       state: SikaState.processing,
       messages: updatedMessages,
       currentText: null,
+      agentSteps: const [],
     );
 
     // 2. ENVOI AU BACKEND SIKA AVEC ORCHESTRATION ET CONTEXTE MULTI-TOURS
@@ -387,6 +429,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
         pendingNextState = SikaState.waitingVoiceConfirmation;
       }
 
+      // Parse safe observable steps returned by the backend ReAct loop
+      final List<Map<String, dynamic>> newAgentSteps = (response['agent_steps'] as List<dynamic>? ?? [])
+          .map((s) => Map<String, dynamic>.from(s as Map))
+          .toList();
+
       final sikaMessage = SikaMessage(
         text: response['message'] as String? ??
             response['response'] as String? ??
@@ -398,9 +445,18 @@ class SikaNotifier extends StateNotifier<SikaData> {
                 action == 'transfer') &&
             !requiresSecurity &&
             (status == 'PROCESSED' || status == 'CONFIRMED'),
+        agentSteps: newAgentSteps.isNotEmpty ? newAgentSteps : null,
       );
       final finalMessages = List<SikaMessage>.from(state.messages)
         ..add(sikaMessage);
+
+      // Invalidate the previous active action if a new one has been prepared
+      final String? previousActiveActionId = state.activeActionId;
+      final Set<String> updatedObsoleteIds = Set<String>.from(state.obsoleteActionIds);
+      if (actionId != null && previousActiveActionId != null && previousActiveActionId != actionId) {
+        updatedObsoleteIds.add(previousActiveActionId);
+        debugPrint('[SIKA ACTIONS] Previous action $previousActiveActionId marked OBSOLETE. New active: $actionId');
+      }
 
       state = state.copyWith(
         state: shouldSpeak
@@ -412,6 +468,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
         pendingNextState: pendingNextState,
         pendingActionId: actionId,
         pendingActionData: actionData,
+        agentSteps: newAgentSteps,
+        activeActionId: actionId ?? state.activeActionId,
+        obsoleteActionIds: updatedObsoleteIds,
       );
 
       if (shouldSpeak) {
@@ -428,10 +487,14 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final finalMessages = List<SikaMessage>.from(state.messages)
         ..add(sikaMessage);
 
+      String userFriendlyError = isEnglish 
+          ? "SIKA cannot connect right now. Please check your network." 
+          : "SIKA n'arrive pas à se connecter pour le moment. Veuillez vérifier votre connexion.";
+
       state = state.copyWith(
         state: SikaState.speaking,
         messages: finalMessages,
-        errorMessage: e.toString(),
+        errorMessage: userFriendlyError,
         pendingNextState: SikaState.error,
         pendingActionId: null,
         clearActionData: true,
@@ -536,9 +599,69 @@ class SikaNotifier extends StateNotifier<SikaData> {
     }
   }
 
+  /// Non-destructive cancellation of the prepared action — preserves conversation history
+  void cancelPendingAction({String? reason}) {
+    final currentLang = _ref.read(languageProvider);
+    final isEnglish = currentLang.code == 'en';
+    final cancelText = reason ??
+        (isEnglish
+            ? 'The prepared operation has been cancelled.'
+            : 'L\'opération préparée a été annulée.');
+
+    final String? currentActionId = state.pendingActionId ?? state.activeActionId;
+    final Set<String> updatedObsolete = Set<String>.from(state.obsoleteActionIds);
+    if (currentActionId != null) {
+      updatedObsolete.add(currentActionId);
+      debugPrint('[SIKA SECURITY] 🛑 Action $currentActionId marked CANCELLED/OBSOLETE.');
+    }
+
+    final sikaMessage = SikaMessage(text: cancelText, isUser: false);
+    state = state.copyWith(
+      state: SikaState.idle,
+      messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
+      clearActionData: true,
+      clearActiveAction: true,
+      obsoleteActionIds: updatedObsolete,
+    );
+  }
+
   Future<void> executeSecurityValidationAndConfirm(String actionId) async {
     final currentLang = _ref.read(languageProvider);
     final isEnglish = currentLang.code == 'en';
+
+    // DOUBLE-CONFIRMATION GUARD: Prevent multiple in-flight confirmation requests
+    if (state.state == SikaState.executingAction) {
+      debugPrint('[SIKA SECURITY] ⚠️ Confirmation already in progress. Ignoring duplicate request.');
+      return;
+    }
+
+    // OBSOLETE ACTION GUARD: Refuse to confirm an action that has been superseded
+    if (state.obsoleteActionIds.contains(actionId)) {
+      debugPrint('[SIKA SECURITY] ⛔ Refusing confirmation of OBSOLETE action: $actionId');
+      final msg = isEnglish
+          ? 'This action has been replaced by a newer request. Please confirm the latest action.'
+          : 'Cette action a été remplacée par une nouvelle demande. Veuillez confirmer la dernière action préparée.';
+      final sikaMessage = SikaMessage(text: msg, isUser: false);
+      state = state.copyWith(
+        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
+        state: SikaState.idle,
+      );
+      return;
+    }
+
+    // ACTIVE ACTION GUARD: Ensure action matches the currently active action if defined
+    if (state.activeActionId != null && state.activeActionId != actionId) {
+      debugPrint('[SIKA SECURITY] ⛔ Action ID $actionId does not match active action ${state.activeActionId}. Aborting.');
+      final msg = isEnglish
+          ? 'This action is no longer active. Please confirm the latest request.'
+          : 'Cette action n\'est plus active. Veuillez confirmer la dernière demande.';
+      final sikaMessage = SikaMessage(text: msg, isUser: false);
+      state = state.copyWith(
+        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
+        state: SikaState.idle,
+      );
+      return;
+    }
 
     try {
       state = state.copyWith(state: SikaState.executingAction);
@@ -571,13 +694,14 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final bool needsReconciliation =
           status == 'UNKNOWN_RESULT' || status == 'REQUIRES_RECONCILIATION';
 
+      // CRITICAL FIX: UNKNOWN_RESULT is NOT a failure — it means the status is
+      // being verified. Map to reconciling, never to error.
       final SikaState pendingState = isExecuted
           ? SikaState.completed
           : (status == 'EXPIRED' || status == 'FAILED')
               ? SikaState.error
               : needsReconciliation
-                  ? SikaState
-                      .error // Affichere l'erreur ; l'action_id est conservé pour la réconciliation
+                  ? SikaState.reconciling  // Reassuring state, not error
                   : SikaState.idle;
 
       final sikaMessage = SikaMessage(text: sikaText, isUser: false);
@@ -611,10 +735,14 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final finalMessages = List<SikaMessage>.from(state.messages)
         ..add(sikaMessage);
 
+      String userFriendlyError = isEnglish
+          ? "Network error communicating with PayMeChap."
+          : "Erreur réseau lors de la communication avec PayMeChap.";
+
       state = state.copyWith(
         state: SikaState.error,
         messages: finalMessages,
-        errorMessage: e.toString(),
+        errorMessage: userFriendlyError,
         pendingNextState: SikaState.error,
         pendingActionId: null,
       );
@@ -625,29 +753,58 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   Future<void> executeActionReconciliation(String actionId) async {
     final currentLang = _ref.read(languageProvider);
+    final isEnglish = currentLang.code == 'en';
     try {
       debugPrint(
           '[RECONCILIATION] Triggering reconciliation for actionId: $actionId');
       final res = await _apiService.sikaReconcileAction(actionId);
+      final String status = (res['status'] as String?) ?? 'UNKNOWN_RESULT';
+
       final String speechText = (res['speech_text'] as String?) ??
           (res['message'] as String?) ??
-          'Statut vérifié auprès de PayMeChap.';
+          (status == 'EXECUTED'
+              ? (isEnglish
+                  ? 'Transaction confirmed and completed successfully on PayMeChap!'
+                  : 'Opération confirmée et exécutée avec succès sur PayMeChap !')
+              : status == 'FAILED'
+                  ? (isEnglish
+                      ? 'The transaction failed on PayMeChap. No funds were debited.'
+                      : 'La transaction a échoué sur PayMeChap. Aucun montant n\'a été débité.')
+                  : (isEnglish
+                      ? 'The transaction status is still pending verification with PayMeChap.'
+                      : 'Le statut de la transaction est toujours en attente de confirmation auprès de PayMeChap.'));
 
       final sikaMessage = SikaMessage(text: speechText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)
         ..add(sikaMessage);
 
-      final isExecuted = res['status'] == 'EXECUTED';
+      final bool isExecuted = status == 'EXECUTED';
+      final bool isFailed = status == 'FAILED';
+      final bool stillPending = status == 'UNKNOWN_RESULT' ||
+          status == 'REQUIRES_RECONCILIATION' ||
+          status == 'RECONCILIATION_IN_PROGRESS';
+
       state = state.copyWith(
         state: SikaState.speaking,
         messages: finalMessages,
-        pendingNextState: isExecuted ? SikaState.completed : SikaState.idle,
-        pendingActionId: null,
+        pendingNextState: isExecuted
+            ? SikaState.completed
+            : isFailed
+                ? SikaState.idle
+                : SikaState.reconciling,
+        pendingActionId: stillPending ? actionId : null,
       );
 
       await _speak(speechText, ttsLocale: currentLang.ttsLanguage);
     } catch (e) {
       debugPrint('[RECONCILIATION ERROR] $e');
+      final errorNotice = isEnglish
+          ? 'Could not connect to verify status. Please try again shortly.'
+          : 'Impossible de joindre le serveur pour vérifier le statut. Veuillez réessayer dans un instant.';
+      final sikaMessage = SikaMessage(text: errorNotice, isUser: false);
+      state = state.copyWith(
+        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
+      );
     }
   }
 
