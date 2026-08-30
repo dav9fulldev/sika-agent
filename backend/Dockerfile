@@ -27,5 +27,7 @@ COPY --chown=appuser:appuser . .
 # Basculer vers l'utilisateur sécurisé
 USER appuser
 
+EXPOSE 8080
+
 # 6. Exécuter le serveur web
 ENTRYPOINT ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

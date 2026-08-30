@@ -37,7 +37,7 @@ class Settings:
         # GCP Project Config
         self.GOOGLE_CLOUD_PROJECT: str = overrides.get("GOOGLE_CLOUD_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", "sika-all-things-agentic"))
         self.GOOGLE_CLOUD_LOCATION: str = overrides.get("GOOGLE_CLOUD_LOCATION", os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
-        self.GEMINI_MODEL: str = overrides.get("GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+        self.GEMINI_MODEL: str = overrides.get("GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-3.5-flash"))
 
         # Secret Manager Flag
         self.USE_GCP_SECRET_MANAGER: bool = overrides.get(

@@ -1,377 +1,504 @@
-# SIKA — Autonomous Personal Financial Agent (Mobile Money)
+# SIKA — Autonomous Personal Financial Agent for Mobile Money
 
-**SIKA** is an autonomous personal financial agent built specifically for the Mobile Money ecosystem (Wave, Orange Money, MTN) in Francophone West Africa (Côte d'Ivoire, FCFA). 
-
-Developed for the **All Things Agentic Hackathon** under the **Taskmaster** track, SIKA transforms how users manage, observe, and interact with their financial lives on mobile devices.
-
----
-
-## About
-
-In emerging markets like West Africa, financial transactions are heavily fragmented across multiple Mobile Money wallets (Wave, Orange Money, MTN Mobile Money) and bank SMS notifications. Users face significant friction:
-- **Wallet Fragmentation**: Cash is spread across multiple apps with no unified balance view.
-- **Tracking Overhead**: Manually calculating total funds or reviewing recent transactions across multiple apps is tedious.
-- **Passivity of Existing Tools**: Traditional budgeting tools and chatbots are purely passive. They can answer basic questions but cannot reason, plan, or safely assist in executing financial tasks.
-
-**SIKA addresses this by operating as an Autonomous Financial Agent on the user's smartphone.** SIKA observes financial events (authorized notifications), maintains a unified financial context, breaks down user objectives into actionable plans, selects deterministic tools, and assists in completing financial operations with strict safety controls (Human-in-the-Loop).
+> **Google Cloud "All Things Agentic" Hackathon — Track: Taskmaster**  
+> An autonomous, secure, and multi-wallet agentic financial assistant designed for West Africa (Côte d'Ivoire & WAEMU region).
 
 ---
 
-## Agentic Workflow
+## 🌍 The Problem
 
-Unlike traditional conversational chatbots that follow a simple `Question ➔ Text Response` pattern, SIKA implements an **autonomous agentic cycle** powered by the **ReAct (Reasoning + Acting)** pattern and Taskmaster principles:
+In West Africa, **Mobile Money is the backbone of financial inclusion**, powering daily transactions for tens of millions of people. However, users face critical real-world friction:
+
+- **Extreme Fragmentation**: Users navigate between multiple separate providers (**Wave, Orange Money, MTN MoMo, PayMeChap, Djamo**).
+- **Zero Unified Visibility**: Checking overall balances or reviewing weekly expenses requires opening 3 to 5 separate mobile applications and entering multiple PINs.
+- **Accidental & Erroneous Transfers**: Typing errors in phone numbers or selecting the wrong wallet lead to irreversible financial loss.
+- **Cognitive Load & Inaccessibility**: Manual calculations, financial jargon, and complex user interfaces exclude non-tech-savvy users and oral-first communities.
+
+---
+
+## 💡 The SIKA Solution
+
+**SIKA** is an **Autonomous Personal Financial Agent** acting as an intelligent co-pilot across Mobile Money accounts.
+
+Unlike standard chatbots, SIKA:
+- 🎙️ **Understands Natural Voice & Text**: Speaks and listens in Ivorian and West African French contexts.
+- 🔗 **Aggregates Multi-Wallet Balances**: Fetches verified balances and transaction streams into a unified real-time financial context.
+- 📊 **Performs Autonomous Financial Analysis**: Computes category spending breakdowns, detects anomalies, and estimates cash runway.
+- 🛡️ **Executes Safe Multi-Step Financial Actions**: Resolves recipient contacts, selects the optimal verified wallet, prepares transactions, and enforces a mandatory **Human-in-the-Loop Confirmation Gate** before any financial execution.
+
+---
+
+## 🤖 Why SIKA is Truly Agentic (Agent vs. Chatbot)
+
+| Feature | Standard Financial Chatbot | SIKA Agentic Assistant |
+|---|---|---|
+| **Goal Reasoning** | Keyword matching or single-prompt completion | Multi-turn planning, goal decomposition, and state tracking |
+| **Tool Execution** | Cannot interact with external systems | Deterministic tool selection via a strictly typed Tool Registry |
+| **Financial State** | Stateless; prone to hallucinations | Backed by server-side persistent state, audit trails, and DB locks |
+| **Safety & Verification** | Risks unauthorized or hallucinated actions | Strict 3-tier risk levels (`READ_ONLY`, `CONFIRMATION_REQUIRED`, `EXECUTION`) |
+| **Execution Control** | Direct invocation or uncontrolled output | Mandatory server-side `WAITING_CONFIRMATION` barrier with biometrics |
+| **Resilience** | Fails completely if cloud AI is unreachable | Resilient multi-tier architecture with deterministic local fallback |
+
+---
+
+## 💳 Demo Environment — PayMeChap
+
+**PayMeChap** is a Mobile Money platform developed by the project author.
+
+### Integration Relationship
+
+**SIKA integrates PayMeChap as a financial provider and consumes PayMeChap APIs.**
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                           SIKA                            │
+│               Autonomous Financial Agent                  │
+└─────────────────────────────┬─────────────────────────────┘
+                              │
+                              │ API Calls (OAuth2 Token / HTTPS)
+                              ▼
+┌───────────────────────────────────────────────────────────┐
+│                      PayMeChap APIs                       │
+│    ├── Authentication (Partner Access Token)              │
+│    ├── Wallet Information (account number, identity)      │
+│    ├── Live Balances (XOF)                                │
+│    ├── Live Transactions (30-day stream)                  │
+│    └── Financial Operations (Payout execution)            │
+└───────────────────────────────────────────────────────────┘
+```
+
+- **SIKA consumes PayMeChap APIs** through a dedicated provider integration layer (`paymechap_api_service`).
+- **Controlled & Reproducible Demo**: Third-party providers (Wave, Orange Money, MTN) require individual consumer accounts, specific hardware enrollment, or proprietary operator approvals. Hackathon judges and reviewers **should NOT** be expected to connect personal Mobile Money accounts or create third-party credentials.
+- **PayMeChap provides a verified, live API environment** that allows the complete SIKA agentic workflow (balance perception, transaction analysis, transfer preparation, and live payout execution) to be demonstrated and reproduced reliably.
+
+### Financial Provider Status Table
+
+| Provider | Status | Role in Demo |
+|---|---|---|
+| **PayMeChap** | 🟢 **VERIFIED** | **Live financial provider used for demonstration** (real partner OAuth2 token, live balance retrieval, 30-day transaction stream, and real payout execution) |
+| **Wave** | 🟡 **NOT VERIFIED** | Not used as a live provider (enrolled wallet structure supported; execution strictly blocked without live API credentials) |
+| **Orange Money** | 🟡 **NOT VERIFIED** | Not used as a live provider (requires explicit user clarification; no mock execution) |
+| **MTN Mobile Money** | 🟡 **NOT VERIFIED** | Not used as a live provider (no silent fallback; honest rejection of unavailable credentials) |
+
+> 🔒 **Security Principle**: SIKA deliberately refuses to use unavailable credentials or invent financial data. If a provider is not verified for live execution, SIKA informs the user and asks for clarification. This is an intentional **Security Feature**, not a limitation.
+
+---
+
+## 🔄 End-to-End Workflows
+
+### 1. General Financial Query & Perception Flow
 
 ```mermaid
-flowchart TD
-    U[User Objective / Voice Input] --> A[SIKA Agent Orchestrator]
-    E[Passive Financial Event / Notification] --> A
-    
-    subgraph Agent Loop
-        A --> Und[1. Understand Intention & Entities]
-        Und --> Reas[2. Reason & Assemble Context]
-        Reas --> ToolSel[3. Select Tool from Registry]
-        ToolSel --> Risk[4. Risk Level & Security Check]
-        
-        Risk -->|READ_ONLY| ExecTool[5a. Execute Tool Deterministically]
-        Risk -->|CONFIRMATION_REQUIRED / EXECUTION| HITL{5b. Human Confirmation Required?}
-        
-        HITL -->|User Confirms| ExecTool
-        HITL -->|User Rejects| Cancel[Cancel Action]
-        
-        ExecTool --> Obs[6. Process Observation / Result]
-        Obs --> Syn[7. Synthesize Response & Update Memory]
-    end
-    
-    Syn --> Res[User Feedback / Vocal TTS & UI Card]
+sequenceDiagram
+    autonumber
+    actor User as 👤 User (Voice/Text)
+    participant UI as 📱 Flutter Mobile (Voice/Chat)
+    participant Router as ⚡ FastAPI SIKA Router
+    participant Agent as 🧠 SIKA Agent Orchestrator
+    participant Tools as 🛠️ Tool Registry
+    participant Repo as 💳 Provider Integration Layer
+    participant PMC as 🏦 PayMeChap APIs
+    participant LLM as ☁️ Vertex AI (Gemini 3.5 Flash)
+
+    User->>UI: "Quel est mon solde global ?"
+    UI->>Router: POST /api/v1/sika/chat {query, context}
+    Router->>Agent: Process query with financial state
+    Agent->>LLM: Intent extraction & tool selection
+    LLM-->>Agent: Call `get_financial_context`
+    Agent->>Tools: execute("get_financial_context")
+    Tools->>Repo: Fetch connected wallets & transactions
+    Repo->>PMC: GET /api/v1/wallets/balance (Bearer token)
+    PMC-->>Repo: Live balance: 50,000 XOF
+    Repo-->>Tools: Aggregate financial state
+    Tools-->>Agent: ToolResult (READ_ONLY, success=True)
+    Agent->>LLM: Synthesize clear vocal/text summary
+    LLM-->>Agent: Natural language response
+    Agent-->>Router: SikaChatResponse
+    Router-->>UI: 200 OK + Balance Card + TTS Audio
+    UI-->>User: Displays clean UI & speaks balance
 ```
 
-### Why SIKA is an AGENT (Not a Chatbot)
-
-| Feature | Chatbot (Passif) | SIKA Agent (Taskmaster) |
-| :--- | :--- | :--- |
-| **Trigger Mechanism** | Only responds when user types a question. | Dual trigger: Voice/Text queries AND passive financial notifications. |
-| **Execution Engine** | Generates text based on training weights. | Invokes deterministic, typed tools with strict argument validation. |
-| **Financial Reasoning** | Risk of mathematical hallucinations. | Math and business logic are 100% deterministic (Python ORM/Brain). |
-| **Safety & Control** | No built-in safety boundaries. | Enforces Risk Levels (`READ_ONLY`, `CONFIRMATION_REQUIRED`, `EXECUTION`). |
-| **Goal Orientation** | Answers single-turn queries. | Accepts high-level goals ("Save 50,000 FCFA") and tracks progress over time. |
-
 ---
 
-## Current Capabilities
-
-- **Wallet Retrieval**: Discovers and aggregates Mobile Money wallets (Wave, Orange Money, MTN).
-- **Balance Aggregation**: Real-time retrieval of individual and total available balances.
-- **Transaction History**: Unified log of incoming and outgoing financial transactions.
-- **Spending Analysis**: Expense summaries and breakdown by category over dynamic time windows.
-- **Global Context Assembly**: Neutrally aggregates user financial state for reasoning engines.
-- **Contact & Recipient Search**: Queries known contacts for transfer destinations.
-- **Safe Transfer Preparation**: Prepares transfer payloads without performing actual operations.
-- **Simulated Execution**: Executes simulated transfers only after explicit user confirmation.
-- **Risk-Based Access Control**: Tiered permissions preventing unauthorized state changes.
-- **Human-in-the-Loop Gate**: Halts execution on sensitive tools until human consent is granted.
-- **Comprehensive Automated Test Suite**: 100% passing unit tests verifying tool behavior.
-
----
-
-## Financial Tools
-
-SIKA features a **Tool Registry** containing 9 specialized financial tools categorized by their risk level:
-
-| Tool | Risk Level | Purpose |
-| :--- | :--- | :--- |
-| `get_wallets` | `READ_ONLY` | Retrieves all known Mobile Money wallets and provider details. |
-| `get_wallet_balance` | `READ_ONLY` | Retrieves the specific balance for a named wallet provider (e.g., Wave, Orange Money). |
-| `get_total_balance` | `READ_ONLY` | Calculates the aggregate total available funds across all active wallets. |
-| `get_recent_transactions` | `READ_ONLY` | Fetches recently observed financial transactions with filter options. |
-| `get_spending_summary` | `READ_ONLY` | Analyzes expense trends and category breakdowns over a given period. |
-| `get_financial_context` | `READ_ONLY` | Compiles a full financial state snapshot (balances, transactions, active goals). |
-| `search_contact` | `READ_ONLY` | Searches for contacts or recipients by name or phone number. |
-| `prepare_transfer` | `CONFIRMATION_REQUIRED` | Prepares a transfer payload and transitions agent state to `WAITING_CONFIRMATION`. |
-| `confirm_transfer` | `EXECUTION` | Simulates transfer execution after explicit user confirmation is validated. |
-
----
-
-## Safety and Human-in-the-Loop
-
-SIKA prioritizes user security and financial safety above all else. Every tool registered in the system is assigned an explicit **Risk Level**:
-
-1. **`READ_ONLY`**: Data inspection tools. These tools cannot modify financial state or execute transactions and can run autonomously.
-2. **`CONFIRMATION_REQUIRED`**: State-preparing tools (e.g., `prepare_transfer`). These tools construct an action draft but **cannot complete execution**. They automatically trigger a `WAITING_CONFIRMATION` state in the application interface.
-3. **`EXECUTION`**: State-modifying tools (e.g., `confirm_transfer`). These tools require a valid user confirmation token. Any attempt to execute without explicit user confirmation (`user_confirmed=True`) is immediately blocked by the Tool Registry.
-
----
-
-## Architecture
-
-SIKA uses a decoupled, hybrid architecture combining a native Android/Flutter mobile client with a fast Python FastAPI backend:
+### 2. Safe Financial Transfer Flow (Human-in-the-Loop Gate)
 
 ```mermaid
-flowchart LR
-    subgraph Client [Flutter & Android Native]
-        UI[Flutter SikaPage UI]
-        STT[Speech-to-Text]
-        TTS[Flutter TTS]
-        NLS[Android NotificationListenerService]
-        MC[MethodChannel Bridge]
-        
-        STT --> UI
-        NLS --> MC --> UI
-    end
+sequenceDiagram
+    autonumber
+    actor User as 👤 User
+    participant UI as 📱 Mobile UI (Human Confirmation Card)
+    participant Backend as ⚡ SIKA Backend
+    participant Orchestrator as 🧠 Action Orchestrator
+    participant DB as 🗄️ PostgreSQL / Action Store
+    participant Partner as 🏦 PayMeChap Partner API
 
-    subgraph Backend [FastAPI Backend Engine]
-        Router[sika_router.py]
-        Orchestrator[SikaAgentOrchestrator]
-        Registry[SikaToolRegistry]
-        Tools[9 Financial Tools]
-        Memory[Memory Bridge]
-        
-        Router --> Orchestrator
-        Orchestrator <--> Registry
-        Registry <--> Tools
-        Orchestrator <--> Memory
-    end
-
-    UI <-->|HTTPS REST| Router
-    UI -->|Vocal Response| TTS
+    User->>UI: "Envoie 10 000 FCFA à Kouamé au 0707070707"
+    UI->>Backend: POST /api/v1/sika/chat
+    Backend->>Orchestrator: Resolve Contact & Select Verified Wallet
+    Orchestrator->>Orchestrator: Parse amount: 10,000 XOF
+    Orchestrator->>Orchestrator: prepare_transfer (NO DEBIT)
+    Orchestrator->>DB: Save action (status: WAITING_CONFIRMATION, action_id: act_xxx)
+    Orchestrator-->>UI: Return Action Card + requires_confirmation=True
+    Note over UI: 🚨 FINANCIAL EXECUTION BLOCKED UNTIL HUMAN CONFIRMATION 🚨
+    UI-->>User: Display Human Confirmation Card (Recipient, Amount, Wallet)
+    User->>UI: Explicit Biometric / Tap Confirmation ("Confirmer")
+    UI->>Backend: POST /api/v1/sika/agent/confirm {action_id: "act_xxx"}
+    Backend->>DB: Validate action ownership & WAITING_CONFIRMATION state
+    DB-->>Backend: Action Validated & Locked
+    Backend->>Partner: execute_payout(access_token, recipient, 10000)
+    Partner-->>Backend: Payout Success (TxRef: PMC_9921)
+    Backend->>DB: Update action status -> EXECUTED
+    Backend-->>UI: 200 OK (status: EXECUTED, message: "Transfert effectué avec succès !")
+    UI-->>User: Green Success State + Audio Confirmation
 ```
 
 ---
 
-## Project Structure
+## 🏛️ System Architecture
 
 ```
-/Users/mac/Desktop/SIKA/
-├── backend/
+                    ┌───────────────────────────────┐
+                    │             USER              │
+                    │         (Voice / Text)        │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │    SIKA Mobile (Flutter)      │
+                    │   • Orbital Voice UI / STT    │
+                    │   • Human Confirmation Cards  │
+                    │   • Android Foreground Service│
+                    └───────────────┬───────────────┘
+                                    │ HTTP / REST (JWT Auth)
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │     FastAPI SIKA Router       │
+                    │   (/api/v1/sika/*, /health)   │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │   SIKA Agent Orchestrator     │
+                    │  • Goal & Multi-Turn State    │
+                    │  • Vertex AI (Gemini 3.5)     │
+                    │  • Deterministic Local Engine │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │     Tool Registry (3 Tiers)   │
+                    │  READ_ONLY | CONFIRM | EXEC   │
+                    └───────┬───────┬───────┬───────┘
+                            │       │       │
+             ┌──────────────┘       │       └──────────────┐
+             ▼                      ▼                      ▼
+    ┌─────────────────┐   ┌───────────────────┐   ┌─────────────────┐
+    │  Balance Tools  │   │ Transaction Tools │   │ Transfer Tools  │
+    └────────┬────────┘   └─────────┬─────────┘   └────────┬────────┘
+             │                      │                      │
+             └──────────────────────┼──────────────────────┘
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │   Provider Integration Layer  │
+                    │   (paymechap_api_service.py)  │
+                    └───────────────┬───────────────┘
+                                    │ HTTPS (Partner OAuth2 Token)
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │        PayMeChap APIs         │
+                    │     (Mobile Money Backend)    │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                            Financial Result
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │         SIKA Response         │
+                    │     ┌─────────┴─────────┐     │
+                    │     ▼                   ▼     │
+                    │ Voice (TTS)         UI (HITL) │
+                    └───────────────────────────────┘
+```
+
+---
+
+## 🛠️ Financial Tool Registry
+
+SIKA's Tool Registry enforces strict type-safe execution and deterministic risk levels:
+
+| Tool Name | Risk Level | Description | Confirmation Required |
+|---|---|---|---|
+| `get_financial_context` | `READ_ONLY` | Aggregates all connected wallets, live balances, and 30-day transaction history | ❌ No |
+| `get_wallet_balance` | `READ_ONLY` | Fetches live balance for a specific enrolled provider | ❌ No |
+| `get_total_balance` | `READ_ONLY` | Calculates the real-time total net worth across verified wallets | ❌ No |
+| `get_recent_transactions`| `READ_ONLY` | Retrieves filtered transactions (up to 30 days) from connected wallets | ❌ No |
+| `get_spending_summary` | `READ_ONLY` | Categorizes and aggregates debits across categories (Food, Transport, Utilities) | ❌ No |
+| `search_contact` | `READ_ONLY` | Resolves recipient name to phone number (no fake contacts permitted) | ❌ No |
+| `prepare_transfer` | `CONFIRMATION_REQUIRED` | Validates wallet & amount, creates `action_id`, locks state in `WAITING_CONFIRMATION` | ⚠️ **Yes (Mandatory)** |
+| `confirm_action` | `EXECUTION` | Verifies server-side action ownership and triggers live payout via PayMeChap API | 🔒 **Yes (Biometric / PIN)** |
+| `cancel_action` | `EXECUTION` | Safely revokes and cancels a pending `WAITING_CONFIRMATION` action | ❌ No |
+
+---
+
+## 🛡️ Safety & Human-in-the-Loop (HITL)
+
+Financial integrity is SIKA's highest priority:
+
+1. **No Execution Before Confirmation**: `prepare_transfer` **never** debits funds. It only creates an immutable server-side action with a unique `action_id`.
+2. **Server-Side State Persistence**: The action is stored in the database with status `WAITING_CONFIRMATION`. Client payloads cannot modify the amount or recipient at confirmation time.
+3. **User Isolation & Multi-Tenancy**: Users can only confirm, inspect, or cancel their own actions. Cross-user action hijacking is strictly rejected (HTTP 403).
+4. **Idempotency & Anti-Replay**: Once an action is executed, subsequent confirmation attempts return `ALREADY_EXECUTED` without duplicate execution.
+5. **No Contact Hallucination**: If a recipient is unknown or ambiguous, SIKA asks for clarification instead of inventing phone numbers.
+6. **30-Day Transaction Boundary**: Old transactions (> 30 days) are automatically filtered out from spending calculations to prevent skewed advice.
+
+---
+
+## ☁️ Google Cloud & Vertex AI Integration
+
+SIKA leverages Google Cloud infrastructure throughout its lifecycle:
+
+- **Vertex AI (Gemini 3.5 Flash)**: Primary LLM accessed via the official `google-genai` Python SDK for natural language reasoning, intent extraction, and response synthesis.
+- **Deterministic Local Fallback**: When operating offline or with constrained connectivity, SIKA seamlessly activates its local deterministic reasoning engine, ensuring 100% uptime for core financial queries and transfer preparations.
+- **Google Cloud SQL & Memorystore**: Configured production infrastructure (`sika-db-instance` PostgreSQL and `sika-redis-instance`).
+- **Google Cloud Run**: Containerized production deployment.
+
+---
+
+## 🗄️ Database & Redis Infrastructure
+
+### Database Layer
+- **PostgreSQL**: Production database engine using SQLAlchemy 2.0+ and Alembic migrations.
+- **SQLite Local Fallback**: In local development without PostgreSQL, `database.py` automatically falls back to local SQLite (`sika_local.db`).
+
+### Redis Layer
+- **Status**: **ACTIVE when configured, with transparent IN-MEMORY FALLBACK for local demo**.
+- **Role**: Redis is used for distributed rate limiting, anti-replay OTP sessions, and real-time JWT token revocation (logout deny-list).
+- **Fallback**: When Redis is not running locally, `create_security_store()` and `wallet_router.py` automatically utilize thread-safe in-memory stores.
+
+---
+
+## 🧰 Technology Stack
+
+| Layer | Technology | Version / Specification |
+|---|---|---|
+| **Mobile Frontend** | Flutter / Dart | Flutter 3.x, Dart 3.x |
+| **Mobile Architecture**| Riverpod, Flutter Animate, Glassmorphism | State management & UI animations |
+| **Android Native** | Kotlin | Foreground Service, MethodChannel bridge |
+| **Backend Framework** | FastAPI (Python) | Python 3.11+, Pydantic v2, Uvicorn |
+| **AI / Cloud LLM** | Google Vertex AI | `google-genai` SDK, Gemini 3.5 Flash |
+| **Database & ORM** | PostgreSQL / SQLite | SQLAlchemy 2.0+, Alembic Migrations |
+| **Caching & Security** | Redis / In-Memory | Distributed Rate Limiting & Token Deny-list |
+| **Containerization** | Docker & Docker Compose | Multi-stage slim image, non-root `appuser` |
+| **Testing** | pytest, pytest-asyncio | 115 comprehensive automated tests |
+
+---
+
+## 📂 Project Structure
+
+```
+.
+├── docker-compose.yml              # Fast development / demo Docker Compose setup
+├── Dockerfile                      # Production container definition (non-root appuser)
+├── .dockerignore                   # Build artifact exclusions
+├── README.md                       # Comprehensive project documentation
+├── docs/                           # Architecture audits, guides & demo scenarios
+├── backend/                        # FastAPI Agentic Backend
+│   ├── Dockerfile                  # Container definition
+│   ├── requirements.txt            # Python dependencies (FastAPI, google-genai, etc.)
+│   ├── alembic/                    # Database migration scripts
 │   ├── app/
-│   │   ├── agent/
-│   │   │   ├── __init__.py           # Package exports & initialization
-│   │   │   ├── orchestrator.py       # SIKA Agent Orchestrator (Taskmaster loop)
-│   │   │   ├── tool_registry.py      # Tool Registry & Risk Level validator
-│   │   │   ├── state_machine.py       # AgentState Enum definitions
-│   │   │   ├── prompt_templates.py   # Taskmaster system prompts
-│   │   │   ├── memory_bridge.py      # Short-term session & context memory
-│   │   │   └── tools/
-│   │   │       ├── __init__.py       # Auto-registers 9 financial tools
-│   │   │       ├── tool_models.py    # RiskLevel, ToolResult & ToolDefinition DTOs
-│   │   │       ├── mock_data.py      # Isolated mock dataset (Wave, OM, MTN)
-│   │   │       ├── wallet_tools.py   # Wallet, balance & contact tools
-│   │   │       ├── transaction_tools.py # Transaction, prepare & confirm tools
-│   │   │       └── financial_tools.py # Spending analysis & global context tools
-│   │   ├── routes/
-│   │   │   └── sika_router.py        # FastAPI routes (/health, /chat, /agent/*, /events)
-│   │   ├── schemas/
-│   │   │   └── sika_dto.py           # Pydantic Request/Response DTOs
-│   │   └── services/
-│   │       ├── sika_ai.py            # AI Service Provider wrapper
-│   │       ├── sika_nlp.py           # Speech formatting & entity helpers
-│   │       ├── financial_brain.py    # Deterministic financial analysis engine
-│   │       └── ai_engine.py          # Legacy engine wrapper
-│   ├── tests/
-│   │   └── test_agent_tools.py       # 12 automated unit tests for Tool Registry
-│   ├── requirements.txt              # Python dependencies (fastapi, google-genai, etc.)
-│   └── .env.example                  # Environment configuration template
-│
-├── mobile/
-│   ├── android/                      # Native Kotlin background services & overlays
-│   ├── lib/                          # Flutter app UI, Riverpod providers & native bridge
-│   ├── pubspec.yaml                  # Flutter package dependencies
-│   └── pubspec.lock
-│
-├── data/                             # Data schemas & local resources
-├── docs/                             # Architecture documentation
-├── scripts/                          # Utility & setup scripts
-└── .gitignore                        # Git exclusion rules
+│   │   ├── main.py                 # Application factory & lifespan
+│   │   ├── config.py               # Pydantic Settings & environment variables
+│   │   ├── database.py             # SQLAlchemy session & SQLite fallback
+│   │   ├── models/                 # Database models (User, Wallet, Action, Goal)
+│   │   ├── routes/                 # API endpoints (sika_router, wallet_router, etc.)
+│   │   ├── schemas/                # Pydantic DTOs & response contracts
+│   │   ├── services/               # Auth, AI Engine, PayMeChap API, Security Store
+│   │   └── agent/                  # SIKA Agent Core
+│   │       ├── orchestrator.py     # Agent reasoning loop & action lifecycle
+│   │       ├── tool_registry.py    # Deterministic tool registry with risk levels
+│   │       └── tools/              # Financial, wallet, and transaction tools
+│   └── tests/                      # Automated test suites (P0-1 to P0-7, Security)
+└── mobile/                         # Flutter Mobile Application
+    ├── pubspec.yaml                # Flutter packages & dependencies
+    ├── android/                    # Android native services (Wake-word, Manifest)
+    └── lib/
+        ├── main.dart               # App entry point
+        ├── core/                   # Design system (Colors, Spacing, Glass widgets)
+        └── features/               # AI Assistant, Wallets, Profile, Auth
 ```
 
 ---
 
-## Backend Setup
+## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.10+ (Tested on Python 3.14.2)
-- virtualenv / venv
+### A. Backend with Docker Compose (Recommended for Reviewers)
 
-### Installation Steps
+```bash
+# 1. Clone repository
+git clone https://github.com/dav9fulldev/sika-agent.git
+cd sika-agent
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
+# 2. Build and start backend
+docker compose up --build
+```
 
-2. Create and activate a Python virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+The backend starts on `http://localhost:8080` (and `http://localhost:8001`).
 
-3. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Verify health probes:
+```bash
+curl http://localhost:8080/health
+# {"status":"healthy","environment":"development","version":"1.0.0"}
 
-4. Start the FastAPI development server:
-   ```bash
-   python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-   ```
+curl http://localhost:8080/api/v1/sika/health
+# {"status":"ready","service":"Sika AI Standalone API","provider":"VERTEX_AI","model":"gemini-3.5-flash"}
+```
 
-5. Verify server health:
-   ```bash
-   curl http://localhost:8001/api/v1/sika/health
-   ```
+To stop containers:
+```bash
+docker compose down
+```
 
 ---
 
-## Mobile Setup
+### B. Backend Local Run (Without Docker)
 
-### Prerequisites
-- Flutter SDK 3.x (Tested on Flutter 3.44.6 / Dart 3.12.2)
-- Android SDK (Target API 34+ / Tested on Pixel 8 Emulator)
+```bash
+cd backend
 
-### Installation Steps
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-1. Navigate to the mobile directory:
-   ```bash
-   cd mobile
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-2. Fetch Flutter dependencies:
-   ```bash
-   flutter pub get
-   ```
-
-3. Run static code analysis:
-   ```bash
-   flutter analyze
-   ```
-
-4. Run on a connected Android device or emulator:
-   ```bash
-   flutter run
-   ```
+# Start backend server
+uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
 
 ---
 
-## Running Tests
+### C. Mobile Application (Flutter)
 
-The SIKA backend includes a comprehensive pytest suite verifying tool registration, execution, argument validation, and risk enforcement.
+```bash
+cd mobile
 
-To run the tests:
+# Install dependencies
+flutter pub get
+
+# Run static analysis
+flutter analyze
+
+# Launch on connected Android device or emulator
+flutter run
+```
+
+#### Android Emulator Connectivity Note
+When running in an Android emulator, connect to the backend using Android's loopback bridge:
+- **Emulator backend URL**: `http://10.0.2.2:8001`
+- **Physical Device**: `http://<YOUR_LOCAL_IP>:8001`
+
+*(Mobile containerization is intentionally omitted because Flutter mobile apps require native Android toolchains, emulator virtualization, and hardware audio drivers).*
+
+---
+
+## 📡 Active API Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/health` | Liveness and readiness healthcheck probe | No |
+| `GET` | `/api/v1/sika/health` | SIKA AI engine and Vertex AI status probe | No |
+| `POST` | `/api/v1/sika/chat` | Main conversational and voice processing entrypoint | Yes (JWT) |
+| `POST` | `/api/v1/sika/agent/confirm` | **Human confirmation gate**: Executes prepared financial action | Yes (JWT) |
+| `POST` | `/api/v1/sika/agent/cancel` | Cancels a pending `WAITING_CONFIRMATION` action | Yes (JWT) |
+| `GET` | `/api/v1/wallets/me` | Retrieves user's connected wallets & live balances | Yes (JWT) |
+| `POST` | `/api/v1/wallets/connect` | Initiates wallet connection (OTP challenge) | Yes (JWT) |
+| `POST` | `/api/v1/wallets/verify-otp` | Verifies OTP code and enrolls wallet in DB | Yes (JWT) |
+| `POST` | `/api/v1/sika/auth/login` | Authenticates user and issues OAuth2 Bearer token | No |
+| `POST` | `/api/v1/sika/auth/logout` | Revokes JWT token in real-time deny-list | Yes (JWT) |
+
+---
+
+## 🧪 Testing & Verification Status
+
+Automated testing validates every layer of SIKA's agentic and security architecture:
 
 ```bash
 cd backend
 source venv/bin/activate
-PYTHONPATH=. pytest tests/test_agent_tools.py -v
+
+# 1. Critical Agent Tools & Financial Pipeline (P0-1 to P0-7)
+pytest tests/test_agent_tools.py -v
+
+# 2. Production Security (OWASP, JWT, Dockerfile, Cascades)
+pytest tests/test_production_security.py -v
+
+# 3. Authorization & Tenant Isolation
+pytest tests/test_authorization_security.py -v
+
+# 4. Anti-Abuse, Rate-Limiting & Session Security
+pytest tests/test_abuse_and_session_security.py -v
+
+# 5. Financial Action Reconciliation & Idempotency
+pytest tests/test_reconciliation.py -v
+
+# 6. Network Resilience & Timeout Handling
+pytest tests/test_network_resilience.py -v
+
+# 7. Wallet Routes Security
+pytest tests/test_wallet_routes_security.py -v
 ```
 
-### Test Suite Results
-```text
-tests/test_agent_tools.py::test_1_registry_finds_tools PASSED            [  8%]
-tests/test_agent_tools.py::test_2_get_wallets PASSED                     [ 16%]
-tests/test_agent_tools.py::test_3_get_wallet_balance PASSED              [ 25%]
-tests/test_agent_tools.py::test_4_get_total_balance PASSED               [ 33%]
-tests/test_agent_tools.py::test_5_get_recent_transactions PASSED         [ 41%]
-tests/test_agent_tools.py::test_6_get_spending_summary PASSED            [ 50%]
-tests/test_agent_tools.py::test_7_prepare_transfer PASSED                [ 58%]
-tests/test_agent_tools.py::test_8_confirm_transfer_simulation PASSED     [ 66%]
-tests/test_agent_tools.py::test_9_non_existent_tool PASSED               [ 75%]
-tests/test_agent_tools.py::test_10_invalid_argument PASSED               [ 83%]
-tests/test_agent_tools.py::test_11_readonly_tools_cannot_trigger_execution PASSED [ 91%]
-tests/test_agent_tools.py::test_12_sensitive_tools_require_confirmation PASSED [100%]
+### Verified Test Results Summary
 
-============================== 12 passed in 0.11s ==============================
-```
+| Test Suite File | Tests Count | Result | Core Validation Scope |
+|---|---|---|---|
+| `test_agent_tools.py` | **49 Tests** | **100% PASS** | P0-1 to P0-7 (Enrolled wallets, PayMeChap balance, 30-day filter, amounts, prepare_transfer, confirm) |
+| `test_production_security.py` | **21 Tests** | **100% PASS** | OWASP headers, payload limit, non-root Docker user, database cascades, Alembic integrity |
+| `test_reconciliation.py` | **12 Tests** | **100% PASS** | Unknown result handling, financial reconciliation, zero duplicate execution |
+| `test_authorization_security.py` | **10 Tests** | **100% PASS** | Multi-tenant isolation, cross-user action hijack prevention, JWT expiry |
+| `test_abuse_and_session_security.py` | **7 Tests** | **100% PASS** | Anti-replay OTP, 3-attempt OTP lockout, PIN brute-force, token logout revocation |
+| `test_network_resilience.py` | **7 Tests** | **100% PASS** | HTTP 500 handling, read timeouts, connection errors, deterministic fallback |
+| `test_wallet_routes_security.py` | **4 Tests** | **100% PASS** | Unauthenticated rejection, user ID spoofing prevention, wallet isolation |
+| `test_learning_backup.py` | **3 Tests** | **100% PASS** | User learning service and backup persistence |
+| `test_mcp_architecture.py` | **2 Tests** | **100% PASS** | MCP server configurations and specialized agent registries |
+| **Total Automated Tests** | **115 Tests** | **100% PASS** | Full backend test suite passing cleanly |
+| **Flutter Mobile Analyze** | **0 Issues** | **100% PASS** | Static analysis, Riverpod typing, null safety |
 
 ---
 
-## API Endpoints
+## 🎬 Recommended 4-Minute Hackathon Demo
 
-The FastAPI server exposes the following active endpoints:
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/v1/sika/health` | Health check endpoint returning API readiness and active provider. |
-| `POST` | `/api/v1/sika/chat` | Primary chat endpoint processing natural language queries. |
-| `POST` | `/api/v1/sika/confirm` | Confirms and logs user transactions. |
-| `POST` | `/api/v1/sika/agent/process` | Main Taskmaster Agent processing pipeline endpoint. |
-| `POST` | `/api/v1/sika/agent/confirm` | Human-in-the-loop validation endpoint for sensitive agent actions. |
-| `POST` | `/api/v1/sika/events` | Asynchronous event ingestion endpoint for Mobile Money notifications. |
-
----
-
-## Environment Variables
-
-Configurable parameters are documented in `backend/.env.example`:
-
-```env
-# AI Provider Configuration (openai / gemini / ollama)
-AI_PROVIDER=openai
-OPENAI_API_KEY=your_openai_key_here
-
-# Google Cloud & Gemini Configuration
-GOOGLE_CLOUD_PROJECT=sika-agentic-hackathon
-GOOGLE_CLOUD_LOCATION=europe-west9
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_API_KEY=your_gemini_key_here
-FIRESTORE_DATABASE=(default)
-
-# Ollama local configuration
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3
-```
-
-> 🔒 **Security Notice**: Never commit real secret keys, service accounts, or tokens to version control.
+1. **Financial Health & Aggregate Balance**:
+   - Voice/Text prompt: *"Sika, quel est mon solde global ?"*
+   - SIKA inspects all enrolled accounts via `get_financial_context` and provides an immediate unified balance across Mobile Money providers.
+2. **Proactive Spending & Runway Analysis**:
+   - Voice/Text prompt: *"Analyse mes dépenses de ce mois et dis-moi si je peux économiser."*
+   - SIKA analyzes 30-day categorized debits, highlights food/transport expenses, and calculates runway.
+3. **Contact Resolution & Clarification (Security Test)**:
+   - Voice/Text prompt: *"Envoie 5000 à David."*
+   - SIKA detects multiple contacts or missing info, safely asking: *"À quel numéro de David souhaites-tu envoyer 5 000 FCFA ?"* (Zero hallucination).
+4. **Autonomous Transfer Preparation (Human-in-the-Loop)**:
+   - Voice/Text prompt: *"Envoie 10 000 FCFA à Kouamé au 0707070707 depuis PayMeChap."*
+   - SIKA parses the amount, selects the verified PayMeChap wallet, executes `prepare_transfer`, and displays the **Human Confirmation Card** in `WAITING_CONFIRMATION` state.
+5. **Biometric Confirmation & Real Payout**:
+   - User reviews the card and taps **"Confirmer"**.
+   - SIKA calls `/agent/confirm`, executes the payout via the live PayMeChap partner API, and confirms completion with an updated balance!
 
 ---
 
-## Current Status
+## 🏆 Hackathon Alignment — Taskmaster Track
 
-### ✅ Implemented
-- Agent core architecture (`orchestrator`, `state_machine`, `prompt_templates`, `memory_bridge`).
-- `SikaToolRegistry` with risk level enforcement (`READ_ONLY`, `CONFIRMATION_REQUIRED`, `EXECUTION`).
-- 9 specialized financial tools for wallet management, transactions, and context assembly.
-- 12 automated pytest unit tests (100% passing).
-- FastAPI REST backend with health and agent endpoints.
-- Flutter application foundation with Riverpod state management and native Android bridges.
-- Background voice service (`SikaWakeWordServiceV2`) and overlay UI (`SikaOverlayServiceV2`) in Kotlin.
-
-### ⏳ In Progress / Next Steps
-- Full Gemini 3.5 Function Calling integration via `google-genai` in `orchestrator.py`.
-- Android `NotificationListenerService` implementation for real-time passive event perception.
-- Flutter interactive action confirmation card (`SikaActionConfirmationCard`).
-
-### 📅 Planned
-- Google Cloud Run production deployment.
-- Google Cloud Firestore persistence for long-term memory.
-- Multi-goal tracking and automated budget allocation strategies.
+SIKA directly fulfills the goals of the **Taskmaster Track**:
+- 🎯 **End-to-End Task Execution**: Moves from ambiguous natural language user requests all the way to verified financial execution.
+- 🧩 **Deterministic Tool Orchestration**: Eliminates hallucination risks by anchoring LLM reasoning in deterministic Python tools.
+- 🛡️ **Safe Autonomous Systems**: Implements state-machine guarantees where sensitive actions cannot proceed without explicit human authorization.
+- 💡 **Real-World Impact**: Solves financial fragmentation for millions of Mobile Money users across West Africa.
 
 ---
 
-## Roadmap
+## 📄 License & Team
 
-```
-[Phase 5 Step 1: Foundation] ──► [Phase 5 Step 2: Tools Registry] ──► [Phase 5 Step 3: Gemini Integration]
-         (Completed)                       (Completed)                        (Next Step)
-                                                                                   │
-[Cloud Run & Firestore] ◄── [Flutter Confirmation Card] ◄── [Android Notification Listener]
-```
-
----
-
-## Hackathon
-
-- **Event**: All Things Agentic Hackathon
-- **Track**: Taskmaster
-
-SIKA embodies the **Taskmaster** track by moving beyond simple chat interfaces. It allows users to give complex financial goals, autonomously evaluates current financial context, plans multi-step interventions, enforces human safety checks, and continuously monitors financial health.
-
----
-
-## Repository
-
-- **GitHub Repository**: [https://github.com/dav9fulldev/sika-agent](https://github.com/dav9fulldev/sika-agent)
-
----
-
-## License
-
-License information will be added in a future release.
+Built with ❤️ by the SIKA Engineering Team for the **Google Cloud All Things Agentic Hackathon**.

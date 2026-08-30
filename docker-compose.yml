@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sika-backend
+    ports:
+      - "8001:8080"
+      - "8080:8080"
+    environment:
+      - ENV=development
+      - PORT=8080
+      - JWT_SECRET_KEY=sika_default_jwt_secret_dev_key_only_change_in_prod_32_chars
+      - AI_PROVIDER=gemini
+      - GEMINI_MODEL=gemini-3.5-flash
+      - GOOGLE_CLOUD_PROJECT=sika-all-things-agentic
+      - GOOGLE_CLOUD_LOCATION=global
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

@@ -18,8 +18,11 @@ __pycache__/
 .Python
 backend/venv/
 venv/
+.venv/
+.pytest_cache/
 ENV/
 env/
+.agents/
 .env
 .env.local
 *.log

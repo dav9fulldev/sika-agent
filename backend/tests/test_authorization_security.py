@@ -38,7 +38,6 @@ def setup_test_db():
     """Initialise et nettoie la base de données et les caches avant chaque test."""
     Base.metadata.create_all(bind=engine)
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()
@@ -59,7 +58,6 @@ def setup_test_db():
 
     _reset_db_safely()
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
     perception_router.PERCEPTIONS_LOG.clear()
     sika_orchestrator.action_store.clear()
     security_rate_limiter.clear()

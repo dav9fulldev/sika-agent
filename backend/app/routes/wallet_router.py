@@ -18,14 +18,54 @@ from ..services.security_rate_limiter import security_rate_limiter
 
 logger = logging.getLogger("WalletRouter")
 
+_otp_memory_store: Dict[str, str] = {}
+
 if settings.REDIS_URL:
-    redis_client = redis.from_url(settings.REDIS_URL, db=0, decode_responses=True)
+    try:
+        redis_client = redis.from_url(settings.REDIS_URL, db=0, decode_responses=True)
+    except Exception:
+        redis_client = None
 else:
-    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    try:
+        redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    except Exception:
+        redis_client = None
+
+
+def _set_otp_session(session_id: str, data: Dict[str, Any], ttl_seconds: int = 600) -> None:
+    payload = json.dumps(data)
+    if redis_client:
+        try:
+            redis_client.setex(f"otp_session:{session_id}", ttl_seconds, payload)
+            return
+        except Exception:
+            pass
+    _otp_memory_store[f"otp_session:{session_id}"] = payload
+
+
+def _get_otp_session(session_id: str) -> Optional[str]:
+    if redis_client:
+        try:
+            val = redis_client.get(f"otp_session:{session_id}")
+            if val is not None:
+                return val
+        except Exception:
+            pass
+    return _otp_memory_store.get(f"otp_session:{session_id}")
+
+
+def _del_otp_session(session_id: str) -> None:
+    if redis_client:
+        try:
+            redis_client.delete(f"otp_session:{session_id}")
+        except Exception:
+            pass
+    _otp_memory_store.pop(f"otp_session:{session_id}", None)
+
 
 router = APIRouter(prefix="/api/v1/wallets", tags=["wallets"])
 
-# Sessions d'OTP en attente de vérification stockées dans Redis
+# Sessions d'OTP en attente de vérification stockées dans Redis / fallback mémoire
 
 # Compatibilité mémoire
 CONNECTED_USER_WALLETS: List[Dict[str, Any]] = []
@@ -203,7 +243,7 @@ def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str
         "attempts": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    redis_client.setex(f"otp_session:{session_id}", 600, json.dumps(session_data))
+    _set_otp_session(session_id, session_data, 600)
 
     msg = f"🔑 Code OTP envoyé au {account_number} pour valider le raccordement de votre compte {provider} !"
     if "paymechap" in prov_lower:
@@ -230,7 +270,7 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
     if not session_id or not otp_code:
         raise HTTPException(status_code=400, detail="Champs 'session_id' et 'otp_code' obligatoires.")
 
-    session_raw = redis_client.get(f"otp_session:{session_id}")
+    session_raw = _get_otp_session(session_id)
     if not session_raw:
         raise HTTPException(status_code=400, detail="Session OTP introuvable, expirée ou déjà consommée.")
     
@@ -244,13 +284,13 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
     session["attempts"] = attempts
 
     if attempts > 3:
-        redis_client.delete(f"otp_session:{session_id}")
+        _del_otp_session(session_id)
         raise HTTPException(
             status_code=429,
             detail="Nombre maximal de tentatives OTP dépassé (3). La session a été invalidée."
         )
 
-    redis_client.setex(f"otp_session:{session_id}", 600, json.dumps(session))
+    _set_otp_session(session_id, session, 600)
 
     provider = session.get("provider", provider)
     account_number = session.get("account_number", account_number)
@@ -260,7 +300,7 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
         verify_res = paymechap_api_service.verify_otp_code(account_number, otp_code)
         if not verify_res.get("success"):
             if attempts >= 3:
-                redis_client.delete(f"otp_session:{session_id}")
+                _del_otp_session(session_id)
                 raise HTTPException(status_code=429, detail="Code OTP incorrect. Nombre maximal de tentatives atteint (3). Session invalidée.")
             err_msg = verify_res.get("message") or f"Code OTP incorrect ({attempts}/3 tentatives)."
             raise HTTPException(status_code=400, detail=err_msg)
@@ -276,7 +316,7 @@ def verify_wallet_otp(data: Dict[str, Any], authorization: Optional[str] = Heade
         fetched = {"balance": 0.0, "currency": "XOF"}
 
     # Consommation immédiate de la session OTP (Anti-Replay)
-    redis_client.delete(f"otp_session:{session_id}")
+    _del_otp_session(session_id)
 
     real_balance = float(fetched.get("balance", 0.0))
 

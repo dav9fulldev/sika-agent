@@ -52,40 +52,68 @@ def test_1_registry_finds_tools():
     assert tool_registry.exists("search_contact") is True
     assert tool_registry.exists("get_financial_context") is True
 
-def test_2_get_wallets():
-    """2. get_wallets fonctionne et retourne les comptes connus."""
+def test_2_get_wallets(monkeypatch):
+    """2. get_wallets fonctionne et retourne les comptes enrôlés."""
+    from app.agent.tools import wallet_tools
+    monkeypatch.setattr(wallet_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(wallet_tools.paymechap_api_service, "fetch_live_balance", lambda token, acc: {"balance": 50000.0, "currency": "XOF"})
     res = tool_registry.execute("get_wallets")
     assert res.success is True
     assert res.risk_level == RiskLevel.READ_ONLY
-    assert len(res.data["wallets"]) == 3
-    assert res.data["wallets"][0]["provider"] == "wave"
+    assert len(res.data["wallets"]) == 1
+    assert res.data["wallets"][0]["provider"] == "paymechap"
 
-def test_3_get_wallet_balance():
-    """3. get_wallet_balance fonctionne pour un compte précis."""
-    res = tool_registry.execute("get_wallet_balance", {"provider": "wave"})
+def test_3_get_wallet_balance(monkeypatch):
+    """3. get_wallet_balance fonctionne pour un compte précis enrôlé."""
+    from app.agent.tools import wallet_tools
+    monkeypatch.setattr(wallet_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(wallet_tools.paymechap_api_service, "fetch_live_balance", lambda token, acc: {"balance": 50000.0, "currency": "XOF"})
+    res = tool_registry.execute("get_wallet_balance", {"provider": "paymechap"})
     assert res.success is True
     assert res.data["balance"] == 50000.0
     assert res.data["currency"] == "XOF"
 
-    res_om = tool_registry.execute("get_wallet_balance", {"provider": "orange_money"})
-    assert res_om.success is True
-    assert res_om.data["balance"] == 25000.0
-
-def test_4_get_total_balance():
-    """4. get_total_balance calcule la somme totale (50k + 25k + 15k = 90k XOF)."""
+def test_4_get_total_balance(monkeypatch):
+    """4. get_total_balance calcule la somme totale sur les comptes enrôlés."""
+    from app.agent.tools import wallet_tools
+    monkeypatch.setattr(wallet_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(wallet_tools.paymechap_api_service, "fetch_live_balance", lambda token, acc: {"balance": 90000.0, "currency": "XOF"})
     res = tool_registry.execute("get_total_balance")
     assert res.success is True
     assert res.data["total_balance"] == 90000.0
 
-def test_5_get_recent_transactions():
-    """5. get_recent_transactions retourne les opérations observées."""
+def test_5_get_recent_transactions(monkeypatch):
+    """5. get_recent_transactions retourne les opérations observées sur les comptes connectés."""
+    from app.agent.tools import transaction_tools
+    monkeypatch.setattr(transaction_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(transaction_tools.paymechap_api_service, "fetch_live_transactions", lambda token, limit=100: [
+        {"id": "tx1", "provider": "paymechap", "amount": 5000.0, "type": "DEBIT", "category": "ALIMENTATION"},
+        {"id": "tx2", "provider": "paymechap", "amount": 12000.0, "type": "CREDIT", "category": "SALAIRE"}
+    ])
     res = tool_registry.execute("get_recent_transactions", {"limit": 2})
     assert res.success is True
     assert len(res.data["transactions"]) == 2
     assert "provider" in res.data["transactions"][0]
 
-def test_6_get_spending_summary():
+def test_6_get_spending_summary(monkeypatch):
     """6. get_spending_summary retourne l'analyse des dépenses par catégorie."""
+    from app.agent.tools import financial_tools
+    from datetime import datetime, timezone, timedelta
+    now_str = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    monkeypatch.setattr(financial_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(financial_tools.paymechap_api_service, "fetch_live_transactions", lambda token, account_number=None, limit=200: [
+        {"id": "tx1", "provider": "paymechap", "amount": 5000.0, "type": "DEBIT", "category": "Alimentation", "timestamp": now_str}
+    ])
     res = tool_registry.execute("get_spending_summary", {"days": 30})
     assert res.success is True
     assert res.data["total_spent"] > 0
@@ -94,9 +122,9 @@ def test_6_get_spending_summary():
 def test_7_prepare_transfer():
     """7. prepare_transfer retourne confirmation_required sans exécuter."""
     res = tool_registry.execute("prepare_transfer", {
-        "provider": "wave",
+        "provider": "paymechap",
         "amount": 5000.0,
-        "recipient": "Kouamé"
+        "recipient": "+22507070707"
     })
     assert res.success is True
     assert res.risk_level == RiskLevel.CONFIRMATION_REQUIRED
@@ -125,14 +153,22 @@ def test_10_invalid_argument():
     assert res.success is False
     assert "Arguments invalides" in res.error_message
 
-def test_11_readonly_tools_cannot_trigger_execution():
+def test_11_readonly_tools_cannot_trigger_execution(monkeypatch):
     """11. Les tools READ_ONLY conservent leur niveau de risque sans modifier de données."""
+    from app.agent.tools import financial_tools
+    from datetime import datetime, timedelta
+    now_str = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    monkeypatch.setattr(financial_tools.financial_repository, "get_wallets", lambda uid=None: [
+        {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
+    ])
+    monkeypatch.setattr(financial_tools.paymechap_api_service, "fetch_live_balance", lambda token, account_number=None: {"balance": 50000.0, "currency": "XOF"})
+    monkeypatch.setattr(financial_tools.paymechap_api_service, "fetch_live_transactions", lambda token, account_number=None, limit=200: [
+        {"id": "tx1", "provider": "paymechap", "amount": 5000.0, "type": "DEBIT", "timestamp": now_str}
+    ])
     res = tool_registry.execute("get_financial_context")
     assert res.risk_level == RiskLevel.READ_ONLY
-    # Ensure recent_transactions contains real data when available
     recent_txs = res.data.get('recent_transactions', [])
     assert isinstance(recent_txs, list)
-    # In test fixtures we have transactions, so expect non‑empty list
     assert len(recent_txs) > 0
     assert res.requires_confirmation is False
 

@@ -18,7 +18,6 @@ def clean_wallet_state():
     """Nettoie l'état des wallets en base et en mémoire avant chaque test."""
     Base.metadata.create_all(bind=engine)
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
     with Session(engine) as db:
         db.query(ConnectedWalletModel).delete()
         db.query(UserModel).delete()
@@ -29,7 +28,6 @@ def clean_wallet_state():
         db.query(UserModel).delete()
         db.commit()
     wallet_router.CONNECTED_USER_WALLETS.clear()
-    wallet_router.PENDING_OTP_SESSIONS.clear()
 
 def create_auth_header(user_id: int, email: str = "test@sika.app") -> dict:
     with Session(engine) as db:
