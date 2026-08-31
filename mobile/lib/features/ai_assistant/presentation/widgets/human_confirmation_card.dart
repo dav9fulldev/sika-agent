@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../../core/widgets/sika_glass_card.dart';
-import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/biometric_service.dart';
 import '../../providers/sika_provider.dart';
 
-/// HumanConfirmationCard — SIKA Financial Assistant Human-in-the-Loop Confirmation Card
+/// HumanConfirmationCard — SIKA Financial Assistant High-End Confirmation Card
 /// 
-/// Strictly adheres to:
-/// - Explicit distinction: "ACTION PRÉPARÉE" vs "ACTION EXÉCUTÉE".
-/// - Prominent security disclaimer: "Votre argent n'a pas encore été transféré."
-/// - Handles all states: active (waiting confirmation), security validation, executing, completed, obsolete, cancelled.
-/// - Double-click / double-tap prevention (both locally and in the Provider).
-/// - Accessible biometric bottom sheet with clear identity authorization description.
+/// Designed by UI/UX & Security Engineers:
+/// - Distinctive Deep Midnight & Indigo Glassmorphism (High-contrast on light chat backgrounds).
+/// - Instant Native Biometric Prompt on "Valider par Empreinte" (Zero redundant intermediate bottom sheets).
+/// - Seamless PayMeChap 4-Digit PIN modal fallback.
+/// - Clear security disclaimer and financial audit details.
 class HumanConfirmationCard extends ConsumerStatefulWidget {
   final String? actionId;
   final String actionTitle;
@@ -31,9 +28,9 @@ class HumanConfirmationCard extends ConsumerStatefulWidget {
   const HumanConfirmationCard({
     super.key,
     this.actionId,
-    this.actionTitle = 'Transfert d\'argent',
-    this.recipientText = 'Destinataire',
-    this.amountText = '---',
+    required this.actionTitle,
+    required this.recipientText,
+    required this.amountText,
     this.sourceAccount,
     this.feeText,
     this.platformText,
@@ -48,18 +45,60 @@ class HumanConfirmationCard extends ConsumerStatefulWidget {
 
 class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
   bool _isSubmittingLocally = false;
+  bool _hasAutoPrompted = false;
 
-  void _handleConfirmTap() {
-    if (_isSubmittingLocally) return;
-    _showSecurityConfirmationModal(context);
+  @override
+  void initState() {
+    super.initState();
+    // Auto-prompt biometrics once after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_hasAutoPrompted) {
+        _hasAutoPrompted = true;
+        _handleBiometricConfirmTap(isAuto: true);
+      }
+    });
   }
 
-  void _showSecurityConfirmationModal(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Future<void> _handleBiometricConfirmTap({bool isAuto = false}) async {
+    if (_isSubmittingLocally) return;
+
+    final biometricService = ref.read(biometricServiceProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
+    final bool isAvailable = await biometricService.isBiometricsAvailable();
+    if (!isAvailable) {
+      if (!isAuto && mounted) {
+        _showPinModal(context);
+      }
+      return;
+    }
+
+    try {
+      final bool authenticated = await biometricService.authenticate(
+        localizedReason: langNotifier.tr(
+          'Authentifiez-vous pour sécuriser PayMeChap et valider ce transfert.',
+          'Authenticate to secure PayMeChap and validate this transfer.',
+        ),
+      );
+
+      if (authenticated && mounted) {
+        setState(() => _isSubmittingLocally = true);
+        widget.onConfirm();
+      } else if (!isAuto && mounted) {
+        _showPinModal(context);
+      }
+    } catch (_) {
+      if (!isAuto && mounted) {
+        _showPinModal(context);
+      }
+    }
+  }
+
+  void _showPinModal(BuildContext context) {
     final langNotifier = ref.read(languageProvider.notifier);
     final apiService = ref.read(apiServiceProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    int selectedMode = 0; // 0 = Biométrie, 1 = Code PIN
     String pinInput = '';
     String? pinError;
     bool isVerifyingPin = false;
@@ -70,426 +109,192 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
       isScrollControlled: true,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (modalContext, setModalState) {
+          builder: (modalCtx, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(modalContext).viewInsets.bottom,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
               ),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.darkBackground
-                      : Theme.of(context).scaffoldBackgroundColor,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                  border: Border.all(
+                    color: AppColors.brandPrimary.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Handle bar
+                    // Handle
                     Container(
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.24),
+                        color: Colors.grey.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
 
-                    // Segmented choice: Biométrie vs Code PIN
+                    // Icon & Title
                     Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.darkSurface
-                            : AppColors.lightSurfaceHighlight,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.08),
-                        ),
+                        color: AppColors.brandPrimary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  selectedMode = 0;
-                                  pinError = null;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: selectedMode == 0
-                                      ? AppColors.brandPrimary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.fingerprint_rounded,
-                                      size: 18,
-                                      color: selectedMode == 0
-                                          ? Colors.white
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.6),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      langNotifier.tr('Biométrie', 'Biometrics'),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: selectedMode == 0
-                                            ? Colors.white
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setModalState(() {
-                                  selectedMode = 1;
-                                  pinError = null;
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: selectedMode == 1
-                                      ? AppColors.brandPrimary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.pin_rounded,
-                                      size: 18,
-                                      color: selectedMode == 1
-                                          ? Colors.white
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.6),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      langNotifier.tr('Code PIN', 'PIN Code'),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: selectedMode == 1
-                                            ? Colors.white
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: const Icon(
+                        Icons.pin_rounded,
+                        color: AppColors.brandPrimary,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      langNotifier.tr('Code PIN PayMeChap', 'PayMeChap PIN Code'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    Text(
+                      langNotifier.tr(
+                        'Entrez votre code secret PayMeChap (4 chiffres) pour signer le transfert de ${widget.amountText}.',
+                        'Enter your 4-digit PayMeChap PIN to sign the transfer of ${widget.amountText}.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        height: 1.3,
                       ),
                     ),
                     const SizedBox(height: 20),
 
-                    // ==========================================
-                    // MODE 0: BIOMÉTRIE (EMPREINTE / FACE ID)
-                    // ==========================================
-                    if (selectedMode == 0) ...[
-                      // Biometric Icon Badge
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandAccent.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.fingerprint_rounded,
-                          color: AppColors.brandAccent,
-                          size: 48,
+                    // PIN Input
+                    Container(
+                      width: 220,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: pinError != null ? AppColors.error : AppColors.brandPrimary.withValues(alpha: 0.5),
+                          width: 1.5,
                         ),
                       ),
-                      const SizedBox(height: 14),
-
-                      Text(
-                        langNotifier.tr(
-                            'Authentification Biométrique', 'Biometric Authorization'),
+                      child: TextField(
+                        autofocus: true,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        obscureText: true,
+                        obscuringCharacter: '●',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.3,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-
-                      Text(
-                        langNotifier.tr(
-                          'Validez avec Face ID ou votre empreinte pour autoriser le transfert de ${widget.amountText} vers ${widget.recipientText}.',
-                          'Confirm with Face ID or fingerprint to authorize the transfer of ${widget.amountText} to ${widget.recipientText}.',
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 14,
                         ),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                              height: 1.4,
-                            ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Bouton Biométrie
-                      SizedBox(
-                        width: double.infinity,
-                        child: SikaPremiumButton(
-                          onPressed: _isSubmittingLocally
-                              ? null
-                              : () async {
-                                  final biometricService = ref.read(biometricServiceProvider);
-                                  final bool authenticated = await biometricService.authenticate(
-                                    localizedReason: langNotifier.tr(
-                                      'Authentifiez-vous pour sécuriser PayMeChap et valider ce transfert.',
-                                      'Authenticate to secure PayMeChap and validate this transfer.',
-                                    ),
-                                  );
-
-                                  if (authenticated) {
-                                    setModalState(() => _isSubmittingLocally = true);
-                                    setState(() => _isSubmittingLocally = true);
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                    widget.onConfirm();
-                                  } else {
-                                    // Basculer sur le code PIN si la biométrie est annulée ou non configurée
-                                    setModalState(() {
-                                      selectedMode = 1;
-                                      pinError = langNotifier.tr(
-                                        'Biométrie non validée. Veuillez utiliser votre code PIN.',
-                                        'Biometrics not validated. Please use your PIN code.',
-                                      );
-                                    });
-                                  }
-                                },
-                          prefixWidget: _isSubmittingLocally
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.fingerprint, size: 22),
-                          text: _isSubmittingLocally
-                              ? langNotifier.tr('Validation en cours...', 'Validating...')
-                              : langNotifier.tr('Scanner l\'empreinte / Face ID', 'Scan Fingerprint / Face ID'),
-                        ),
-                      ),
-                    ],
-
-                    // ==========================================
-                    // MODE 1: CODE PIN PAYMECHAP
-                    // ==========================================
-                    if (selectedMode == 1) ...[
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandPrimary.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.lock_outline_rounded,
-                          color: AppColors.brandPrimary,
-                          size: 40,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      Text(
-                        langNotifier.tr(
-                            'Code PIN PayMeChap', 'PayMeChap PIN Code'),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.3,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-
-                      Text(
-                        langNotifier.tr(
-                          'Saisissez votre code PIN secret PayMeChap (4 chiffres) pour signer ce transfert de ${widget.amountText}.',
-                          'Enter your secret 4-digit PayMeChap PIN to sign this transfer of ${widget.amountText}.',
-                        ),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                              height: 1.3,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // PIN INPUT FIELD
-                      Container(
-                        width: 200,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppColors.darkSurface
-                              : AppColors.lightSurface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: pinError != null
-                                ? AppColors.error
-                                : AppColors.brandPrimary.withValues(alpha: 0.4),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: TextField(
-                          autofocus: true,
-                          keyboardType: TextInputType.number,
-                          maxLength: 4,
-                          obscureText: true,
-                          obscuringCharacter: '●',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                          hintText: '••••',
+                          hintStyle: TextStyle(
                             fontSize: 26,
-                            fontWeight: FontWeight.bold,
                             letterSpacing: 14,
+                            color: Colors.grey,
                           ),
-                          decoration: const InputDecoration(
-                            counterText: '',
-                            border: InputBorder.none,
-                            hintText: '••••',
-                            hintStyle: TextStyle(
-                              fontSize: 26,
-                              letterSpacing: 14,
-                              color: Colors.grey,
-                            ),
-                            contentPadding: EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onChanged: (val) {
-                            setModalState(() {
-                              pinInput = val.trim();
-                              pinError = null;
-                            });
-                          },
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
                         ),
+                        onChanged: (val) {
+                          setModalState(() {
+                            pinInput = val.trim();
+                            pinError = null;
+                          });
+                        },
                       ),
+                    ),
 
-                      if (pinError != null) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline_rounded,
-                                color: AppColors.error, size: 16),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                pinError!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.error,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-
-                      // Bouton Valider PIN
-                      SizedBox(
-                        width: double.infinity,
-                        child: SikaPremiumButton(
-                          onPressed: (pinInput.length < 4 || isVerifyingPin || _isSubmittingLocally)
-                              ? null
-                              : () async {
-                                  setModalState(() {
-                                    isVerifyingPin = true;
-                                    pinError = null;
-                                  });
-                                  try {
-                                    // 1. Vérification auprès du endpoint PayMeChap officiel
-                                    await apiService.verifyWalletPin(pin: pinInput);
-                                    
-                                    // 2. PIN validé avec succès -> Exécution
-                                    setModalState(() => _isSubmittingLocally = true);
-                                    setState(() => _isSubmittingLocally = true);
-                                    if (ctx.mounted) {
-                                      Navigator.pop(ctx);
-                                    }
-                                    widget.onConfirm();
-                                  } catch (err) {
-                                    setModalState(() {
-                                      isVerifyingPin = false;
-                                      pinError = langNotifier.tr(
-                                        'Code PIN PayMeChap incorrect.',
-                                        'Incorrect PayMeChap PIN code.',
-                                      );
-                                    });
-                                  }
-                                },
-                          prefixWidget: isVerifyingPin
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.check_circle_outline, size: 20),
-                          text: isVerifyingPin
-                              ? langNotifier.tr('Vérification du PIN...', 'Checking PIN...')
-                              : langNotifier.tr('Valider avec le code PIN', 'Confirm with PIN'),
+                    if (pinError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        pinError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 24),
 
-                    // Cancel button
+                    // Submit PIN Button
                     SizedBox(
                       width: double.infinity,
-                      child: SikaPremiumButton(
-                        onPressed: (_isSubmittingLocally || isVerifyingPin)
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandPrimary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: (pinInput.length < 4 || isVerifyingPin || _isSubmittingLocally)
                             ? null
-                            : () {
-                                Navigator.pop(ctx);
-                                widget.onCancel();
+                            : () async {
+                                setModalState(() {
+                                  isVerifyingPin = true;
+                                  pinError = null;
+                                });
+                                try {
+                                  await apiService.verifyWalletPin(pin: pinInput);
+                                  setModalState(() => _isSubmittingLocally = true);
+                                  setState(() => _isSubmittingLocally = true);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  widget.onConfirm();
+                                } catch (err) {
+                                  setModalState(() {
+                                    isVerifyingPin = false;
+                                    pinError = langNotifier.tr(
+                                      'Code PIN PayMeChap incorrect.',
+                                      'Incorrect PayMeChap PIN code.',
+                                    );
+                                  });
+                                }
                               },
-                        text: langNotifier.tr('Annuler l\'opération', 'Cancel operation'),
-                        isSecondary: true,
+                        child: isVerifyingPin
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(
+                                langNotifier.tr('Confirmer le transfert', 'Confirm transfer'),
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Cancel
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        langNotifier.tr('Retour', 'Back'),
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : Colors.black54,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -504,10 +309,9 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sikaData = ref.watch(sikaProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
 
-    // Determine state of this specific card
     final bool isObsolete = (widget.actionId != null &&
             sikaData.obsoleteActionIds.contains(widget.actionId)) ||
         (widget.actionId != null &&
@@ -520,360 +324,313 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
     final bool isCompleted = sikaData.state == SikaState.completed &&
         (widget.actionId == null || widget.actionId == sikaData.activeActionId);
 
-    return Opacity(
-      opacity: isObsolete ? 0.55 : 1.0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: SikaGlassCard(
-          borderColor: isObsolete
-              ? (isDark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle)
-              : (isExecuting
-                  ? AppColors.brandPrimary.withValues(alpha: 0.6)
-                  : AppColors.brandAccent.withValues(alpha: 0.4)),
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── 1. HEADER BADGE & STATUS ─────────────────────────────────
-              _buildHeaderBadge(context, isDark, isObsolete, isExecuting, isCompleted),
-              const SizedBox(height: 12),
-
-              // ── 2. SECURITY DISCLAIMER ──────────────────────────────────
-              if (!isObsolete && !isExecuting && !isCompleted)
-                _buildSecurityDisclaimer(context, isDark),
-
-              const SizedBox(height: 12),
-
-              // ── 3. TRANSACTION DETAILS CARD ─────────────────────────────
-              _buildDetailsCard(context, isDark, isObsolete),
-
-              const SizedBox(height: 12),
-
-              // ── 4. ACTION BUTTONS ───────────────────────────────────────
-              _buildActionButtons(context, isObsolete, isExecuting, isCompleted),
-            ],
-          ),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A), // Slate 900
+            Color(0xFF1E1B4B), // Indigo 950
+            Color(0xFF0B132B), // Midnight Blue
+          ],
         ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isExecuting
+              ? const Color(0xFF6366F1)
+              : const Color(0xFF10B981).withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-    ).animate().fade(duration: 350.ms).slideY(begin: 0.04, end: 0);
-  }
-
-  Widget _buildHeaderBadge(BuildContext context, bool isDark, bool isObsolete,
-      bool isExecuting, bool isCompleted) {
-    Color badgeBg;
-    Color badgeTextColor;
-    String badgeText;
-    String statusSubtitle;
-    IconData badgeIcon;
-
-    if (isObsolete) {
-      badgeBg = isDark
-          ? AppColors.darkSurfaceHighlight
-          : AppColors.lightSurfaceHighlight;
-      badgeTextColor = isDark
-          ? AppColors.darkTextTertiary
-          : AppColors.lightTextTertiary;
-      badgeText = 'REMPLACÉE';
-      statusSubtitle = 'Cette préparation a été remplacée par une nouvelle demande.';
-      badgeIcon = Icons.history_rounded;
-    } else if (isExecuting) {
-      badgeBg = AppColors.brandPrimary.withValues(alpha: 0.15);
-      badgeTextColor = AppColors.brandPrimary;
-      badgeText = 'EXÉCUTION SÉCURISÉE';
-      statusSubtitle = 'Transfert en cours de finalisation sur PayMeChap...';
-      badgeIcon = Icons.sync_rounded;
-    } else if (isCompleted) {
-      badgeBg = AppColors.brandAccent.withValues(alpha: 0.15);
-      badgeTextColor = AppColors.brandAccent;
-      badgeText = 'TRANSACTION EFFECTUÉE';
-      statusSubtitle = 'L\'opération a été confirmée et traitée avec succès.';
-      badgeIcon = Icons.check_circle_outline_rounded;
-    } else {
-      badgeBg = AppColors.brandAccent.withValues(alpha: 0.15);
-      badgeTextColor = AppColors.brandAccent;
-      badgeText = 'ACTION PRÉPARÉE';
-      statusSubtitle = 'En attente de votre confirmation biométrique';
-      badgeIcon = Icons.shield_outlined;
-    }
-
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: badgeBg,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            badgeIcon,
-            color: badgeTextColor,
-            size: 22,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── 1. HEADER BADGE & STATUS ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                      width: 1,
                     ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        langNotifier.tr('ACTION PRÉPARÉE', 'ACTION PREPARED'),
+                        style: const TextStyle(
+                          color: Color(0xFF34D399),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  widget.platformText ?? 'PayMeChap / Direct',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // ── 2. SECURITY DISCLAIMER ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF064E3B).withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lock_rounded,
+                    color: Color(0xFF34D399),
+                    size: 15,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      badgeText,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: badgeTextColor,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                            fontSize: 10,
-                          ),
+                      langNotifier.tr(
+                        'Votre argent n\'a pas encore été transféré.',
+                        'Your funds have not been transferred yet.',
+                      ),
+                      style: const TextStyle(
+                        color: Color(0xFFE2E8F0),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                statusSubtitle,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                      fontSize: 11,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+            ),
+            const SizedBox(height: 14),
 
-  Widget _buildSecurityDisclaimer(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.brandAccent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.brandAccent.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.lock_outline_rounded,
-            color: AppColors.brandAccent,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Votre argent n\'a pas encore été transféré.',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+            // ── 3. FINANCIAL SUMMARY ──
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        langNotifier.tr('Montant à transférer', 'Amount to transfer'),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        widget.amountText,
+                        style: const TextStyle(
+                          color: Color(0xFF34D399),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12, height: 16),
+                  _buildDarkDetailRow('Destinataire', widget.recipientText, Icons.person_outline_rounded),
+                  const SizedBox(height: 6),
+                  _buildDarkDetailRow('Compte source', widget.sourceAccount ?? 'PayMeChap', Icons.account_balance_wallet_outlined),
+                  const SizedBox(height: 6),
+                  _buildDarkDetailRow('Frais SIKA', widget.feeText ?? 'Gratuit', Icons.check_circle_outline_rounded),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 16),
 
-  Widget _buildDetailsCard(
-      BuildContext context, bool isDark, bool isObsolete) {
-    return SikaGlassCard(
-      padding: const EdgeInsets.all(14),
-      borderColor: isDark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Amount & Title
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                widget.actionTitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
-                      fontWeight: FontWeight.w600,
+            // ── 4. ACTION BUTTONS ──
+            if (isExecuting) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Validation PayMeChap en cours...',
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
-              Text(
-                widget.amountText,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: isObsolete
-                          ? (isDark
-                              ? AppColors.darkTextTertiary
-                              : AppColors.lightTextTertiary)
-                          : AppColors.brandAccent,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
+            ] else if (isCompleted) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Transfert effectué avec succès',
+                      style: TextStyle(color: Color(0xFF34D399), fontSize: 13, fontWeight: FontWeight.bold),
                     ),
+                  ],
+                ),
+              ),
+            ] else if (isObsolete) ...[
+              Center(
+                child: Text(
+                  langNotifier.tr('Demande expirée ou remplacée', 'Request expired or replaced'),
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  // Cancel
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 46,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white70,
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isSubmittingLocally ? null : widget.onCancel,
+                        child: Text(
+                          langNotifier.tr('Annuler', 'Cancel'),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // PIN Option
+                  SizedBox(
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: AppColors.brandPrimary.withValues(alpha: 0.5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _isSubmittingLocally ? null : () => _showPinModal(context),
+                      icon: const Icon(Icons.pin_rounded, size: 16),
+                      label: Text(
+                        langNotifier.tr('Code PIN', 'PIN Code'),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Biometrics Primary
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _isSubmittingLocally ? null : () => _handleBiometricConfirmTap(isAuto: false),
+                        icon: const Icon(Icons.fingerprint_rounded, size: 18),
+                        label: Text(
+                          langNotifier.tr('Valider', 'Authorize'),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-          Divider(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.08),
-            height: 18,
-          ),
-          _buildDetailRow(context, isDark, 'Destinataire', widget.recipientText),
-          const SizedBox(height: 6),
-          _buildDetailRow(
-              context, isDark, 'Compte source', widget.sourceAccount ?? 'Portefeuille Principal'),
-          const SizedBox(height: 6),
-          _buildDetailRow(context, isDark, 'Frais SIKA', widget.feeText ?? '—'),
-          const SizedBox(height: 6),
-          _buildDetailRow(
-              context, isDark, 'Plateforme', widget.platformText ?? 'PayMeChap / Direct'),
-        ],
+          ],
+        ),
       ),
-    );
+    ).animate().fade(duration: 300.ms).slideY(begin: 0.05, end: 0);
   }
 
-  Widget _buildDetailRow(
-      BuildContext context, bool isDark, String label, String value) {
+  Widget _buildDarkDetailRow(String label, String value, IconData icon) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        Icon(icon, size: 14, color: Colors.white54),
+        const SizedBox(width: 8),
         Text(
           label,
-          style: TextStyle(
-            color: isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: Colors.white60, fontSize: 12),
         ),
+        const Spacer(),
         Text(
           value,
-          style: TextStyle(
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButtons(BuildContext context, bool isObsolete,
-      bool isExecuting, bool isCompleted) {
-    if (isObsolete) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        child: Text(
-          '⛔ Action désactivée (remplacée par une demande plus récente)',
-          style: TextStyle(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.5),
-            fontSize: 11,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
-    }
-
-    if (isExecuting) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.brandPrimary,
-              ),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Exécution sécurisée en cours...',
-              style: TextStyle(
-                color: AppColors.brandPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (isCompleted) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: AppColors.brandAccent, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Opération confirmée et exécutée avec succès',
-              style: TextStyle(
-                color: AppColors.brandAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: 'Annuler cette opération préparée',
-            child: SikaPremiumButton(
-              onPressed: _isSubmittingLocally ? null : widget.onCancel,
-              text: 'Annuler',
-              isSecondary: true,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          flex: 2,
-          child: Semantics(
-            button: true,
-            label: 'Confirmer votre identité avec la biométrie ou le code PIN',
-            child: SikaPremiumButton(
-              onPressed: _isSubmittingLocally ? null : _handleConfirmTap,
-              prefixWidget: const Icon(Icons.security_rounded, size: 18),
-              text: 'Confirmer (Biométrie / PIN)',
-            ),
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ],
     );

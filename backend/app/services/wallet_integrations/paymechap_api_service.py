@@ -495,58 +495,87 @@ class PayMeChapAPIService:
 
         return []
 
-    def execute_payout(self, access_token: str, recipient_phone: str, amount: float, motif: str = "Transfert SIKA", action_id: Optional[str] = None) -> Dict[str, Any]:
-        """Exécute un transfert de fonds PayMeChap via l'API Partenaire (POST /api/v1/partners/transactions/{sender_phone}/transfer)."""
+    def execute_payout(self, access_token: str, recipient_phone: str, amount: float, sender_phone: Optional[str] = None, motif: str = "Transfert SIKA", action_id: Optional[str] = None) -> Dict[str, Any]:
+        """Exécute un transfert de fonds PayMeChap via l'API Partenaire avec résolution automatique de la source."""
         token = self.get_partner_access_token() or access_token
         clean_recipient = recipient_phone.replace(" ", "").replace("+225", "")
-        endpoint = f"{self.base_url}/api/v1/partners/transactions/{clean_recipient}/transfer"
+        clean_sender = sender_phone.replace(" ", "").replace("+225", "") if sender_phone else None
 
         full_motif = f"{motif} [{action_id}]" if action_id else motif
         payload = {
             "telephoneDestination": clean_recipient,
+            "destinataire": clean_recipient,
+            "recipient": clean_recipient,
             "montant": amount,
+            "amount": amount,
             "motif": full_motif,
             "reference": action_id or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
             "idempotency_key": action_id,
         }
+        if clean_sender:
+            payload["telephoneSource"] = clean_sender
+            payload["sender"] = clean_sender
+            payload["telephone"] = clean_sender
 
-        try:
-            headers = {
-                "Authorization": f"Bearer {token}" if token else "",
-                "Content-Type": "application/json",
-            }
-            if action_id:
-                headers["X-Idempotency-Key"] = action_id
+        endpoints_to_try = []
+        if clean_sender:
+            endpoints_to_try.append(f"{self.base_url}/api/v1/partners/transactions/{clean_sender}/transfer")
+            endpoints_to_try.append(f"{self.base_url}/api/v1/partners/wallets/{clean_sender}/transfer")
+        endpoints_to_try.append(f"{self.base_url}/api/v1/partners/transactions/transfer")
+        endpoints_to_try.append(f"{self.base_url}/api/v1/transactions/transfer")
 
-            logger.info(f"[PayMeChap Payout API] POST {endpoint} pour {amount} FCFA vers {clean_recipient} (action_id={action_id})")
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=150)
-            if resp.status_code in [200, 201]:
-                data = resp.json()
-                res_data = data.get("data") or data
-                return {
-                    "success": True,
-                    "transaction_id": res_data.get("transaction_id") or action_id or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
-                    "reference": action_id or res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
-                    "amount": float(res_data.get("amount") or amount),
-                    "fees": float(res_data.get("fees") or 0.0),
-                    "currency": res_data.get("currency") or "XOF",
-                    "status": (res_data.get("status") or "COMPLETED").lower(),
-                    "created_at": res_data.get("created_at") or datetime.utcnow().isoformat(),
-                }
-            if resp.status_code >= 500:
-                logger.error(f"[PayMeChap Payout API] Erreur HTTP {resp.status_code} sur {endpoint} - Résultat inconnu.")
-                resp.raise_for_status()
+        headers = {
+            "Authorization": f"Bearer {token}" if token else "",
+            "Content-Type": "application/json",
+        }
+        if action_id:
+            headers["X-Idempotency-Key"] = action_id
 
-            logger.warning(f"[PayMeChap Payout API] Échec HTTP métier {resp.status_code}: {resp.text}")
+        last_resp = None
+        for endpoint in endpoints_to_try:
+            try:
+                logger.info(f"[PayMeChap Payout API] Tentative POST {endpoint} pour {amount} FCFA de {clean_sender} vers {clean_recipient} (action_id={action_id})")
+                resp = requests.post(endpoint, json=payload, headers=headers, timeout=150)
+                last_resp = resp
+                if resp.status_code in [200, 201]:
+                    data = resp.json()
+                    res_data = data.get("data") or data
+                    return {
+                        "success": True,
+                        "transaction_id": res_data.get("transaction_id") or action_id or f"TRANSFER-{int(datetime.utcnow().timestamp())}",
+                        "reference": action_id or res_data.get("reference") or f"PARTNER-SIKA-{int(datetime.utcnow().timestamp())}",
+                        "amount": float(res_data.get("amount") or amount),
+                        "fees": float(res_data.get("fees") or 0.0),
+                        "currency": res_data.get("currency") or "XOF",
+                        "status": (res_data.get("status") or "COMPLETED").lower(),
+                        "created_at": res_data.get("created_at") or datetime.utcnow().isoformat(),
+                    }
+                if resp.status_code == 404:
+                    logger.info(f"[PayMeChap Payout API] Endpoint {endpoint} non trouvé (404), tentative du fallback suivant...")
+                    continue
+                if resp.status_code >= 500:
+                    logger.error(f"[PayMeChap Payout API] Erreur HTTP {resp.status_code} sur {endpoint} - Résultat inconnu.")
+                    resp.raise_for_status()
+
+                logger.warning(f"[PayMeChap Payout API] Échec HTTP métier {resp.status_code}: {resp.text}")
+                break
+            except requests.exceptions.RequestException as req_exc:
+                logger.error(f"[PayMeChap Payout API] Erreur réseau (Timeout/Connexion): {req_exc}")
+                raise
+
+        if last_resp is not None:
             return {
                 "success": False,
                 "status": "FAILED",
-                "message": f"Refus de PayMeChap (Code {resp.status_code})",
-                "details": resp.text
+                "message": f"Refus de PayMeChap (Code {last_resp.status_code})",
+                "details": last_resp.text
             }
-        except requests.exceptions.RequestException as req_exc:
-            logger.error(f"[PayMeChap Payout API] Erreur réseau (Timeout/Connexion): {req_exc}")
-            raise
+
+        return {
+            "success": False,
+            "status": "FAILED",
+            "message": "Impossible d'effectuer le transfert PayMeChap. Veuillez réessayer."
+        }
 
 
 

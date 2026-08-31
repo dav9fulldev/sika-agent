@@ -540,11 +540,40 @@ class SikaAgentOrchestrator:
                 if amount <= 0 or not recipient_phone:
                     raise ValueError("Montant invalide ou destinataire manquant dans le payload.")
 
+                # Résolution dynamique du numéro de téléphone source
+                sender_phone = parsed_payload.get("sender_phone") or parsed_payload.get("telephoneSource")
+                if not sender_phone:
+                    try:
+                        with Session(engine) as db:
+                            from ..models.connected_wallet import ConnectedWalletModel
+                            from ..models.user import UserModel
+                            pmc_wallet = db.query(ConnectedWalletModel).filter(
+                                ConnectedWalletModel.user_id == user_id,
+                                ConnectedWalletModel.provider.ilike("%paymechap%"),
+                                ConnectedWalletModel.connection_status == "connected"
+                            ).first()
+                            if pmc_wallet and pmc_wallet.external_wallet_id:
+                                sender_phone = pmc_wallet.external_wallet_id
+                            else:
+                                any_wallet = db.query(ConnectedWalletModel).filter(
+                                    ConnectedWalletModel.user_id == user_id,
+                                    ConnectedWalletModel.connection_status == "connected"
+                                ).first()
+                                if any_wallet and any_wallet.external_wallet_id:
+                                    sender_phone = any_wallet.external_wallet_id
+                                else:
+                                    u_rec = db.query(UserModel).filter(UserModel.id == user_id).first()
+                                    if u_rec and u_rec.phone:
+                                        sender_phone = u_rec.phone
+                    except Exception as e:
+                        logger.warning(f"[PAYOUT SENDER RESOLVE] Impossible de résoudre sender_phone: {e}")
+
                 motif = parsed_payload.get("motif", "Transfert SIKA")
                 
                 payout_res = paymechap_api_service.execute_payout(
                     access_token="",
                     recipient_phone=recipient_phone,
+                    sender_phone=sender_phone,
                     amount=amount,
                     motif=motif,
                     action_id=action_id
