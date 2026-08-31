@@ -627,9 +627,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
       startListening();
     } else if (nextState == SikaState.securityValidation && actionId != null) {
       debugPrint(
-          '[SECURITY] 🔐 Launching security validation for action_id: $actionId');
-      state = state.copyWith(state: SikaState.securityValidation);
-      executeSecurityValidationAndConfirm(actionId);
+          '[SECURITY] 🔐 Awaiting user biometric or PIN confirmation on card for action_id: $actionId');
+      state = state.copyWith(
+        state: SikaState.securityValidation,
+        pendingActionId: actionId,
+        pendingActionData: state.pendingActionData,
+      );
     } else {
       state = state.copyWith(
         state: nextState ?? SikaState.idle,
