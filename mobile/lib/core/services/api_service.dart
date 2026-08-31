@@ -295,6 +295,7 @@ class ApiService {
     String? userFirstName,
     String? displayCurrencyCode,
     String? displayCurrencySymbol,
+    String? language,
   }) async {
     final response = await http
         .post(
@@ -306,6 +307,7 @@ class ApiService {
               'user_firstname': userFirstName ?? 'Utilisateur',
               'display_currency_code': displayCurrencyCode ?? 'XOF',
               'display_currency_symbol': displayCurrencySymbol ?? 'XOF',
+              'language': language ?? 'fr',
             }
           }),
         )
@@ -415,6 +417,36 @@ class ApiService {
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
     String errorMsg = 'Échec de la validation OTP (${response.statusCode})';
+    try {
+      final errObj = jsonDecode(response.body);
+      if (errObj is Map && errObj['detail'] != null) {
+        errorMsg = errObj['detail'].toString();
+      }
+    } catch (_) {}
+    throw Exception(errorMsg);
+  }
+
+  Future<Map<String, dynamic>> verifyWalletPin({
+    required String pin,
+    String? accountNumber,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.walletsVerifyPin}'),
+          headers: _headers,
+          body: jsonEncode({
+            'pin': pin,
+            if (accountNumber != null && accountNumber.isNotEmpty)
+              'account_number': accountNumber,
+          }),
+        )
+        .timeout(AppConfig.defaultTimeout);
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    _handleStatusCode(response.statusCode);
+    String errorMsg = 'Code PIN PayMeChap incorrect (${response.statusCode})';
     try {
       final errObj = jsonDecode(response.body);
       if (errObj is Map && errObj['detail'] != null) {

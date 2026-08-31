@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/widgets/sika_glass_card.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/api_service_provider.dart';
 import '../../providers/sika_provider.dart';
 
 /// HumanConfirmationCard — SIKA Financial Assistant Human-in-the-Loop Confirmation Card
@@ -48,11 +50,18 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
 
   void _handleConfirmTap() {
     if (_isSubmittingLocally) return;
-    _showBiometricModal(context);
+    _showSecurityConfirmationModal(context);
   }
 
-  void _showBiometricModal(BuildContext context) {
+  void _showSecurityConfirmationModal(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final langNotifier = ref.read(languageProvider.notifier);
+    final apiService = ref.read(apiServiceProvider);
+
+    int selectedMode = 0; // 0 = Biométrie, 1 = Code PIN
+    String pinInput = '';
+    String? pinError;
+    bool isVerifyingPin = false;
 
     showModalBottomSheet(
       context: context,
@@ -61,169 +70,410 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkBackground
-                    : Theme.of(context).scaffoldBackgroundColor,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(28)),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle bar
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.24),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Biometric Icon Badge
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandAccent.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.fingerprint_rounded,
-                      color: AppColors.brandAccent,
-                      size: 48,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  Text(
-                    'Authentification Biométrique',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.3,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  Semantics(
-                    label: 'Explication de la confirmation biométrique',
-                    child: Text(
-                      'Confirmez votre identité avec Face ID ou votre empreinte digitale pour autoriser le transfert de ${widget.amountText} vers ${widget.recipientText}.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                            height: 1.4,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // SIKA Security Guarantee
-                  SikaGlassCard(
-                    padding: const EdgeInsets.all(14),
-                    borderColor: AppColors.brandAccent.withValues(alpha: 0.3),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.verified_user_outlined,
-                          color: AppColors.brandAccent,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Autorisation sécurisée SIKA',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Votre confirmation biométrique signe définitivement cette transaction.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Confirm button with debouncing
-                  SizedBox(
-                    width: double.infinity,
-                    child: Semantics(
-                      button: true,
-                      label: 'Confirmer votre identité avec la biométrie pour autoriser cette opération',
-                      child: SikaPremiumButton(
-                        onPressed: _isSubmittingLocally
-                            ? null
-                            : () {
-                                setModalState(() => _isSubmittingLocally = true);
-                                setState(() => _isSubmittingLocally = true);
-                                Navigator.pop(ctx);
-                                widget.onConfirm();
-                              },
-                        prefixWidget: _isSubmittingLocally
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.fingerprint, size: 22),
-                        text: _isSubmittingLocally
-                            ? 'Validation en cours...'
-                            : 'Scanner l\'empreinte / Face ID',
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.darkBackground
+                      : Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle bar
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.24),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 16),
 
-                  // Cancel button
-                  SizedBox(
-                    width: double.infinity,
-                    child: Semantics(
-                      button: true,
-                      label: 'Annuler cette opération préparée',
+                    // Segmented choice: Biométrie vs Code PIN
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkSurface
+                            : AppColors.lightSurfaceHighlight,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  selectedMode = 0;
+                                  pinError = null;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: selectedMode == 0
+                                      ? AppColors.brandPrimary
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.fingerprint_rounded,
+                                      size: 18,
+                                      color: selectedMode == 0
+                                          ? Colors.white
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      langNotifier.tr('Biométrie', 'Biometrics'),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: selectedMode == 0
+                                            ? Colors.white
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  selectedMode = 1;
+                                  pinError = null;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: selectedMode == 1
+                                      ? AppColors.brandPrimary
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.pin_rounded,
+                                      size: 18,
+                                      color: selectedMode == 1
+                                          ? Colors.white
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      langNotifier.tr('Code PIN', 'PIN Code'),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: selectedMode == 1
+                                            ? Colors.white
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ==========================================
+                    // MODE 0: BIOMÉTRIE (EMPREINTE / FACE ID)
+                    // ==========================================
+                    if (selectedMode == 0) ...[
+                      // Biometric Icon Badge
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandAccent.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.fingerprint_rounded,
+                          color: AppColors.brandAccent,
+                          size: 48,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      Text(
+                        langNotifier.tr(
+                            'Authentification Biométrique', 'Biometric Authorization'),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.3,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      Text(
+                        langNotifier.tr(
+                          'Validez avec Face ID ou votre empreinte pour autoriser le transfert de ${widget.amountText} vers ${widget.recipientText}.',
+                          'Confirm with Face ID or fingerprint to authorize the transfer of ${widget.amountText} to ${widget.recipientText}.',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                              height: 1.4,
+                            ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Bouton Biométrie
+                      SizedBox(
+                        width: double.infinity,
+                        child: SikaPremiumButton(
+                          onPressed: _isSubmittingLocally
+                              ? null
+                              : () {
+                                  setModalState(() => _isSubmittingLocally = true);
+                                  setState(() => _isSubmittingLocally = true);
+                                  Navigator.pop(ctx);
+                                  widget.onConfirm();
+                                },
+                          prefixWidget: _isSubmittingLocally
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.fingerprint, size: 22),
+                          text: _isSubmittingLocally
+                              ? langNotifier.tr('Validation en cours...', 'Validating...')
+                              : langNotifier.tr('Scanner l\'empreinte / Face ID', 'Scan Fingerprint / Face ID'),
+                        ),
+                      ),
+                    ],
+
+                    // ==========================================
+                    // MODE 1: CODE PIN PAYMECHAP
+                    // ==========================================
+                    if (selectedMode == 1) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandPrimary.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: AppColors.brandPrimary,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(
+                        langNotifier.tr(
+                            'Code PIN PayMeChap', 'PayMeChap PIN Code'),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.3,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      Text(
+                        langNotifier.tr(
+                          'Saisissez votre code PIN secret PayMeChap (4 chiffres) pour signer ce transfert de ${widget.amountText}.',
+                          'Enter your secret 4-digit PayMeChap PIN to sign this transfer of ${widget.amountText}.',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                              height: 1.3,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // PIN INPUT FIELD
+                      Container(
+                        width: 200,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.darkSurface
+                              : AppColors.lightSurface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: pinError != null
+                                ? AppColors.error
+                                : AppColors.brandPrimary.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: TextField(
+                          autofocus: true,
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          obscureText: true,
+                          obscuringCharacter: '●',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 14,
+                          ),
+                          decoration: const InputDecoration(
+                            counterText: '',
+                            border: InputBorder.none,
+                            hintText: '••••',
+                            hintStyle: TextStyle(
+                              fontSize: 26,
+                              letterSpacing: 14,
+                              color: Colors.grey,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onChanged: (val) {
+                            setModalState(() {
+                              pinInput = val.trim();
+                              pinError = null;
+                            });
+                          },
+                        ),
+                      ),
+
+                      if (pinError != null) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                color: AppColors.error, size: 16),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                pinError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
+                      // Bouton Valider PIN
+                      SizedBox(
+                        width: double.infinity,
+                        child: SikaPremiumButton(
+                          onPressed: (pinInput.length < 4 || isVerifyingPin || _isSubmittingLocally)
+                              ? null
+                              : () async {
+                                  setModalState(() {
+                                    isVerifyingPin = true;
+                                    pinError = null;
+                                  });
+                                  try {
+                                    // 1. Vérification auprès du endpoint PayMeChap officiel
+                                    await apiService.verifyWalletPin(pin: pinInput);
+                                    
+                                    // 2. PIN validé avec succès -> Exécution
+                                    setModalState(() => _isSubmittingLocally = true);
+                                    setState(() => _isSubmittingLocally = true);
+                                    if (ctx.mounted) {
+                                      Navigator.pop(ctx);
+                                    }
+                                    widget.onConfirm();
+                                  } catch (err) {
+                                    setModalState(() {
+                                      isVerifyingPin = false;
+                                      pinError = langNotifier.tr(
+                                        'Code PIN PayMeChap incorrect.',
+                                        'Incorrect PayMeChap PIN code.',
+                                      );
+                                    });
+                                  }
+                                },
+                          prefixWidget: isVerifyingPin
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_outline, size: 20),
+                          text: isVerifyingPin
+                              ? langNotifier.tr('Vérification du PIN...', 'Checking PIN...')
+                              : langNotifier.tr('Valider avec le code PIN', 'Confirm with PIN'),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    // Cancel button
+                    SizedBox(
+                      width: double.infinity,
                       child: SikaPremiumButton(
-                        onPressed: _isSubmittingLocally
+                        onPressed: (_isSubmittingLocally || isVerifyingPin)
                             ? null
                             : () {
                                 Navigator.pop(ctx);
                                 widget.onCancel();
                               },
-                        text: 'Annuler l\'opération',
+                        text: langNotifier.tr('Annuler l\'opération', 'Cancel operation'),
                         isSecondary: true,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -597,11 +847,11 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
           flex: 2,
           child: Semantics(
             button: true,
-            label: 'Confirmer votre identité avec la biométrie',
+            label: 'Confirmer votre identité avec la biométrie ou le code PIN',
             child: SikaPremiumButton(
               onPressed: _isSubmittingLocally ? null : _handleConfirmTap,
-              prefixWidget: const Icon(Icons.fingerprint, size: 18),
-              text: 'Confirmer (Biométrie)',
+              prefixWidget: const Icon(Icons.security_rounded, size: 18),
+              text: 'Confirmer (Biométrie / PIN)',
             ),
           ),
         ),

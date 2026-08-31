@@ -36,6 +36,7 @@ class ApiConstants {
   static const String walletsCoffres = '/api/v1/wallets/coffres';
   static const String walletsConnect = '/api/v1/wallets/connect';
   static const String walletsVerifyOtp = '/api/v1/wallets/verify-otp';
+  static const String walletsVerifyPin = '/api/v1/wallets/verify-pin';
   static const String walletsSync = '/api/v1/wallets/sync';
 
   // Perception SMS

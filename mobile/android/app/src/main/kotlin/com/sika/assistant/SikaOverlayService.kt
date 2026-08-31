@@ -175,6 +175,10 @@
                       if (isEn) "I didn't catch the amount. Could you please repeat?" else "Je n'ai pas compris le montant. Peux-tu répéter ?"
                   }
               }
+              l.contains("transf") || l.contains("envoie") || l.contains("transfer") || l.contains("send") || l.contains("depot") || l.contains("dépôt") -> {
+                  sendToFlutter(cmd)
+                  if (isEn) "Transfer prepared. Please confirm with fingerprint or PIN code." else "Transfert préparé. Veuillez confirmer par empreinte ou code PIN."
+              }
               else -> { sendToFlutter(cmd); if (isEn) "Processing..." else "Traitement..." }
           }
           upStatus(resp); speak(resp)
