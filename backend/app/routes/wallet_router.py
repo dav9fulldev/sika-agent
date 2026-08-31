@@ -380,6 +380,7 @@ def verify_transaction_pin(data: Dict[str, Any], authorization: Optional[str] = 
     if not account_number:
         db = SessionLocal()
         try:
+            # 1. Recherche du wallet PayMeChap connecté
             active_pmc = db.query(ConnectedWalletModel).filter(
                 ConnectedWalletModel.user_id == user_id,
                 ConnectedWalletModel.provider.ilike("%paymechap%"),
@@ -388,7 +389,21 @@ def verify_transaction_pin(data: Dict[str, Any], authorization: Optional[str] = 
             if active_pmc and active_pmc.external_wallet_id:
                 account_number = active_pmc.external_wallet_id
             else:
-                raise HTTPException(status_code=400, detail="Aucun compte PayMeChap raccordé à ce profil.")
+                # 2. Fallback: n'importe quel portefeuille actif enrôlé
+                any_wallet = db.query(ConnectedWalletModel).filter(
+                    ConnectedWalletModel.user_id == user_id,
+                    ConnectedWalletModel.connection_status == "connected"
+                ).first()
+                if any_wallet and any_wallet.external_wallet_id:
+                    account_number = any_wallet.external_wallet_id
+                else:
+                    # 3. Fallback: numéro de téléphone du profil utilisateur
+                    from ..models.user import UserModel
+                    user_record = db.query(UserModel).filter(UserModel.id == user_id).first()
+                    if user_record and user_record.phone:
+                        account_number = user_record.phone
+                    else:
+                        raise HTTPException(status_code=400, detail="Aucun compte PayMeChap ou numéro de téléphone raccordé à ce profil.")
         finally:
             db.close()
 
