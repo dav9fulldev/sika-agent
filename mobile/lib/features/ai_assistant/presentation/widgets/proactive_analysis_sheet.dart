@@ -124,17 +124,17 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             borderColor: const Color(0xFF334155),
             child: Column(
               children: [
-                _buildMetricRow(context, '💰 Expense Detected', '30 000 FCFA',
+                _buildMetricRow(context, '💰 Expense Detected', '—',
                     isHighlight: true),
                 const SizedBox(height: 6),
                 _buildMetricRow(context, 'Category', 'Dining / Restaurant'),
                 const SizedBox(height: 6),
                 _buildMetricRow(
-                    context, 'Similar spending this week', '12 500 FCFA'),
+                    context, 'Similar spending this week', '—'),
                 const SizedBox(height: 6),
-                _buildMetricRow(context, 'Remaining budget', '45 000 FCFA'),
+                _buildMetricRow(context, 'Remaining budget', '—'),
                 const SizedBox(height: 6),
-                _buildMetricRow(context, 'Monthly savings goal', '50 000 FCFA'),
+                _buildMetricRow(context, 'Monthly savings goal', '—'),
               ],
             ),
           ),
@@ -153,7 +153,7 @@ class ProactiveAnalysisSheet extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             borderColor: const Color(0xFFF59E0B).withValues(alpha: 0.3),
             child: Text(
-              'This single expense consumes about two-thirds of your remaining budget (45,000 FCFA) and threatens your 50,000 FCFA savings target.',
+              'This single expense consumes a significant portion of your remaining budget and threatens your savings target.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface,
                     height: 1.4,

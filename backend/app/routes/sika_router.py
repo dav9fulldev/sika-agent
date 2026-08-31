@@ -21,15 +21,21 @@ from ..agent.orchestrator import sika_orchestrator
 
 def strip_markdown(text: str) -> str:
     if not text:
-        return text
-    # Remove markdown bold/italic
+        return ""
+    # Remove markdown bold / italic markers (**bold**, *italic*, __bold__, _italic_)
     text = re.sub(r'[*_]{1,3}([^*_]+)[*_]{1,3}', r'\1', text)
+    # Remove any leftover stray asterisks
+    text = re.sub(r'\*{1,2}', '', text)
     # Remove markdown headers
     text = re.sub(r'#+\s?', '', text)
-    # Remove markdown links
+    # Remove markdown links [text](url) -> text
     text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    # Remove code backticks
+    text = re.sub(r'`+', '', text)
     # Remove markdown bullet points
     text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
+    # Clean up double spaces
+    text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
 
 router = APIRouter(prefix="/api/v1/sika", tags=["sika"])
@@ -168,14 +174,22 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
     session["history"] = history[-10:]
     sika_session_manager.save_user_session(str(user_id), session)
 
-    raw_speech = strip_markdown(result.get("speech_text", result.get("response", "")))
+    raw_response = result.get("response", result.get("message", ""))
+    cleaned_message = strip_markdown(raw_response)
+
+    detected_language = result.get("language") or sika_ai.detect_language(data.query)
+
+    raw_speech = strip_markdown(result.get("speech_text", raw_response))
     # Transformation des nombres avec espaces (ex: "1 800 000" -> "1800000") pour un rendu vocal fluide
     cleaned_speech = re.sub(r'(\d)\s+(?=\d)', r'\1', raw_speech)
-    cleaned_speech = cleaned_speech.replace("FCFA", "francs CFA")
+    curr_code = str(ctx_dict.get("currency_code", "")).upper()
+    curr_sym = str(ctx_dict.get("currency_symbol", "")).upper()
+    if detected_language == "fr" and (curr_code in ["XOF", "FCFA"] or curr_sym == "FCFA"):
+        cleaned_speech = cleaned_speech.replace("FCFA", "francs CFA")
 
     return SikaResponseDTO(
         query=data.query,
-        message=result.get("response", result.get("message", "")),
+        message=cleaned_message,
         intent=result.get("intent", result.get("action", "chat")),
         sentiment=result.get("sentiment", "positive"),
         suggestions=result.get("suggestions", []),
@@ -187,6 +201,7 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
         requires_security_validation=result.get("requires_security_validation", result.get("requires_biometric", False)),
         should_speak=result.get("should_speak", True),
         speech_text=cleaned_speech,
+        language=detected_language,
         action_data=result.get("action_data"),
         agent_steps=result.get("agent_steps", []),
     )

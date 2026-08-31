@@ -467,7 +467,7 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
           _buildDetailRow(
               context, isDark, 'Compte source', widget.sourceAccount ?? 'Portefeuille Principal'),
           const SizedBox(height: 6),
-          _buildDetailRow(context, isDark, 'Frais SIKA', widget.feeText ?? '0 FCFA'),
+          _buildDetailRow(context, isDark, 'Frais SIKA', widget.feeText ?? '—'),
           const SizedBox(height: 6),
           _buildDetailRow(
               context, isDark, 'Plateforme', widget.platformText ?? 'PayMeChap / Direct'),

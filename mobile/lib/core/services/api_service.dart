@@ -304,8 +304,8 @@ class ApiService {
             'query': query,
             'context': {
               'user_firstname': userFirstName ?? 'Utilisateur',
-              'currency_code': currencyCode ?? 'XOF',
-              'currency_symbol': currencySymbol ?? 'FCFA',
+              'currency_code': currencyCode ?? '',
+              'currency_symbol': currencySymbol ?? '',
             }
           }),
         )

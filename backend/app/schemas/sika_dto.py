@@ -53,6 +53,7 @@ class SikaResponseDTO(BaseModel):
     requires_security_validation: Optional[bool] = False
     should_speak: Optional[bool] = True
     speech_text: Optional[str] = None
+    language: Optional[str] = "fr"
     action_data: Optional[Dict[str, Any]] = None
     agent_steps: List[Dict[str, Any]] = []
 

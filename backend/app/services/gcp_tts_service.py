@@ -42,6 +42,12 @@ class GCPTTSService:
             return {"success": False, "error": "Service GCP Text-to-Speech non disponible."}
 
         try:
+            # Auto-align language_code with voice_name prefix if needed
+            if voice_name.startswith("en-"):
+                language_code = "-".join(voice_name.split("-")[:2])
+            elif voice_name.startswith("fr-"):
+                language_code = "-".join(voice_name.split("-")[:2])
+
             synthesis_input = texttospeech.SynthesisInput(text=text.strip())
 
             # Sélection de la voix haute qualité (Neural2 / Wavenet / Standard)

@@ -115,18 +115,23 @@ class SikaNLP:
         return result
     
     @staticmethod
-    def format_amount_for_speech(amount: float) -> str:
+    def format_amount_for_speech(amount: float, currency: str = "") -> str:
         """
-        Formate un montant pour le TTS avec FCFA
-        
-        Examples:
-            5000 → "cinq mille francs cfa"
-            15000 → "quinze mille francs cfa"
-            250 → "deux cent cinquante francs cfa"
+        Formate un montant pour le TTS.
         """
         amount_int = int(amount)
         words = SikaNLP.number_to_words(amount_int)
-        return f"{words} francs cfa"
+        
+        if currency.upper() in ["FCFA", "XOF"]:
+            return f"{words} francs cfa"
+        elif currency.upper() == "USD" or currency == "$":
+            return f"{words} dollars"
+        elif currency.upper() == "EUR" or currency == "€":
+            return f"{words} euros"
+        elif currency:
+            return f"{words} {currency}"
+            
+        return words
 
     # ===== CATÉGORIES EN LANGAGE NATUREL =====
 

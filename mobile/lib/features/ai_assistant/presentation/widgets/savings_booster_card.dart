@@ -30,7 +30,8 @@ class SavingsBoosterCard extends ConsumerWidget {
         walletState.coffres.isNotEmpty ? walletState.coffres.first : null;
     final double targetAmount = firstCoffre != null && firstCoffre.objectif > 0
         ? firstCoffre.objectif
-        : 500000.0;
+        : 0.0;
+    final String targetText = targetAmount > 0 ? currNotifier.format(targetAmount) : '—';
     final String coffreName =
         firstCoffre?.nom ?? langNotifier.tr('Épargne', 'Savings');
 
@@ -66,8 +67,8 @@ class SavingsBoosterCard extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             langNotifier.tr(
-              'En mettant de côté ${currNotifier.format(500)} aujourd\'hui, vous atteindrez votre coffre "$coffreName" (${currNotifier.format(targetAmount)}) avec 5 jours d\'avance !',
-              'By putting aside ${currNotifier.format(500)} today, you will reach your "$coffreName" target (${currNotifier.format(targetAmount)}) 5 days earlier!',
+              'En mettant un peu de côté aujourd\'hui, vous atteindrez votre objectif "$coffreName" ($targetText) plus rapidement !',
+              'By putting some money aside today, you will reach your "$coffreName" target ($targetText) faster!',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
@@ -81,8 +82,8 @@ class SavingsBoosterCard extends ConsumerWidget {
               onPressed: () {
                 sikaNotifier.sendTextMessage(
                   langNotifier.tr(
-                    'Ajouter ${currNotifier.format(500)} à mon objectif d\'épargne.',
-                    'Add ${currNotifier.format(500)} to my savings goal.',
+                    'Ajouter de l\'argent à mon objectif d\'épargne.',
+                    'Add money to my savings goal.',
                   ),
                 );
                 if (onBoostConfirmed != null) onBoostConfirmed!();
@@ -90,8 +91,8 @@ class SavingsBoosterCard extends ConsumerWidget {
               prefixWidget: Icon(Icons.savings_outlined,
                   color: Theme.of(context).colorScheme.onSurface, size: 18),
               text: langNotifier.tr(
-                  'Épargner ${currNotifier.format(500)} maintenant',
-                  'Boost ${currNotifier.format(500)} now'),
+                  'Épargner maintenant',
+                  'Boost savings now'),
             ),
           ),
         ],

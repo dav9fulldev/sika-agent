@@ -58,7 +58,7 @@ class SikaSyncService {
 
           final response = await apiService
               .perceiveSms(
-            text: 'Dépense de $amount FCFA en $category ($description)',
+            text: 'Dépense de $amount en $category ($description)',
             sender: 'OFFLINE_SYNC',
           )
               .timeout(

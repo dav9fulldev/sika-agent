@@ -10,8 +10,8 @@ class RunwayCardWidget extends ConsumerWidget {
 
   const RunwayCardWidget({
     super.key,
-    this.totalBalanceFcfa = 45000.0,
-    this.dailyBurnRateFcfa = 2500.0,
+    this.totalBalanceFcfa = 0.0,
+    this.dailyBurnRateFcfa = 0.0,
   });
 
   @override

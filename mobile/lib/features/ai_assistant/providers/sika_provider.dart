@@ -416,6 +416,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final bool shouldSpeak =
           (response['should_speak'] == true) || state.isVoiceMode;
 
+      final String backendLanguage = response['language'] as String? ?? (isEnglish ? 'en' : 'fr');
+      final finalTtsLocale = backendLanguage == 'en' ? 'en-US' : 'fr-FR';
+
       debugPrint(
           '[SIKA API] Action detected: $action | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
 
@@ -474,7 +477,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       );
 
       if (shouldSpeak) {
-        await _speak(sikaText, ttsLocale: activeTtsLocale);
+        await _speak(sikaText, ttsLocale: finalTtsLocale);
       }
     } catch (e) {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');

@@ -29,7 +29,8 @@ class AIEngine:
         amount: float,
         category: str,
         description: str,
-        planned_purchases: List
+        planned_purchases: List,
+        currency: str = ""
     ) -> Dict[str, Any]:
         """
         Vérifie si une transaction entrante correspond à un achat déjà planifié.
@@ -52,7 +53,7 @@ class AIEngine:
             return {
                 "is_planned": True,
                 "matched_purchase": matched,
-                "warning_message": f"✅ Achat prévu : {matched.get('name')}. Montant prévu : {matched.get('amount'):,.0f} FCFA.",
+                "warning_message": f"✅ Achat prévu : {matched.get('name')}. Montant prévu : {matched.get('amount'):,.0f} {currency}.",
                 "severity": "low"
             }
         else:
@@ -61,7 +62,7 @@ class AIEngine:
                 "is_planned": False,
                 "matched_purchase": None,
                 "warning_message": (
-                    f"⚠️ ATTENTION ! Cette dépense de {amount:,.0f} FCFA ({category}) "
+                    f"⚠️ ATTENTION ! Cette dépense de {amount:,.0f} {currency} ({category}) "
                     f"n'était pas prévue dans ta liste d'achats. "
                     f"Es-tu vraiment sûr(e) d'en avoir besoin maintenant ?"
                 ),
@@ -128,14 +129,15 @@ class AIEngine:
         total_spent: float,
         total_limit: float,
         days_remaining: int,
-        predicted_overspend: float
+        predicted_overspend: float,
+        currency: str = ""
     ) -> str:
         """Générer un conseil pour la fin de mois"""
         if predicted_overspend > 0:
             daily_reduction = predicted_overspend / days_remaining if days_remaining > 0 else predicted_overspend
             return (
-                f"⚠️ À ce rythme, vous dépasserez votre budget de {predicted_overspend:,.0f} FCFA. "
-                f"Réduisez vos dépenses de {daily_reduction:,.0f} FCFA par jour pour rester dans les limites."
+                f"⚠️ À ce rythme, vous dépasserez votre budget de {predicted_overspend:,.0f} {currency}. "
+                f"Réduisez vos dépenses de {daily_reduction:,.0f} {currency} par jour pour rester dans les limites."
             )
 
         usage = (total_spent / total_limit * 100) if total_limit > 0 else 0
@@ -143,18 +145,18 @@ class AIEngine:
 
         if usage < 50:
             return (
-                f"🎉 Excellent ! Vous avez encore {remaining:,.0f} FCFA disponibles. "
+                f"🎉 Excellent ! Vous avez encore {remaining:,.0f} {currency} disponibles. "
                 f"Continuez ainsi et pensez à épargner le surplus !"
             )
         elif usage < 75:
             return (
-                f"👍 Vous êtes sur la bonne voie. Il vous reste {remaining:,.0f} FCFA "
+                f"👍 Vous êtes sur la bonne voie. Il vous reste {remaining:,.0f} {currency} "
                 f"pour les {days_remaining} prochains jours."
             )
         else:
             daily_budget = remaining / days_remaining if days_remaining > 0 else 0
             return (
-                f"⚡ Attention ! Limitez vos dépenses à {daily_budget:,.0f} FCFA par jour "
+                f"⚡ Attention ! Limitez vos dépenses à {daily_budget:,.0f} {currency} par jour "
                 f"pour ne pas dépasser votre budget."
             )
 
@@ -165,23 +167,24 @@ class AIEngine:
         total_spent: float,
         remaining: float,
         budgets: List,
-        goals: List
+        goals: List,
+        currency: str = ""
     ) -> str:
         """Traiter une requête vocale et générer une réponse contextuelle"""
         query_lower = query.lower()
 
         # Détecter l'intention
         if any(word in query_lower for word in ["combien", "reste", "disponible", "solde"]):
-            return self._handle_balance_query(remaining, total_budget, total_spent)
+            return self._handle_balance_query(remaining, total_budget, total_spent, currency=currency)
 
         if any(word in query_lower for word in ["acheter", "dépenser", "payer", "puis-je"]):
-            return self._handle_purchase_query(query_lower, remaining, budgets)
+            return self._handle_purchase_query(query_lower, remaining, budgets, currency=currency)
 
         if any(word in query_lower for word in ["objectif", "épargne", "économie"]):
-            return self._handle_goals_query(goals)
+            return self._handle_goals_query(goals, currency=currency)
 
         if any(word in query_lower for word in ["budget", "catégorie"]):
-            return self._handle_budget_query(budgets)
+            return self._handle_budget_query(budgets, currency=currency)
 
         if any(word in query_lower for word in ["conseil", "recommandation", "aide"]):
             return self._handle_advice_query(total_spent, total_budget, remaining)
@@ -189,19 +192,19 @@ class AIEngine:
         # Réponse par défaut
         return (
             f"Je suis votre assistant financier GèrTonArgent ! "
-            f"Vous avez actuellement {remaining:,.0f} FCFA disponibles sur un budget total de {total_budget:,.0f} FCFA. "
+            f"Vous avez actuellement {remaining:,.0f} {currency} disponibles sur un budget total de {total_budget:,.0f} {currency}. "
             f"Demandez-moi si vous pouvez faire un achat, consultez vos objectifs, ou demandez des conseils !"
         )
 
-    def _handle_balance_query(self, remaining: float, total_budget: float, total_spent: float) -> str:
+    def _handle_balance_query(self, remaining: float, total_budget: float, total_spent: float, currency: str = "") -> str:
         """Gérer les questions sur le solde"""
         usage = (total_spent / total_budget * 100) if total_budget > 0 else 0
         return (
-            f"📊 Il vous reste {remaining:,.0f} FCFA sur votre budget mensuel. "
-            f"Vous avez dépensé {total_spent:,.0f} FCFA soit {usage:.0f}% de votre budget."
+            f"📊 Il vous reste {remaining:,.0f} {currency} sur votre budget mensuel. "
+            f"Vous avez dépensé {total_spent:,.0f} {currency} soit {usage:.0f}% de votre budget."
         )
 
-    def _handle_purchase_query(self, query: str, remaining: float, budgets: List) -> str:
+    def _handle_purchase_query(self, query: str, remaining: float, budgets: List, currency: str = "") -> str:
         """Gérer les questions sur les achats potentiels"""
         # Essayer d'extraire un montant de la requête
         amounts = re.findall(r'(\d+[\s,.]?\d*)', query.replace(' ', ''))
@@ -211,14 +214,14 @@ class AIEngine:
                 if amount <= remaining:
                     percentage = (amount / remaining * 100)
                     return (
-                        f"✅ Oui, vous pouvez dépenser {amount:,.0f} FCFA. "
+                        f"✅ Oui, vous pouvez dépenser {amount:,.0f} {currency}. "
                         f"Cela représente {percentage:.0f}% de votre budget restant. "
-                        f"Après cet achat, il vous restera {remaining - amount:,.0f} FCFA."
+                        f"Après cet achat, il vous restera {remaining - amount:,.0f} {currency}."
                     )
                 else:
                     return (
-                        f"⚠️ Attention ! Vous voulez dépenser {amount:,.0f} FCFA mais "
-                        f"il ne vous reste que {remaining:,.0f} FCFA. "
+                        f"⚠️ Attention ! Vous voulez dépenser {amount:,.0f} {currency} mais "
+                        f"il ne vous reste que {remaining:,.0f} {currency}. "
                         f"Je vous conseille de reporter cet achat ou de trouver une alternative moins chère."
                     )
             except ValueError:
@@ -226,10 +229,10 @@ class AIEngine:
 
         return (
             f"💰 Pour savoir si vous pouvez faire un achat, dites-moi le montant ! "
-            f"Il vous reste actuellement {remaining:,.0f} FCFA disponibles."
+            f"Il vous reste actuellement {remaining:,.0f} {currency} disponibles."
         )
 
-    def _handle_goals_query(self, goals: List) -> str:
+    def _handle_goals_query(self, goals: List, currency: str = "") -> str:
         """Gérer les questions sur les objectifs"""
         if not goals:
             return "🎯 Vous n'avez pas encore d'objectifs d'épargne. Créez-en un pour commencer à économiser !"
@@ -244,12 +247,12 @@ class AIEngine:
             remaining = goal.target_amount - goal.current_amount
             response += (
                 f"\n• {goal.name}: {progress:.0f}% atteint "
-                f"({goal.current_amount:,.0f} / {goal.target_amount:,.0f} FCFA)"
+                f"({goal.current_amount:,.0f} / {goal.target_amount:,.0f} {currency})"
             )
 
         return response
 
-    def _handle_budget_query(self, budgets: List) -> str:
+    def _handle_budget_query(self, budgets: List, currency: str = "") -> str:
         """Gérer les questions sur les budgets"""
         if not budgets:
             return "📝 Vous n'avez pas encore de budgets configurés. Créez vos budgets par catégorie !"
@@ -261,7 +264,7 @@ class AIEngine:
             status = "✅" if usage < 70 else "⚠️" if usage < 90 else "🔴"
             response += (
                 f"\n{status} {budget.category.value.capitalize()}: "
-                f"{budget.current_spent:,.0f} / {budget.monthly_limit:,.0f} FCFA ({usage:.0f}%)"
+                f"{budget.current_spent:,.0f} / {budget.monthly_limit:,.0f} {currency} ({usage:.0f}%)"
             )
 
         return response

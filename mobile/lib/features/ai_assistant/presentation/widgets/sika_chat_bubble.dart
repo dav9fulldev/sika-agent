@@ -133,9 +133,9 @@ class SikaChatBubble extends ConsumerWidget {
         child: HumanConfirmationCard(
           actionId: actionId,
           recipientText: recipient,
-          amountText: '$amount FCFA',
+          amountText: amount,
           sourceAccount: data['source_wallet']?.toString() ?? 'Portefeuille Principal',
-          feeText: data['fee'] != null ? '${data['fee']} FCFA' : '0 FCFA',
+          feeText: data['fee'] != null ? '${data['fee']}' : '—',
           platformText: data['platform']?.toString() ?? 'PayMeChap / Direct',
           onConfirm: () {
             if (actionId != null) {

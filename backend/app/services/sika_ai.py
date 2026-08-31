@@ -84,93 +84,85 @@ class SikaAIService:
                 f"{e}. Le fallback SIKA reste actif."
             )
 
-    def _is_english(self, message: str) -> bool:
-        """Détection simple de la langue anglaise."""
+    def detect_language(self, message: str) -> str:
+        """
+        Détection dynamique et déterministe de la langue (Anglais 'en' ou Français 'fr').
+        Ne dépend d'aucun profil statique en BDD.
+        """
+        if not message or not message.strip():
+            return "fr"
 
         msg_lower = message.lower()
 
-        french_indicators = [
-            "solde",
-            "dépense",
-            "dépensé",
-            "combien",
-            "épargne",
-            "bonjour",
-            "salut",
-            "transfert",
-            "transférer",
-            "mon",
-            "ma",
-            "mes",
-            "coffre",
-            "budget",
+        # Expressions et motifs forts anglais
+        en_phrases = [
+            "what's my", "what is my", "whats my", "how much", "how's my", "how is my",
+            "my balance", "total balance", "recent spending", "recent expenses",
+            "send ", "transfer ", "check my", "show me", "can you", "please ",
+            "what can you do", "who are you"
+        ]
+        # Expressions et motifs forts français
+        fr_phrases = [
+            "quel est", "quelle est", "quels sont", "quelles sont", "combien j'ai",
+            "combien de", "combien sur", "mon solde", "solde total", "mes dépenses",
+            "mes depenses", "dépenses récentes", "envoie ", "envoyer ", "transférer ",
+            "que peux-tu faire", "qui es-tu"
         ]
 
-        english_indicators = [
-            "balance",
-            "spending",
-            "spent",
-            "how much",
-            "savings",
-            "hello",
-            "hi",
-            "transfer",
-            "wallet",
-            "safe",
-            "budget",
-            "expenses",
-        ]
+        en_score = sum(3 for p in en_phrases if p in msg_lower)
+        fr_score = sum(3 for p in fr_phrases if p in msg_lower)
 
-        fr_count = sum(
-            1 for keyword in french_indicators
-            if keyword in msg_lower
-        )
+        # Mots-clés individuels
+        english_words = {
+            "what", "what's", "whats", "how", "much", "is", "my", "total", "balance",
+            "check", "spending", "spent", "expenses", "expense", "send", "transfer",
+            "savings", "safe", "deposit", "withdraw", "hello", "hi", "hey", "please",
+            "can", "you", "i", "to", "for", "from", "show", "me", "recent", "analyze",
+            "analysis", "money", "wallet", "wallets", "account", "accounts", "good",
+            "morning", "evening", "thanks", "thank"
+        }
 
-        en_count = sum(
-            1 for keyword in english_indicators
-            if keyword in msg_lower
-        )
+        french_words = {
+            "quel", "quelle", "quels", "quelles", "est", "sont", "mon", "ma", "mes",
+            "solde", "soldes", "combien", "dépense", "dépenses", "dépensé", "depense",
+            "depenses", "envoie", "envoyer", "transférer", "transferer", "transfert",
+            "épargne", "epargne", "coffre", "coffres", "bonjour", "salut", "bonsoir",
+            "coucou", "retrait", "retirer", "verser", "compte", "comptes", "portefeuille",
+            "portefeuilles", "analyse", "analyser", "récent", "recents", "récentes", "recentes",
+            "merci", "argent", "fonds"
+        }
 
-        if en_count > fr_count:
-            return True
+        tokens = set(re.findall(r"\b[a-zA-Z'’àâäéèêëîïôöùûüç]+\b", msg_lower))
+        en_score += sum(1 for t in tokens if t in english_words)
+        fr_score += sum(1 for t in tokens if t in french_words)
 
-        return False
+        if en_score > fr_score:
+            return "en"
+        return "fr"
+
+    def _is_english(self, message: str) -> bool:
+        """Vérifie si le message est en anglais."""
+        return self.detect_language(message) == "en"
 
     def _format_currency(
         self,
-        amount_fcfa: float,
+        amount: float,
         context: Dict[str, Any]
     ) -> str:
         """
-        Formate un montant selon la devise active.
-
-        Les montants internes de SIKA sont actuellement
-        exprimés en FCFA.
+        Formate un montant selon la devise active du runtime.
+        Préserve exactement le montant sans le convertir, 
+        et utilise le symbole du contexte (provenance des données stricte).
         """
-
-        code = (
-            context.get("currency_code")
-            or "XOF"
-        ).upper()
-
-        symbol = (
-            context.get("currency_symbol")
-            or "FCFA"
-        )
-
-        if code == "USD" or symbol == "$":
-            value = amount_fcfa / 600.0
-            return f"${value:.2f}"
-
-        elif code == "EUR" or symbol == "€":
-            value = amount_fcfa / 655.957
-            return f"{value:.2f} €"
-
-        elif code == "GBP" or symbol == "£":
-            value = amount_fcfa / 770.0
-            return f"£{value:.2f}"
-
-        return f"{int(amount_fcfa):,} FCFA".replace(",", " ")
+        code = context.get("currency_code")
+        symbol = context.get("currency_symbol")
+        
+        if not symbol and not code:
+            # If absolutely no currency is given, just format the number
+            return f"{int(amount):,}".replace(",", " ")
+            
+        display_currency = symbol if symbol else code
+        return f"{int(amount):,} {display_currency}".replace(",", " ").strip()
 
     def _extract_action(
         self,
@@ -419,6 +411,11 @@ class SikaAIService:
             "état de mes comptes",
             "portefeuilles",
             "wallet balance",
+            "my balance",
+            "balance",
+            "what is my balance",
+            "what's my balance",
+            "whats my balance",
         ]
 
         if any(
@@ -480,9 +477,9 @@ class SikaAIService:
                 acc = selected_w.get("account_number", "")
                 acc_info = f" ({acc})" if acc else ""
                 response = (
-                    f"Ton solde {prov_name}{acc_info} est de **{fmt_bal}**."
+                    f"Ton solde {prov_name}{acc_info} est de {fmt_bal}."
                     if not is_english
-                    else f"Your {prov_name}{acc_info} balance is **{fmt_bal}**."
+                    else f"Your {prov_name}{acc_info} balance is {fmt_bal}."
                 )
                 suggestions = [
                     "Voir mes dépenses récentes",
@@ -519,9 +516,9 @@ class SikaAIService:
                 acc = selected_w.get("account_number", "")
                 acc_info = f" ({acc})" if acc else ""
                 response = (
-                    f"Ton solde {prov_name}{acc_info} est de **{fmt_bal}**."
+                    f"Ton solde {prov_name}{acc_info} est de {fmt_bal}."
                     if not is_english
-                    else f"Your {prov_name}{acc_info} balance is **{fmt_bal}**."
+                    else f"Your {prov_name}{acc_info} balance is {fmt_bal}."
                 )
                 suggestions = [
                     "Voir mes dépenses récentes",
@@ -932,7 +929,7 @@ class SikaAIService:
                 )
 
                 suggestions = [
-                    "Deposit 10 000 FCFA into safe",
+                    "Deposit into safe",
                     "Check total balance",
                     "View recent expenses",
                 ]
@@ -948,7 +945,7 @@ class SikaAIService:
                 )
 
                 suggestions = [
-                    "Déposer 10 000 FCFA dans le coffre",
+                    "Déposer dans le coffre",
                     "Vérifier mon solde",
                     "Voir mes dépenses",
                 ]
@@ -1183,14 +1180,12 @@ class SikaAIService:
 
                     response = (
                         f"Based on your financial context, "
-                        "setting aside between 10 000 FCFA "
-                        "and 15 000 FCFA could be a good option. "
-                        "Would you like me to prepare the deposit?"
+                        "setting aside some money could be a good option. "
+                        "Would you like me to prepare a deposit?"
                     )
 
                     suggestions = [
-                        "Deposit 10 000 FCFA into safe",
-                        "Deposit 15 000 FCFA into safe",
+                        "Deposit into safe",
                         "Check total balance",
                     ]
 
@@ -1198,15 +1193,13 @@ class SikaAIService:
 
                     response = (
                         f"En tenant compte de ton contexte financier "
-                        f"{user_firstname}, mettre de côté entre "
-                        "10 000 FCFA et 15 000 FCFA pourrait être "
-                        "une bonne option. "
+                        f"{user_firstname}, mettre de l'argent de côté "
+                        "pourrait être une bonne option. "
                         "Souhaites-tu que je prépare le dépôt ?"
                     )
 
                     suggestions = [
-                        "Déposer 10 000 FCFA dans le coffre",
-                        "Déposer 15 000 FCFA dans le coffre",
+                        "Déposer dans le coffre",
                         "Vérifier mon solde",
                     ]
 
@@ -1428,9 +1421,12 @@ class SikaAIService:
                         safe_tools.append(func)
 
         active_wallets = [w for w in context.get("wallets", []) if w.get("is_active", True)]
-        total_balance_fcfa = sum(w.get("balance", 0.0) for w in active_wallets)
+        total_balance = sum(w.get("balance", 0.0) for w in active_wallets)
+        currency_sym = context.get("currency_symbol") or context.get("currency_code") or ""
         
-        context_str = f"Solde total: {total_balance_fcfa} FCFA\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} FCFA)" for w in active_wallets])
+        context_str = f"Solde total: {total_balance} {currency_sym}\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} {currency_sym})" for w in active_wallets])
+
+        lang_instruction = "Réponds UNIQUEMENT en anglais." if is_english else "Réponds UNIQUEMENT en français."
 
         system_instruction = f"""
             RÈGLE CRITIQUE — ACTIONS FINANCIÈRES ET TOOLS :
@@ -1448,8 +1444,10 @@ RÈGLES STRICTES :
 4. Si une information est ambiguë (plusieurs contacts avec le même nom), pose une question courte pour clarifier avant d'agir. Ne demande PAS le numéro si tu l'as déjà trouvé.
 5. Tu ne peux pas exécuter directement une transaction. Appelle `prepare_transfer`, cela mettra la transaction en attente de confirmation humaine.
 6. Réponds de manière concise, naturelle et chaleureuse.
-    7. Tu ne dois JAMAIS inventer un `action_id` ni générer un identifiant commençant par "act_" dans une réponse texte si `prepare_transfer` n'a pas été appelé avec succès.
-    8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
+7. Tu ne dois JAMAIS inventer un `action_id` ni générer un identifiant commençant par "act_" dans une réponse texte si `prepare_transfer` n'a pas été appelé avec succès.
+8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
+
+LANGUE : {lang_instruction}
 """
         
         messages = []
@@ -1627,6 +1625,7 @@ RÈGLES STRICTES :
             "status": "WAITING_CONFIRMATION" if (action_detected == "prepare_transfer" and bool(action_id)) else "PROCESSED",
             "should_speak": True,
             "agent_steps": agent_steps,
+            "language": "en" if is_english else "fr",
         }
 
 # Instance globale utilisée dans l'application

@@ -87,7 +87,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
     final sikaNotifier = ref.read(sikaProvider.notifier);
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
-    ref.watch(currencyProvider);
+    final currState = ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
     final walletState = ref.watch(walletProvider);
     final sikaData = ref.watch(sikaProvider);
@@ -249,10 +249,10 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: ProactiveAlertCard(
-                              amountText: currNotifier.format(30000),
+                              amountText: '—',
                               message: langNotifier.tr(
-                                'Dépense de ${currNotifier.format(30000)} détectée. Cela consomme 2/3 de votre budget restant.',
-                                'A ${currNotifier.format(30000)} expense detected. This uses 2/3 of your remaining budget.',
+                                'Dépense détectée. Cela consomme une part importante de votre budget restant.',
+                                'Expense detected. This uses a large part of your remaining budget.',
                               ),
                               onExamine: () => _openAnalysisSheet(sikaNotifier),
                               onDismiss: () =>
@@ -285,7 +285,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                     ? currNotifier.format(amountVal)
                                     : '---',
                                 sourceAccount: actionData['source_wallet']?.toString() ?? 'Portefeuille Principal',
-                                feeText: actionData['fee'] != null ? '${actionData['fee']} FCFA' : '0 FCFA',
+                                feeText: actionData['fee'] != null ? '${actionData['fee']} ${currState.code}' : '—',
                                 platformText: actionData['platform']?.toString() ?? 'PayMeChap / Direct',
                                 onConfirm: () => sikaNotifier
                                     .executeSecurityValidationAndConfirm(
@@ -385,13 +385,13 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
                                 context,
                                 icon: Icons.bolt_rounded,
                                 text: langNotifier.tr(
-                                    'Puis-je dépenser 15 000 FCFA ?',
-                                    'Can I spend 15,000 FCFA today?'),
+                                    'Puis-je faire cet achat ?',
+                                    'Can I make this purchase?'),
                                 color: AppColors.warning,
                                 onTap: () => _submitQuery(
                                     langNotifier.tr(
-                                        'Est-ce que je peux dépenser 15000 FCFA aujourd\'hui ?',
-                                        'Can I spend 15000 FCFA today?'),
+                                        'Est-ce que je peux faire cet achat aujourd\'hui ?',
+                                        'Can I make this purchase today?'),
                                     sikaNotifier),
                                 delay: 550,
                               ),

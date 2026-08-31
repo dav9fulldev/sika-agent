@@ -39,7 +39,7 @@ class FinancialBrain:
     # 1. DÉTECTION ACHATS IMPULSIFS
     # ========================================================================
     
-    def detect_impulsive_purchase(self, amount: float) -> Dict:
+    def detect_impulsive_purchase(self, amount: float, currency: str = "") -> Dict:
         """
         Détecte si un achat est impulsif
         
@@ -60,7 +60,7 @@ class FinancialBrain:
                 "is_impulsive": True,
                 "severity": "high",
                 "reason": f"Cette dépense représente {(amount/monthly_income)*100:.1f}% de ton revenu mensuel",
-                "suggestion": f"C'est beaucoup ! Réfléchis bien avant de valider. Maximum conseillé: {threshold:.0f} FCFA",
+                "suggestion": f"C'est beaucoup ! Réfléchis bien avant de valider. Maximum conseillé: {threshold:.0f} {currency}",
                 "risk_score": min((amount / threshold) * 10, 10)
             }
         
@@ -79,8 +79,8 @@ class FinancialBrain:
             return {
                 "is_impulsive": True,
                 "severity": "medium",
-                "reason": f"Tu as déjà dépensé {recent_spending:.0f} FCFA aujourd'hui",
-                "suggestion": f"Cette nouvelle dépense portera ton total à {total_with_new:.0f} FCFA (limite: {threshold:.0f} FCFA)",
+                "reason": f"Tu as déjà dépensé {recent_spending:.0f} {currency} aujourd'hui",
+                "suggestion": f"Cette nouvelle dépense portera ton total à {total_with_new:.0f} {currency} (limite: {threshold:.0f} {currency})",
                 "risk_score": min((total_with_new / threshold) * 8, 10)
             }
         
@@ -224,7 +224,7 @@ class FinancialBrain:
         insights = []
         
         if daily_avg > 0:
-            insights.append(f"Tu dépenses en moyenne {daily_avg:.0f} FCFA par jour")
+            insights.append(f"Tu dépenses en moyenne {daily_avg:.0f} {currency} par jour")
         
         if max_day:
             insights.append(f"Tu dépenses le plus les {max_day}s")
@@ -290,7 +290,7 @@ class FinancialBrain:
         if projected_total > monthly_budgets:
             risk_level = "high"
             status = "danger"
-            message = f"⚠️ ALERTE ! Tu risques de dépasser ton budget de {projected_total - monthly_budgets:.0f} FCFA"
+            message = f"⚠️ ALERTE ! Tu risques de dépasser ton budget de {projected_total - monthly_budgets:.0f} {currency}"
         elif (monthly_spending / monthly_budgets) * 100 >= self.HIGH_SPENDING_THRESHOLD:
             risk_level = "medium"
             status = "warning"
@@ -315,7 +315,7 @@ class FinancialBrain:
             "status": status,
             "message": message,
             "daily_budget_recommendation": daily_budget_remaining,
-            "advice": f"Pour tenir jusqu'à la fin du mois, dépense maximum {daily_budget_remaining:.0f} FCFA par jour"
+            "advice": f"Pour tenir jusqu'à la fin du mois, dépense maximum {daily_budget_remaining:.0f} {currency} par jour"
         }
     
     # ========================================================================

@@ -13,7 +13,7 @@ class ProactiveAlertCard extends StatelessWidget {
     super.key,
     this.title = 'Financial Alert',
     required this.message,
-    this.amountText = '30 000 FCFA',
+    this.amountText = '—',
     required this.onExamine,
     required this.onDismiss,
   });
