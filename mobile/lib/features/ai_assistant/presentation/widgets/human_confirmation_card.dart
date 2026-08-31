@@ -6,6 +6,7 @@ import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/api_service_provider.dart';
+import '../../../../core/services/biometric_service.dart';
 import '../../providers/sika_provider.dart';
 
 /// HumanConfirmationCard — SIKA Financial Assistant Human-in-the-Loop Confirmation Card
@@ -269,11 +270,30 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
                         child: SikaPremiumButton(
                           onPressed: _isSubmittingLocally
                               ? null
-                              : () {
-                                  setModalState(() => _isSubmittingLocally = true);
-                                  setState(() => _isSubmittingLocally = true);
-                                  Navigator.pop(ctx);
-                                  widget.onConfirm();
+                              : () async {
+                                  final biometricService = ref.read(biometricServiceProvider);
+                                  final bool authenticated = await biometricService.authenticate(
+                                    localizedReason: langNotifier.tr(
+                                      'Authentifiez-vous pour sécuriser PayMeChap et valider ce transfert.',
+                                      'Authenticate to secure PayMeChap and validate this transfer.',
+                                    ),
+                                  );
+
+                                  if (authenticated) {
+                                    setModalState(() => _isSubmittingLocally = true);
+                                    setState(() => _isSubmittingLocally = true);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    widget.onConfirm();
+                                  } else {
+                                    // Basculer sur le code PIN si la biométrie est annulée ou non configurée
+                                    setModalState(() {
+                                      selectedMode = 1;
+                                      pinError = langNotifier.tr(
+                                        'Biométrie non validée. Veuillez utiliser votre code PIN.',
+                                        'Biometrics not validated. Please use your PIN code.',
+                                      );
+                                    });
+                                  }
                                 },
                           prefixWidget: _isSubmittingLocally
                               ? const SizedBox(
