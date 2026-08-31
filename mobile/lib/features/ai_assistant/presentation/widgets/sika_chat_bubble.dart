@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../providers/sika_provider.dart';
-import 'human_confirmation_card.dart';
 import 'agent_progress_widget.dart';
 
 class SikaChatBubble extends ConsumerWidget {
@@ -122,31 +121,62 @@ class SikaChatBubble extends ConsumerWidget {
     final String type = (data['type'] ?? data['action'] ?? (data['recipient'] != null ? 'transfer' : '')).toString().toLowerCase();
     final String amount = (data['amount'] ?? '').toString();
     final String recipient = data['recipient']?.toString() ?? data['destinataire']?.toString() ?? 'Destinataire inconnu';
-    final sikaData = ref.watch(sikaProvider);
-    final String? actionId = (data['action_id'] ?? sikaData.pendingActionId ?? sikaData.activeActionId)?.toString();
 
     if (type == 'transfer' || type == 'transfert' || data.containsKey('recipient') || data.containsKey('amount')) {
       final currency = data['currency']?.toString() ?? 'XOF';
       final formattedAmount = amount.isNotEmpty ? '$amount $currency' : '—';
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: HumanConfirmationCard(
-          actionId: actionId,
-          recipientText: recipient,
-          amountText: formattedAmount,
-          sourceAccount: data['source_wallet']?.toString() ?? (data['provider']?.toString() ?? 'PayMeChap').toUpperCase(),
-          feeText: data['fee'] != null ? '${data['fee']} $currency' : 'Gratuit',
-          platformText: data['platform']?.toString() ?? 'PayMeChap / Direct',
-          onConfirm: () {
-            if (actionId != null) {
-              ref
-                  .read(sikaProvider.notifier)
-                  .executeSecurityValidationAndConfirm(actionId);
-            }
-          },
-          onCancel: () {
-            ref.read(sikaProvider.notifier).cancelPendingAction();
-          },
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceHighlight : AppColors.lightSurfaceHighlight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.brandPrimary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.brandPrimary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.send_rounded,
+                size: 16,
+                color: AppColors.brandPrimary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Transfert $formattedAmount',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'Vers: $recipient',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }

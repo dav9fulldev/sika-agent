@@ -75,7 +75,8 @@ class SikaAgentOrchestrator:
             "status": "WAITING_CONFIRMATION",
             "created_at": time.time(),
             "ttl": ttl_seconds,
-            "result": None
+            "payload": payload,
+            "result": payload
         }
         self.action_store[action_id] = entry
 

@@ -1649,7 +1649,8 @@ LANGUE : {lang_instruction}
                                             "user_id": act.user_id,
                                             "action_type": act.action_type,
                                             "status": act.status,
-                                            "result": None,
+                                            "payload": action_data_detected,
+                                            "result": action_data_detected,
                                         }
                                         final_response_text = (
                                             "I have prepared the transfer. Would you like to confirm?"
