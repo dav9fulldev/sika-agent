@@ -507,7 +507,16 @@ class SikaAgentOrchestrator:
             }
 
         try:
-            if "transfer" in action_id or "act_tr" in action_id:
+            is_transfer = (
+                "recipient" in parsed_payload
+                or "destinataire" in parsed_payload
+                or "recipient_phone" in parsed_payload
+                or "transfer" in action_id
+                or "act_tr" in action_id
+                or (action_meta and action_meta.get("action_type") in ["TRANSFER", "TRANSFERT"])
+                or (db_action and db_action.action_type in ["TRANSFER", "TRANSFERT"])
+            )
+            if is_transfer:
                 # Extraction dynamique et sécurisée
                 try:
                     amount = float(parsed_payload.get("amount", 0))

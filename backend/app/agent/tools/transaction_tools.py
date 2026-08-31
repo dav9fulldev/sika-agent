@@ -94,7 +94,7 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
             error_message="Le provider source du transfert est obligatoire et doit provenir d'un portefeuille enrôlé."
         )
 
-    action_id = f"act_{uuid.uuid4().hex[:8]}"
+    action_id = f"act_tr_{uuid.uuid4().hex[:8]}"
     return ToolResult(
         success=True,
         tool_name="prepare_transfer",
