@@ -435,7 +435,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final actionId = response['action_id'] as String?;
       final bool requiresSecurity =
           response['requires_security_validation'] == true ||
-              response['requires_biometric'] == true;
+              response['requires_biometric'] == true ||
+              response['requires_confirmation'] == true ||
+              (actionId != null && (action == 'prepare_transfer' || action == 'transfer'));
       final actionData = response['action_data'] != null
           ? Map<String, dynamic>.from(response['action_data'])
           : null;
@@ -447,11 +449,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final finalTtsLocale = backendLanguage == 'en' ? 'en-US' : 'fr-FR';
 
       debugPrint(
-          '[SIKA API] Action detected: $action | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
+          '[SIKA API] Action detected: $action | Action ID: $actionId | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
 
       SikaState pendingNextState = SikaState.idle;
 
-      if (requiresSecurity && actionId != null) {
+      if (actionId != null && (requiresSecurity || action == 'prepare_transfer')) {
         pendingNextState = SikaState.securityValidation;
       } else if (action == 'ask_ambiguity' ||
           status == 'NEEDS_CLARIFICATION' ||

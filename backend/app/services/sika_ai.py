@@ -1490,6 +1490,7 @@ RÈGLES STRICTES :
 8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
 9. RÈGLE DES DEVISES : Gemini ne doit JAMAIS effectuer de conversion monétaire ou de calcul de taux de change. Si la devise d'affichage ({display_code}) est différente de la devise du portefeuille ({wallet_code}) et qu'aucun taux n'est fourni par le backend, annonce clairement les valeurs dans la devise de base du portefeuille ({wallet_code}) pour éviter toute incohérence.
 10. RÈGLE SALUTATIONS : Si le message utilisateur est une simple salutation (ex: hello, bonjour, hi), réponds de façon chaleureuse et présente tes capacités d'assistance. N'appelle JAMAIS de tool financier (prepare_transfer, etc.), même si l'historique conversationnel mentionnait un transfert antérieur.
+11. RÈGLE CONFIRMATION ET PAIEMENT : Tu ne dois JAMAIS dire à l'utilisateur d'ouvrir l'application PayMeChap pour valider. La validation sécurisée par biométrie (Face ID / empreinte) ou code PIN se fait DIRECTEMENT dans l'application SIKA sur la carte de confirmation qui s'affiche à l'écran.
 
 LANGUE : {lang_instruction}
 """
@@ -1671,6 +1672,7 @@ LANGUE : {lang_instruction}
                 else "Je n'ai pas pu terminer l'analyse."
             )
 
+        is_transfer_action = bool(action_detected == "prepare_transfer" and action_id)
         return {
             "response": final_response_text,
             "action": action_detected,
@@ -1680,9 +1682,10 @@ LANGUE : {lang_instruction}
             "suggestions": [],
             "provider": "VERTEX_AI_AGENT",
             "model": self.model,
-            # Require a real action_id to mark as requiring confirmation.
-            "requires_confirmation": (action_detected == "prepare_transfer" and bool(action_id)),
-            "status": "WAITING_CONFIRMATION" if (action_detected == "prepare_transfer" and bool(action_id)) else "PROCESSED",
+            "requires_confirmation": is_transfer_action,
+            "requires_biometric": is_transfer_action,
+            "requires_security_validation": is_transfer_action,
+            "status": "WAITING_CONFIRMATION" if is_transfer_action else "PROCESSED",
             "should_speak": True,
             "agent_steps": agent_steps,
             "language": "en" if is_english else "fr",

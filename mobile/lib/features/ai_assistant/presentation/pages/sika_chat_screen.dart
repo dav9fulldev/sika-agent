@@ -91,10 +91,11 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     final bool isProcessing = sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.agentWorking;
 
-    // Lock input when biometric confirmation is waiting
-    final bool isAwaitingConfirmation =
-        sikaData.state == SikaState.securityValidation ||
-        sikaData.state == SikaState.executingAction;
+    // Lock input when confirmation is waiting
+    final bool isAwaitingConfirmation = sikaData.pendingActionId != null &&
+        (sikaData.state == SikaState.securityValidation ||
+            sikaData.state == SikaState.waitingVoiceConfirmation ||
+            sikaData.state == SikaState.executingAction);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
