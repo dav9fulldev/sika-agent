@@ -262,8 +262,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
           }
         },
         listenOptions: SpeechListenOptions(
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 5),
+          listenFor: const Duration(seconds: 45),
+          pauseFor: const Duration(milliseconds: 1600),
           localeId: activeSttLocale,
           cancelOnError: false,
           partialResults: true,
@@ -879,87 +879,47 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   bool _isEnglishText(String text) {
-    final lower = text.toLowerCase();
+    final lower = text.toLowerCase().trim();
+    if (lower.isEmpty) return _ref.read(languageProvider).code == 'en';
 
     final frenchIndicators = [
-      'bonjour',
-      'salut',
-      'coucou',
-      'bonsoir',
-      'comment',
-      'vas',
-      'va',
-      'ça va',
-      'ca va',
-      'solde',
-      'combien',
-      'portefeuille',
-      'dépense',
-      'depense',
-      'épargne',
-      'epargne',
-      'transfert',
-      'transférer',
-      'argent',
-      'merci',
-      'oui',
-      'non',
-      'je',
-      'tu',
-      'moi',
-      'toi',
-      'suis',
-      'vais',
-      'bien',
-      'comment tu vas'
+      'bonjour', 'salut', 'coucou', 'bonsoir', 'sika', 'dis sika', 'hey sika',
+      'fais', 'fait', 'effectue', 'envoie', 'transfère', 'transfere', 'transférer', 'transferer', 'transfert',
+      'stp', 'svp', 's\'il te plaît', 'sil te plait', 's\'il vous plaît', 'sil vous plait',
+      'rapide', 'vite', 'combien', 'solde', 'mon', 'ma', 'mes', 'compte', 'comptes',
+      'portefeuille', 'portefeuilles', 'argent', 'fonds', 'somme', 'montant',
+      'franc', 'francs', 'cfa', 'fcfa', 'xof', 'coffre', 'coffres', 'épargne', 'epargne',
+      'dépense', 'depense', 'dépenses', 'depenses', 'dépensé', 'retrait', 'retirer',
+      'verser', 'dépôt', 'depot', 'déposer', 'analyser', 'analyse', 'récent', 'recent',
+      'merci', 'oui', 'non', 'd\'accord', 'daccord', 'annuler', 'confirmer',
+      'je', 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles',
+      'le', 'la', 'les', 'un', 'une', 'des', 'du', 'au', 'aux', 'à', 'de', 'pour', 'sur', 'vers', 'avec',
+      'comment', 'pourquoi', 'quand', 'quel', 'quelle', 'quels', 'quelles', 'est', 'sont',
+      'peux-tu', 'pouvez-vous', 'aide-moi', 'aidez-moi', 'vas', 'va', 'ça va', 'ca va',
+      'suis', 'vais', 'bien'
     ];
     final englishIndicators = [
-      'hello',
-      'hi',
-      'hey',
-      'how are you',
-      'say hello',
-      'good morning',
-      'thanks',
-      'thank',
-      'how much',
-      'money',
-      'total',
-      'balance',
-      'transfer',
-      'rebalance',
-      'save',
-      'savings',
-      'add',
-      'goal',
-      'how is my',
-      'what is my',
-      'analyze',
-      'recent',
-      'expenses',
-      'spend',
-      'wallet',
-      'dollars',
-      'usd',
-      'are you okay',
-      'are you fine',
-      'are you good',
-      'you okay',
-      'doing',
-      'okay',
-      'ok'
+      'hello', 'hi', 'hey', 'how are you', 'say hello', 'good morning', 'good evening',
+      'thanks', 'thank', 'thank you', 'how much', 'money', 'total', 'balance',
+      'transfer', 'send', 'rebalance', 'save', 'savings', 'add', 'goal',
+      'how is my', 'what is my', 'analyze', 'recent', 'expenses', 'spend', 'spent',
+      'wallet', 'wallets', 'dollars', 'usd', 'are you okay', 'are you fine',
+      'are you good', 'you okay', 'doing', 'please', 'can you', 'show me'
     ];
 
     int frenchCount = 0;
     int englishCount = 0;
 
     for (final word in frenchIndicators) {
-      if (lower.contains(word)) frenchCount++;
+      if (lower.contains(word)) frenchCount += 2;
     }
     for (final word in englishIndicators) {
-      if (lower.contains(word)) englishCount++;
+      if (lower.contains(word)) englishCount += 2;
     }
 
+    if (frenchCount > 0 && englishCount == 0) return false;
+    if (englishCount > 0 && frenchCount == 0) return true;
+    if (frenchCount >= englishCount && frenchCount > 0) return false;
     if (englishCount > frenchCount) return true;
     if (frenchCount > englishCount) return false;
 

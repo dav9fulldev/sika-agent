@@ -38,9 +38,12 @@ def test_gcp_tts_voices_list():
 
 def test_chat_endpoint_does_not_embed_audio_base64():
     """Vérifie que /chat retourne speech_text et should_speak sans doubler la génération audio base64."""
+    from app.services.auth_service import oauth2_auth_service
+    token = oauth2_auth_service.create_access_token({"sub": "test@sika.com", "user_id": 1})
     response = client.post(
         "/api/v1/sika/chat",
-        json={"query": "Quel est mon solde ?"}
+        json={"query": "Quel est mon solde ?"},
+        headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
     data = response.json()

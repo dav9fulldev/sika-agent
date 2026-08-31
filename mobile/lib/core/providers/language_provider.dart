@@ -16,7 +16,7 @@ extension AppLanguageExtension on AppLanguage {
 class LanguageNotifier extends StateNotifier<AppLanguage> {
   static const String _keyLang = 'sika_preferred_language';
 
-  LanguageNotifier() : super(AppLanguage.english) {
+  LanguageNotifier() : super(AppLanguage.french) {
     _loadSavedLanguage();
   }
 
@@ -25,10 +25,10 @@ class LanguageNotifier extends StateNotifier<AppLanguage> {
       final prefs = await SharedPreferences.getInstance();
       final savedCode = prefs.getString(_keyLang);
       if (savedCode != null) {
-        if (savedCode == 'fr' || savedCode.toLowerCase() == 'french') {
-          state = AppLanguage.french;
-        } else {
+        if (savedCode == 'en' || savedCode.toLowerCase() == 'english') {
           state = AppLanguage.english;
+        } else {
+          state = AppLanguage.french;
         }
       }
       _syncNativeLanguage();

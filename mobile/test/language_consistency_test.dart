@@ -13,18 +13,18 @@ void main() {
   group('SIKA Language Consistency Unit & Widget Tests', () {
     test('LanguageNotifier translates correctly and updates state', () {
       final notifier = LanguageNotifier();
-      expect(notifier.state, AppLanguage.english);
-      expect(notifier.isEnglish, true);
-      expect(notifier.tr('Bonjour', 'Hello'), 'Hello');
-
-      notifier.setLanguage(AppLanguage.french);
       expect(notifier.state, AppLanguage.french);
       expect(notifier.isEnglish, false);
       expect(notifier.tr('Bonjour', 'Hello'), 'Bonjour');
 
-      notifier.setLanguageByString('en');
+      notifier.setLanguage(AppLanguage.english);
       expect(notifier.state, AppLanguage.english);
+      expect(notifier.isEnglish, true);
       expect(notifier.tr('Bonjour', 'Hello'), 'Hello');
+
+      notifier.setLanguageByString('fr');
+      expect(notifier.state, AppLanguage.french);
+      expect(notifier.tr('Bonjour', 'Hello'), 'Bonjour');
     });
 
     testWidgets('SikaChatScreen renders English welcome and suggestions when app is English', (tester) async {

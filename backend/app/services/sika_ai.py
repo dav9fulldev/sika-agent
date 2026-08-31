@@ -87,39 +87,40 @@ class SikaAIService:
     def detect_language(self, message: str) -> str:
         """
         Détection dynamique et déterministe de la langue (Anglais 'en' ou Français 'fr').
-        Ne dépend d'aucun profil statique en BDD.
+        Priorité naturelle au Français (zone UEMOA / Afrique de l'Ouest).
         """
         if not message or not message.strip():
             return "fr"
 
-        msg_lower = message.lower()
+        msg_lower = message.lower().strip()
 
         # Expressions et motifs forts anglais
         en_phrases = [
             "what's my", "what is my", "whats my", "how much", "how's my", "how is my",
             "my balance", "total balance", "recent spending", "recent expenses",
             "send ", "transfer ", "check my", "show me", "can you", "please ",
-            "what can you do", "who are you"
+            "what can you do", "who are you", "how are you", "good morning", "good evening"
         ]
         # Expressions et motifs forts français
         fr_phrases = [
             "quel est", "quelle est", "quels sont", "quelles sont", "combien j'ai",
             "combien de", "combien sur", "mon solde", "solde total", "mes dépenses",
             "mes depenses", "dépenses récentes", "envoie ", "envoyer ", "transférer ",
-            "que peux-tu faire", "qui es-tu"
+            "fais un", "fait un", "fais le", "fait le", "s'il te plaît", "sil te plait",
+            "s'il vous plaît", "sil vous plait", "que peux-tu faire", "qui es-tu",
+            "comment vas-tu", "comment tu vas", "bonjour", "salut", "stp", "svp"
         ]
 
-        en_score = sum(3 for p in en_phrases if p in msg_lower)
-        fr_score = sum(3 for p in fr_phrases if p in msg_lower)
+        en_score = sum(4 for p in en_phrases if p in msg_lower)
+        fr_score = sum(4 for p in fr_phrases if p in msg_lower)
 
         # Mots-clés individuels
         english_words = {
             "what", "what's", "whats", "how", "much", "is", "my", "total", "balance",
             "check", "spending", "spent", "expenses", "expense", "send", "transfer",
             "savings", "safe", "deposit", "withdraw", "hello", "hi", "hey", "please",
-            "can", "you", "i", "to", "for", "from", "show", "me", "recent", "analyze",
-            "analysis", "money", "wallet", "wallets", "account", "accounts", "good",
-            "morning", "evening", "thanks", "thank"
+            "can", "you", "show", "recent", "analyze", "analysis", "money", "wallet",
+            "wallets", "account", "accounts", "thanks", "thank"
         }
 
         french_words = {
@@ -129,13 +130,17 @@ class SikaAIService:
             "épargne", "epargne", "coffre", "coffres", "bonjour", "salut", "bonsoir",
             "coucou", "retrait", "retirer", "verser", "compte", "comptes", "portefeuille",
             "portefeuilles", "analyse", "analyser", "récent", "recents", "récentes", "recentes",
-            "merci", "argent", "fonds"
+            "merci", "argent", "fonds", "fais", "fait", "effectue", "rapide", "vite",
+            "stp", "svp", "franc", "francs", "cfa", "fcfa", "xof", "un", "une", "des",
+            "du", "au", "aux", "sur", "vers", "pour", "avec", "de", "le", "la", "les"
         }
 
         tokens = set(re.findall(r"\b[a-zA-Z'’àâäéèêëîïôöùûüç]+\b", msg_lower))
         en_score += sum(1 for t in tokens if t in english_words)
         fr_score += sum(1 for t in tokens if t in french_words)
 
+        if fr_score >= en_score and fr_score > 0:
+            return "fr"
         if en_score > fr_score:
             return "en"
         return "fr"
