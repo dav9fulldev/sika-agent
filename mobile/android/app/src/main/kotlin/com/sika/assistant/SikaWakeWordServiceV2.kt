@@ -37,6 +37,12 @@ class SikaWakeWordServiceV2 : Service() {
         
         var currentState: ServiceState = ServiceState.STOPPED
             private set
+            
+        // Memory-only session context to avoid plaintext storage
+        var currentToken: String? = null
+        var currentUserFirstname: String? = null
+        var currentCurrency: String? = null
+        var currentLanguage: String? = null
     }
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -119,9 +125,10 @@ class SikaWakeWordServiceV2 : Service() {
             try {
                 speechRecognizer?.destroy()
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+                val targetLocale = if (currentLanguage?.startsWith("en", ignoreCase = true) == true) "en-US" else "fr-FR"
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, targetLocale)
                     putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 5000)
                     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000)

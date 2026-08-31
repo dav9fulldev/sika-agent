@@ -60,7 +60,13 @@
 
       override fun onBind(intent: Intent?): IBinder? = null
       override fun onDestroy() { super.onDestroy(); hideOverlay(); speechRecognizer?.destroy(); tts?.shutdown() }
-      override fun onInit(status: Int) { if (status == TextToSpeech.SUCCESS) { tts?.language = Locale.FRENCH; tts?.setSpeechRate(0.9f) } }
+      override fun onInit(status: Int) {
+          if (status == TextToSpeech.SUCCESS) {
+              val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
+              tts?.language = if (isEn) Locale.US else Locale.FRENCH
+              tts?.setSpeechRate(0.9f)
+          }
+      }
 
       private fun createNotificationChannel() {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -129,8 +135,12 @@
               override fun onPartialResults(p: android.os.Bundle?) { p?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { upTranscript(it) } }
               override fun onEvent(t: Int, p: android.os.Bundle?) {}
           })
-          val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-  putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR"); putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true) }
+          val targetLocale = if (SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true) "en-US" else "fr-FR"
+          val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+              putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+              putExtra(RecognizerIntent.EXTRA_LANGUAGE, targetLocale)
+              putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+          }
           speechRecognizer?.startListening(i)
       }
 

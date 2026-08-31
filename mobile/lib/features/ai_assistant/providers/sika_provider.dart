@@ -155,11 +155,18 @@ class SikaNotifier extends StateNotifier<SikaData> {
           // Timeout normal (l'utilisateur n'a rien dit)
           state = state.copyWith(state: SikaState.idle);
         } else {
-          String friendlyError = "Erreur de reconnaissance vocale (${val.errorMsg})";
+          final isEn = _ref.read(languageProvider).code == 'en';
+          String friendlyError = isEn
+              ? "Speech recognition error (${val.errorMsg})"
+              : "Erreur de reconnaissance vocale (${val.errorMsg})";
           if (val.errorMsg.contains('permission')) {
-             friendlyError = "Veuillez autoriser l'accès au microphone.";
+            friendlyError = isEn
+                ? "Please allow microphone access in settings."
+                : "Veuillez autoriser l'accès au microphone.";
           } else if (val.errorMsg == 'error_network' || val.errorMsg.contains('network')) {
-             friendlyError = "SIKA n'arrive pas à se connecter au réseau.";
+            friendlyError = isEn
+                ? "SIKA cannot connect to the network."
+                : "SIKA n'arrive pas à se connecter au réseau.";
           }
           state = state.copyWith(
             state: SikaState.error,
@@ -392,8 +399,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final response = await _apiService.sikaChat(
         cleanQuery,
         userFirstName: userFirstName,
-        currencyCode: currencyCode,
-        currencySymbol: currencySymbol,
+        displayCurrencyCode: currencyCode,
+        displayCurrencySymbol: currencySymbol,
       );
 
       final String sikaText = (response['speech_text'] as String?) ??

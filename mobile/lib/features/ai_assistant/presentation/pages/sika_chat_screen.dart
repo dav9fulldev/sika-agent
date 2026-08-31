@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_prompt_suggestion.dart';
 import '../widgets/sika_thinking_indicator.dart';
@@ -73,6 +74,9 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
 
     final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
     final bool isProcessing = sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.agentWorking;
 
@@ -80,7 +84,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: _buildAppBar(context, isDark, isProcessing, sikaNotifier),
+      appBar: _buildAppBar(context, isDark, isProcessing, sikaNotifier, langNotifier),
       body: Column(
         children: [
           // RECONCILIATION CARD — shown for UNKNOWN_RESULT / REQUIRES_RECONCILIATION
@@ -94,7 +98,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           // MESSAGES OR EMPTY STATE
           Expanded(
             child: sikaData.messages.isEmpty
-                ? _buildWelcomeState(context, sikaNotifier)
+                ? _buildWelcomeState(context, sikaNotifier, langNotifier)
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
@@ -114,7 +118,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
 
           // ERROR STATE
           if (sikaData.state == SikaState.error && sikaData.pendingActionId == null)
-            _buildConnectionError(context, sikaData.errorMessage),
+            _buildConnectionError(context, sikaData.errorMessage, langNotifier),
 
           // INPUT BAR
           SikaInputBar(
@@ -136,7 +140,8 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, bool isDark, bool isProcessing, SikaNotifier sikaNotifier) {
+  PreferredSizeWidget _buildAppBar(
+      BuildContext context, bool isDark, bool isProcessing, SikaNotifier sikaNotifier, LanguageNotifier langNotifier) {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -200,7 +205,9 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      isProcessing ? 'En train de réfléchir...' : 'Assistant actif',
+                      isProcessing
+                          ? langNotifier.tr('En train de réfléchir...', 'Thinking...')
+                          : langNotifier.tr('Assistant actif', 'Active assistant'),
                       style: TextStyle(
                         color: isProcessing ? AppColors.brandSecondary : AppColors.success,
                         fontSize: 11,
@@ -215,7 +222,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
             IconButton(
               icon: Icon(Icons.refresh_rounded, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), size: 22),
               onPressed: () => sikaNotifier.clearConversation(),
-              tooltip: 'Nouvelle conversation',
+              tooltip: langNotifier.tr('Nouvelle conversation', 'New conversation'),
             ),
           ],
         ),
@@ -230,7 +237,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     );
   }
 
-  Widget _buildWelcomeState(BuildContext context, SikaNotifier sikaNotifier) {
+  Widget _buildWelcomeState(BuildContext context, SikaNotifier sikaNotifier, LanguageNotifier langNotifier) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Column(
@@ -252,21 +259,11 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
             ),
             child: Center(
               child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF635BFF), Color(0xFF4F46E5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.brandPrimary.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                    ),
-                  ],
+                  color: Colors.white,
                 ),
                 child: const Center(
                   child: Text('✦', style: TextStyle(fontSize: 22, color: Colors.white)),
@@ -277,7 +274,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           const SizedBox(height: 24),
           
           Text(
-            'Bonjour 👋',
+            langNotifier.tr('Bonjour 👋', 'Hello 👋'),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
@@ -286,7 +283,10 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           const SizedBox(height: 12),
           
           Text(
-            'Je suis SIKA, votre assistant financier intelligent.\nJe peux vous aider à comprendre vos dépenses et à mieux gérer votre budget.',
+            langNotifier.tr(
+              'Je suis SIKA, votre assistant financier intelligent.\nJe peux vous aider à comprendre vos dépenses et à mieux gérer votre budget.',
+              'I am SIKA, your smart financial assistant.\nI can help you understand your spending and better manage your budget.',
+            ),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -297,31 +297,31 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           
           // Suggestions
           SikaPromptSuggestion(
-            text: 'Analyser mes dépenses',
+            text: langNotifier.tr('Analyser mes dépenses', 'Analyze my spending'),
             icon: Icons.analytics_outlined,
             delay: 500.ms,
-            onTap: () => sikaNotifier.sendTextMessage('Analyser mes dépenses'),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Analyser mes dépenses', 'Analyze my spending')),
           ),
           const SizedBox(height: 12),
           SikaPromptSuggestion(
-            text: 'Comment puis-je économiser ?',
-            icon: Icons.savings_outlined,
+            text: langNotifier.tr('Quel est mon solde ?', 'What\'s my balance?'),
+            icon: Icons.account_balance_wallet_outlined,
             delay: 600.ms,
-            onTap: () => sikaNotifier.sendTextMessage('Comment puis-je économiser ?'),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Quel est mon solde ?', 'What\'s my balance?')),
           ),
           const SizedBox(height: 12),
           SikaPromptSuggestion(
-            text: 'Résumer ma situation financière',
-            icon: Icons.summarize_outlined,
+            text: langNotifier.tr('Comment puis-je économiser ?', 'How can I save money?'),
+            icon: Icons.savings_outlined,
             delay: 700.ms,
-            onTap: () => sikaNotifier.sendTextMessage('Résumer ma situation financière'),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Comment puis-je économiser ?', 'How can I save money?')),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildConnectionError(BuildContext context, String? errorMessage) {
+  Widget _buildConnectionError(BuildContext context, String? errorMessage, LanguageNotifier langNotifier) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
@@ -341,7 +341,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'SIKA n\'a pas pu répondre pour le moment.',
+                  langNotifier.tr('SIKA n\'a pas pu répondre pour le moment.', 'SIKA was unable to answer right now.'),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w600,
@@ -350,7 +350,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  errorMessage ?? 'Une erreur réseau est survenue.',
+                  errorMessage ?? langNotifier.tr('Une erreur réseau est survenue.', 'A network error occurred.'),
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontSize: 12,

@@ -1,8 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 
-class SikaInputBar extends StatelessWidget {
+class SikaInputBar extends ConsumerWidget {
   final TextEditingController controller;
   final bool isListening;
   final bool isSpeaking;
@@ -21,8 +23,11 @@ class SikaInputBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+    final hint = langNotifier.tr('Demander à SIKA...', 'Ask SIKA...');
 
     return Padding(
       padding: EdgeInsets.only(
@@ -96,7 +101,7 @@ class SikaInputBar extends StatelessWidget {
                               fontSize: 15,
                             ),
                         decoration: InputDecoration(
-                          hintText: 'Demander à SIKA...',
+                          hintText: hint,
                           hintStyle: TextStyle(
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                             fontSize: 15,

@@ -293,8 +293,8 @@ class ApiService {
   Future<Map<String, dynamic>> sikaChat(
     String query, {
     String? userFirstName,
-    String? currencyCode,
-    String? currencySymbol,
+    String? displayCurrencyCode,
+    String? displayCurrencySymbol,
   }) async {
     final response = await http
         .post(
@@ -304,8 +304,8 @@ class ApiService {
             'query': query,
             'context': {
               'user_firstname': userFirstName ?? 'Utilisateur',
-              'currency_code': currencyCode ?? '',
-              'currency_symbol': currencySymbol ?? '',
+              'display_currency_code': displayCurrencyCode ?? 'XOF',
+              'display_currency_symbol': displayCurrencySymbol ?? 'XOF',
             }
           }),
         )

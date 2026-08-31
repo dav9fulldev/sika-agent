@@ -1029,11 +1029,15 @@ class SikaAIService:
             return {
                 "response": response,
                 "action": None,
+                "action_id": None,
                 "action_data": None,
                 "sentiment": "positive",
                 "suggestions": suggestions,
                 "provider": "VERTEX_AI",
                 "model": self.model,
+                "requires_confirmation": False,
+                "status": "PROCESSED",
+                "language": "en" if is_english else "fr",
             }
 
         # =========================================================
@@ -1111,10 +1115,12 @@ class SikaAIService:
             amount = self._extract_transfer_amount(user_message)
             provider = selected_wallet.get("provider")
             # Prepare transfer (no execution yet)
+            wallet_code = financial_context.get("wallet_currency_code") or "XOF"
             prepare_res = transaction_tools.prepare_transfer(
                 provider=provider,
                 amount=amount,
                 recipient=recipient_value,
+                currency=wallet_code,
             )
             if not prepare_res.success:
                 return {
@@ -1350,13 +1356,16 @@ class SikaAIService:
     ) -> Dict[str, Any]:
         """Formate une réponse générée par Gemini."""
 
+        # Clean markdown artifacts for clean UI/TTS rendering
+        clean_response = sika_response.replace("**", "").replace("*", "")
+
         action, action_data = self._extract_action(
             sika_response,
             user_message,
         )
 
         return {
-            "response": sika_response,
+            "response": clean_response,
             "action": action,
             "action_data": action_data,
             "sentiment": "positive",
@@ -1381,6 +1390,27 @@ class SikaAIService:
             "model": self.model,
         }
 
+    def _is_pure_greeting(self, message: str) -> bool:
+        """
+        Détecte si un message utilisateur est une salutation pure sans intention financière explicite
+        (ex: "hello", "bonjour", "salut", "hi", "coucou", "good morning", "hey sika").
+        """
+        if not message:
+            return False
+        clean = re.sub(r"[^\w\s]", "", message.lower()).strip()
+        pure_greetings = {
+            "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+            "bonjour", "salut", "coucou", "bonsoir", "sika", "hey sika", "hello sika",
+            "dis sika", "comment tu vas", "ça va", "ca va", "comment vas tu", "how are you",
+            "what's up", "whats up", "yo"
+        }
+        if clean in pure_greetings:
+            return True
+        words = clean.split()
+        if len(words) <= 3 and all(w in {"hello", "hi", "hey", "sika", "bonjour", "salut", "coucou", "bonsoir", "yo", "ca", "ça", "va"} for w in words):
+            return True
+        return False
+
     async def chat(
         self,
         user_message: str,
@@ -1396,6 +1426,10 @@ class SikaAIService:
         context = financial_context or {}
         firstname = user_firstname or context.get("user_firstname") or "David"
         is_english = self._is_english(user_message)
+
+        # Salutation pure : Réponse directe sans exécuter de transaction de l'historique
+        if self._is_pure_greeting(user_message):
+            return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
 
         if not self.client:
             return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
@@ -1422,9 +1456,17 @@ class SikaAIService:
 
         active_wallets = [w for w in context.get("wallets", []) if w.get("is_active", True)]
         total_balance = sum(w.get("balance", 0.0) for w in active_wallets)
-        currency_sym = context.get("currency_symbol") or context.get("currency_code") or ""
         
-        context_str = f"Solde total: {total_balance} {currency_sym}\nComptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} {currency_sym})" for w in active_wallets])
+        # 3-Tier Currency Architecture mapping
+        display_code = context.get("display_currency_code") or "XOF"
+        display_sym = context.get("display_currency_symbol") or "FCFA"
+        wallet_code = context.get("wallet_currency_code") or "XOF"
+        wallet_sym = context.get("wallet_currency_symbol") or "FCFA"
+        
+        context_str = f"Solde total brut des portefeuilles : {total_balance} {wallet_sym}\n"
+        context_str += f"Devise d'affichage UI : {display_code} ({display_sym})\n"
+        context_str += f"Devise de base du portefeuille : {wallet_code} ({wallet_sym})\n"
+        context_str += "Comptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} {wallet_sym})" for w in active_wallets])
 
         lang_instruction = "Réponds UNIQUEMENT en anglais." if is_english else "Réponds UNIQUEMENT en français."
 
@@ -1446,6 +1488,8 @@ RÈGLES STRICTES :
 6. Réponds de manière concise, naturelle et chaleureuse.
 7. Tu ne dois JAMAIS inventer un `action_id` ni générer un identifiant commençant par "act_" dans une réponse texte si `prepare_transfer` n'a pas été appelé avec succès.
 8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
+9. RÈGLE DES DEVISES : Gemini ne doit JAMAIS effectuer de conversion monétaire ou de calcul de taux de change. Si la devise d'affichage ({display_code}) est différente de la devise du portefeuille ({wallet_code}) et qu'aucun taux n'est fourni par le backend, annonce clairement les valeurs dans la devise de base du portefeuille ({wallet_code}) pour éviter toute incohérence.
+10. RÈGLE SALUTATIONS : Si le message utilisateur est une simple salutation (ex: hello, bonjour, hi), réponds de façon chaleureuse et présente tes capacités d'assistance. N'appelle JAMAIS de tool financier (prepare_transfer, etc.), même si l'historique conversationnel mentionnait un transfert antérieur.
 
 LANGUE : {lang_instruction}
 """
@@ -1551,7 +1595,11 @@ LANGUE : {lang_instruction}
                                 action_type="TRANSFER" if call.name == "prepare_transfer" else "GENERIC_ACTION",
                                 payload=action_data_detected
                             )
-                            final_response_text = f"J'ai préparé l'opération. Veux-tu confirmer ?"
+                            final_response_text = (
+                                "I have prepared the transfer. Would you like to confirm?"
+                                if is_english
+                                else "J'ai préparé l'opération. Veux-tu confirmer ?"
+                            )
                         break
                 
                 if action_detected == "prepare_transfer":
@@ -1573,7 +1621,11 @@ LANGUE : {lang_instruction}
                             action_detected = "prepare_transfer"
                             action_id = candidate
                             action_data_detected = sika_orchestrator.action_store[candidate].get("result") or {}
-                            final_response_text = "J'ai préparé l'opération. Veux-tu confirmer ?"
+                            final_response_text = (
+                                "I have prepared the transfer. Would you like to confirm?"
+                                if is_english
+                                else "J'ai préparé l'opération. Veux-tu confirmer ?"
+                            )
                         else:
                             # 2) Fallback: check persistent DB for a matching action
                             try:
@@ -1598,7 +1650,11 @@ LANGUE : {lang_instruction}
                                             "status": act.status,
                                             "result": None,
                                         }
-                                        final_response_text = "J'ai préparé l'opération. Veux-tu confirmer ?"
+                                        final_response_text = (
+                                            "I have prepared the transfer. Would you like to confirm?"
+                                            if is_english
+                                            else "J'ai préparé l'opération. Veux-tu confirmer ?"
+                                        )
                             except Exception as e:
                                 logger.warning(f"Fallback DB lookup failed for action_id {candidate}: {e}")
                 except Exception as e:
@@ -1609,7 +1665,11 @@ LANGUE : {lang_instruction}
             step += 1
             
         if not final_response_text:
-            final_response_text = "Je n'ai pas pu terminer l'analyse."
+            final_response_text = (
+                "I was unable to complete the analysis."
+                if is_english
+                else "Je n'ai pas pu terminer l'analyse."
+            )
 
         return {
             "response": final_response_text,

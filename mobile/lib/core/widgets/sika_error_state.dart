@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_spacing.dart';
+import '../providers/language_provider.dart';
 import 'sika_premium_button.dart';
 
-class SikaErrorState extends StatelessWidget {
-  final String title;
+class SikaErrorState extends ConsumerWidget {
+  final String? title;
   final String message;
   final String? retryText;
   final VoidCallback? onRetryPressed;
 
   const SikaErrorState({
     super.key,
-    this.title = 'Une erreur est survenue',
+    this.title,
     required this.message,
-    this.retryText = 'Réessayer',
+    this.retryText,
     this.onRetryPressed,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
+    final displayTitle = title ?? langNotifier.tr('Une erreur est survenue', 'An error occurred');
+    final displayRetry = retryText ?? langNotifier.tr('Réessayer', 'Retry');
 
     return Center(
       child: Padding(
@@ -47,7 +54,7 @@ class SikaErrorState extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             
             Text(
-              title,
+              displayTitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -73,7 +80,7 @@ class SikaErrorState extends StatelessWidget {
                 width: double.infinity,
                 child: SikaPremiumButton(
                   onPressed: onRetryPressed,
-                  text: retryText ?? 'Réessayer',
+                  text: displayRetry,
                   prefixWidget: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
                 ),
               ).animate().fade(delay: 400.ms).slideY(begin: 0.1, end: 0),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_images.dart';
@@ -35,15 +36,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     final otp = await authNotifier.forgotPassword(email);
 
     if (otp != null && mounted) {
-      // In a real app, we wouldn't receive the OTP here, we would just navigate.
-      // But since we want to demonstrate it, we can show it in a snackbar for dev purposes.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Code reçu (mode dev) : $otp'),
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      if (kDebugMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Code reçu (mode dev) : $otp'),
+            backgroundColor: AppColors.primary,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
 
       Navigator.push(
         context,

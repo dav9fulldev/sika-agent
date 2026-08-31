@@ -50,7 +50,7 @@ def get_recent_transactions(limit: int = 5, provider: Optional[str] = None) -> T
         }
     )
 
-def prepare_transfer(provider: str, amount: float, recipient: str, currency: str = "XOF") -> ToolResult:
+def prepare_transfer(provider: str, amount: float, recipient: str, currency: str) -> ToolResult:
     """
     Prépares une transaction SANS l'exécuter.
     Passe en état CONFIRMATION_REQUIRED pour validation humaine.
@@ -107,7 +107,7 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
             "amount": float(amount),
             "currency": currency,
             "recipient": str(recipient).strip(),
-            "summary": f"Préparation transfert de {amount} {currency} vers {recipient} via {(provider or 'wave').capitalize()}"
+            "summary": f"Préparation transfert de {amount} {currency} vers {recipient} via {provider.capitalize()}"
         }
     )
 

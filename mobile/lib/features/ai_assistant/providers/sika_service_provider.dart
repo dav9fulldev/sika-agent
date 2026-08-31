@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/language_provider.dart';
 import 'sika_provider.dart';
 
 /// Service pour controler Sika en arriere-plan (wake word detection)
@@ -74,6 +75,7 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
 
   /// Demarrer le service de detection du wake word "Sika"
   Future<void> startSikaService() async {
+    final langNotifier = _ref.read(languageProvider.notifier);
     try {
       await _channel.invokeMethod('startSikaService');
       state = state.copyWith(isServiceRunning: true, error: null);
@@ -81,13 +83,17 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
     } catch (e) {
       debugPrint('Error starting Sika service: \$e');
       state = state.copyWith(
-        error: 'Impossible de demarrer le service Sika',
+        error: langNotifier.tr(
+          'Impossible de démarrer le service Sika',
+          'Unable to start Sika service',
+        ),
       );
     }
   }
 
   /// Arreter le service de detection
   Future<void> stopSikaService() async {
+    final langNotifier = _ref.read(languageProvider.notifier);
     try {
       await _channel.invokeMethod('stopSikaService');
       state = state.copyWith(isServiceRunning: false, error: null);
@@ -95,20 +101,27 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
     } catch (e) {
       debugPrint('Error stopping Sika service: \$e');
       state = state.copyWith(
-        error: 'Impossible d arreter le service Sika',
+        error: langNotifier.tr(
+          'Impossible d\'arrêter le service Sika',
+          'Unable to stop Sika service',
+        ),
       );
     }
   }
 
   /// Afficher l overlay Sika manuellement (sans wake word)
   Future<void> showSikaOverlay() async {
+    final langNotifier = _ref.read(languageProvider.notifier);
     try {
       await _channel.invokeMethod('showSikaOverlay');
       debugPrint('Sika overlay shown');
     } catch (e) {
       debugPrint('Error showing Sika overlay: \$e');
       state = state.copyWith(
-        error: 'Impossible d afficher Sika',
+        error: langNotifier.tr(
+          'Impossible d\'afficher Sika',
+          'Unable to display Sika',
+        ),
       );
     }
   }

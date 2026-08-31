@@ -42,11 +42,11 @@ class MainActivity : FlutterActivity() {
                     val alias = intent.getStringExtra("detectedAlias") ?: "sika"
                     Log.d("SikaReceiver", "Wake Word Triggered: \$alias")
                     
-                    // Ramener l'application au premier plan
-                    val bringToFrontIntent = Intent(context, MainActivity::class.java).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    }
-                    context?.startActivity(bringToFrontIntent)
+                    // Ramener l'application au premier plan (RETIRED FOR BACKGROUND VOICE)
+                    // val bringToFrontIntent = Intent(context, MainActivity::class.java).apply {
+                    //    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    // }
+                    // context?.startActivity(bringToFrontIntent)
                     
                     // Notifier Flutter
                     sikaChannel.invokeMethod("onWakeWordTriggered", alias)
@@ -164,6 +164,23 @@ class MainActivity : FlutterActivity() {
                 "hideSikaOverlay" -> {
                     hideSikaOverlayV2()
                     result.success(true)
+                }
+                "setSessionContext" -> {
+                    try {
+                        val token = call.argument<String>("token")
+                        val firstname = call.argument<String>("firstname")
+                        val currency = call.argument<String>("currency")
+                        val language = call.argument<String>("language")
+                        
+                        SikaWakeWordServiceV2.currentToken = token
+                        SikaWakeWordServiceV2.currentUserFirstname = firstname
+                        SikaWakeWordServiceV2.currentCurrency = currency
+                        SikaWakeWordServiceV2.currentLanguage = language
+                        
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("err", e.message, null)
+                    }
                 }
                 "checkMicrophonePermission" -> {
                     result.success(hasMicrophonePermission())

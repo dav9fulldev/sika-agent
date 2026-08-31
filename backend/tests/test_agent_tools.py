@@ -124,7 +124,8 @@ def test_7_prepare_transfer():
     res = tool_registry.execute("prepare_transfer", {
         "provider": "paymechap",
         "amount": 5000.0,
-        "recipient": "+22507070707"
+        "recipient": "+22507070707",
+        "currency": "XOF"
     })
     assert res.success is True
     assert res.risk_level == RiskLevel.CONFIRMATION_REQUIRED
@@ -788,8 +789,8 @@ class TestTransferPreparation:
     def test_transfer_F_action_id_uniqueness(self):
         """P0-7-F: prepare_transfer génère des action_id non vides et uniques."""
         import app.agent.tools.transaction_tools as tt
-        res1 = tt.prepare_transfer("paymechap", 5000.0, "+22501020304")
-        res2 = tt.prepare_transfer("paymechap", 5000.0, "+22501020304")
+        res1 = tt.prepare_transfer("paymechap", 5000.0, "+22501020304", "XOF")
+        res2 = tt.prepare_transfer("paymechap", 5000.0, "+22501020304", "XOF")
         assert res1.success is True
         assert res2.success is True
         aid1 = res1.data["action_id"]

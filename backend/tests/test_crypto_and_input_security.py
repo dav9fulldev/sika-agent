@@ -144,28 +144,28 @@ def test_revoked_token_rejected_everywhere():
 
 def test_negative_financial_amount_rejected():
     """Vérifie qu'un montant négatif est strictement rejeté lors de la préparation."""
-    res = prepare_transfer("wave", -10000.0, "Kouamé")
+    res = prepare_transfer("wave", -10000.0, "Kouamé", "XOF")
     assert res.success is False
     assert "supérieur à 0" in res.error_message
 
 
 def test_zero_financial_amount_rejected():
     """Vérifie qu'un montant nul (0 FCFA) est strictement rejeté."""
-    res = prepare_transfer("wave", 0.0, "Kouamé")
+    res = prepare_transfer("wave", 0.0, "Kouamé", "XOF")
     assert res.success is False
     assert "supérieur à 0" in res.error_message
 
 
 def test_extreme_financial_amount_rejected():
     """Vérifie que les montants extrêmes, NaN et Infinity sont rejetés."""
-    res_extreme = prepare_transfer("wave", 999_999_999.0, "Kouamé")
+    res_extreme = prepare_transfer("wave", 999_999_999.0, "Kouamé", "XOF")
     assert res_extreme.success is False
     assert "plafond" in res_extreme.error_message.lower()
 
-    res_nan = prepare_transfer("wave", float("nan"), "Kouamé")
+    res_nan = prepare_transfer("wave", float("nan"), "Kouamé", "XOF")
     assert res_nan.success is False
 
-    res_inf = prepare_transfer("wave", float("inf"), "Kouamé")
+    res_inf = prepare_transfer("wave", float("inf"), "Kouamé", "XOF")
     assert res_inf.success is False
 
 
@@ -430,7 +430,7 @@ def test_prompt_injection_cannot_bypass_human_confirmation():
 
 def test_prompt_injection_cannot_modify_server_side_amount():
     """Vérifie qu'un prompt injecté ne modifie pas les plafonds de sécurité backend."""
-    res = prepare_transfer("wave", 999_000_000, "attacker")
+    res = prepare_transfer("wave", 999_000_000, "attacker", "XOF")
     assert res.success is False
 
 

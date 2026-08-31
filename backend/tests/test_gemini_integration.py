@@ -2,7 +2,7 @@ import os
 # pyrefly: ignore [missing-import]
 import pytest
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 from app.services.sika_ai import SikaAI
 from app.agent.orchestrator import SikaAgentOrchestrator
 
@@ -38,7 +38,7 @@ def test_gemini_chat_invocation(mock_gemini_env):
     mock_genai_client = MagicMock()
     mock_response = MagicMock()
     mock_response.text = "Salut ! Je suis Sika et je surveille tes finances via Google Gemini sur Vertex AI."
-    mock_genai_client.models.generate_content.return_value = mock_response
+    mock_genai_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     with patch("google.genai.Client", return_value=mock_genai_client):
         sika_ai = SikaAI()
@@ -52,7 +52,7 @@ def test_gemini_chat_invocation(mock_gemini_env):
         
         res = asyncio.run(run())
 
-        assert mock_genai_client.models.generate_content.called is True
+        assert mock_genai_client.aio.models.generate_content.called is True
         assert res["model"] == "gemini-3.5-flash"
         assert "Gemini" in res["response"]
 
@@ -62,7 +62,7 @@ def test_orchestrator_react_loop_with_gemini(mock_gemini_env):
     mock_genai_client = MagicMock()
     mock_response = MagicMock()
     mock_response.text = "Je prépare un transfert de 10 000 FCFA sur Wave vers Kouamé."
-    mock_genai_client.models.generate_content.return_value = mock_response
+    mock_genai_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     with patch("google.genai.Client", return_value=mock_genai_client):
         orchestrator = SikaAgentOrchestrator()
@@ -75,7 +75,7 @@ def test_orchestrator_react_loop_with_gemini(mock_gemini_env):
 
         result = asyncio.run(run())
 
-        assert mock_genai_client.models.generate_content.called is True
+        assert mock_genai_client.aio.models.generate_content.called is True
         assert result["status"] == "PROCESSED"
         assert result["requires_confirmation"] is True
         assert result["model"] == "gemini-3.5-flash"
@@ -84,7 +84,7 @@ def test_orchestrator_react_loop_with_gemini(mock_gemini_env):
 def test_gemini_fallback_on_error(mock_gemini_env):
     """Vérifie le fallback automatique vers _chat_basic en cas d'erreur de credentials ou réseau Vertex AI."""
     mock_genai_client = MagicMock()
-    mock_genai_client.models.generate_content.side_effect = Exception("Vertex AI ADC / Network Timeout")
+    mock_genai_client.aio.models.generate_content = AsyncMock(side_effect=Exception("Vertex AI ADC / Network Timeout"))
 
     with patch("google.genai.Client", return_value=mock_genai_client):
         sika_ai = SikaAI()

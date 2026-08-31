@@ -119,6 +119,31 @@ class SikaNativeService {
     }
   }
 
+  static Future<bool> setSessionContext({
+    required String token,
+    required String firstname,
+    required String currency,
+    required String language,
+  }) async {
+    try {
+      final bool result = await platform.invokeMethod<bool>(
+            'setSessionContext',
+            {
+              'token': token,
+              'firstname': firstname,
+              'currency': currency,
+              'language': language,
+            },
+          ) ??
+          false;
+      debugPrint('[SikaNative] Session context set: $result');
+      return result;
+    } catch (e) {
+      debugPrint('[SikaNative] Error setting session context: $e');
+      return false;
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> readPendingTransactions() async {
     try {
       final String? jsonStr =

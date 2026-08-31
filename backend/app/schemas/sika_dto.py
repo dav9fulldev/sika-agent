@@ -16,13 +16,21 @@ class GoalDTO(BaseModel):
 class FinancialContextDTO(BaseModel):
     user_id: int = 1
     user_firstname: str = "David"
-    currency_code: str = "USD"
-    currency_symbol: str = "$"
+    display_currency_code: str = "USD"
+    display_currency_symbol: str = "$"
+    wallet_id: Optional[str] = None
+    wallet_name: Optional[str] = None
+    provider: Optional[str] = None
+    wallet_currency_code: str = "XOF"
+    wallet_currency_symbol: str = "XOF"
+    execution_currency_code: str = "XOF"
     monthly_income: Optional[float] = None
     budgets: List[BudgetDTO] = []
     goals: List[GoalDTO] = []
     total_budget: float = 0.0
     total_spent: float = 0.0
+    balance: float = 0.0
+    available_balance: float = 0.0
 
 class SikaQueryDTO(BaseModel):
     query: str

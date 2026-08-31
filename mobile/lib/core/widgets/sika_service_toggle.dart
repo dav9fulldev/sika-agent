@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
+import '../providers/language_provider.dart';
 
-class SikaServiceToggle extends StatelessWidget {
+class SikaServiceToggle extends ConsumerWidget {
   final bool isRunning;
   final ValueChanged<bool> onChanged;
 
@@ -12,7 +14,10 @@ class SikaServiceToggle extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
+
     return SwitchListTile(
       value: isRunning,
       onChanged: onChanged,
@@ -21,7 +26,10 @@ class SikaServiceToggle extends StatelessWidget {
       inactiveThumbColor: AppColors.textSecondary,
       inactiveTrackColor: AppColors.border,
       title: Text(
-        'Service Vocal SIKA (Wake-word)',
+        langNotifier.tr(
+          'Service Vocal SIKA (Wake-word)',
+          'SIKA Voice Service (Wake-word)',
+        ),
         style: TextStyle(
           color: Theme.of(context).colorScheme.onSurface,
           fontSize: 14,
@@ -29,7 +37,12 @@ class SikaServiceToggle extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        isRunning ? 'Service natif actif (écoute "Sika")' : 'Service inactif',
+        isRunning
+            ? langNotifier.tr(
+                'Service natif actif (écoute "Sika")',
+                'Native service active (listening for "Sika")',
+              )
+            : langNotifier.tr('Service inactif', 'Service inactive'),
         style: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 12,

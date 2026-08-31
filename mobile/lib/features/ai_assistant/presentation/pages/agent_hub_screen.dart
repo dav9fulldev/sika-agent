@@ -9,7 +9,6 @@ import '../widgets/proactive_alert_card.dart';
 import '../widgets/proactive_analysis_sheet.dart';
 import '../widgets/human_confirmation_card.dart';
 import '../widgets/runway_card_widget.dart';
-import '../widgets/wallet_rebalance_card.dart';
 import '../widgets/savings_booster_card.dart';
 import '../../../../core/constants/app_images.dart';
 import '../../../wallet/presentation/widgets/connect_wallet_modal.dart';
@@ -220,17 +219,7 @@ class _AgentHubScreenState extends ConsumerState<AgentHubScreen>
 
                         const SizedBox(height: 16),
 
-                        // ── WALLET REBALANCE (si >= 2 comptes) ───────────
-                        if (walletState.wallets.length >= 2) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: WalletRebalanceCard(
-                              onRebalanceConfirmed: () => widget.onOpenChat(),
-                            ),
-                          ).animate().fade(delay: 250.ms).slideY(
-                              begin: 0.08, end: 0, curve: Curves.easeOutCubic),
-                          const SizedBox(height: 16),
-                        ],
+                        // ── WALLET REBALANCE (REMOVED: No backend data available) ───────────
 
                         // ── SAVINGS BOOSTER (si >= 1 compte) ─────────────
                         if (walletState.wallets.isNotEmpty) ...[

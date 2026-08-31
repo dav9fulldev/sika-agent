@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum AppCurrency { fcfa, usd, eur, gbp }
+enum AppCurrency { fcfa, usd, eur, gbp, unknown }
 
 extension AppCurrencyExtension on AppCurrency {
   String get code {
@@ -13,6 +13,8 @@ extension AppCurrencyExtension on AppCurrency {
         return 'EUR';
       case AppCurrency.gbp:
         return 'GBP';
+      case AppCurrency.unknown:
+        return '';
     }
   }
 
@@ -26,19 +28,22 @@ extension AppCurrencyExtension on AppCurrency {
         return '€';
       case AppCurrency.gbp:
         return '£';
+      case AppCurrency.unknown:
+        return '';
     }
   }
 
+  // CRITICAL FINAL ARCHITECTURE: DO NOT INVENT EXCHANGE RATES
+  // If no authoritative exchange rate service exists, return 1.0
+  // and do NOT fabricate fixed rates like 1 USD = 600 XOF.
   double get rateFromFcfa {
     switch (this) {
       case AppCurrency.fcfa:
         return 1.0;
-      case AppCurrency.usd:
-        return 1.0 / 600.0;
-      case AppCurrency.eur:
-        return 1.0 / 655.957;
-      case AppCurrency.gbp:
-        return 1.0 / 770.0;
+      default:
+        // No authoritative conversion service available. Refuse conversion by returning 1.0
+        // The UI will detect this and fallback to XOF (FCFA) to avoid misleading the user.
+        return 1.0;
     }
   }
 }
@@ -65,19 +70,27 @@ class CurrencyNotifier extends StateNotifier<AppCurrency> {
         state = AppCurrency.gbp;
         break;
       default:
-        state = AppCurrency.fcfa;
+        state = AppCurrency.unknown;
         break;
     }
   }
 
-  /// Formats an amount given in base FCFA to the active currency with exchange conversion
-  String format(double amountInFcfa) {
-    final converted = amountInFcfa * state.rateFromFcfa;
-    if (state == AppCurrency.fcfa) {
-      final intVal = converted.round();
+  /// Formats an amount. If the currency is unknown, it refuses to format a fake currency.
+  String format(double amount, {String? baseCurrency}) {
+    if (state == AppCurrency.unknown && baseCurrency == null) {
+      return '—';
+    }
+    
+    // If we are in FCFA, or if conversion is unavailable (rate == 1.0 for non-FCFA),
+    // we must fallback to the wallet's true currency (or baseCurrency if provided)
+    // to avoid displaying fake converted values.
+    if (state == AppCurrency.fcfa || state == AppCurrency.unknown || state.rateFromFcfa == 1.0) {
+      final intVal = amount.round();
       final formattedStr = _formatIntegerWithSpaces(intVal);
-      return '$formattedStr FCFA';
+      final suffix = baseCurrency ?? 'FCFA';
+      return '$formattedStr $suffix'.trim();
     } else {
+      final converted = amount * state.rateFromFcfa;
       return '${state.symbol}${converted.toStringAsFixed(2)}';
     }
   }

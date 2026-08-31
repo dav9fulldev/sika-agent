@@ -8,10 +8,18 @@ import '../../../../core/widgets/sika_premium_button.dart';
 
 /// WalletRebalanceCard — Module Cœur SIKA: Équilibrage Intelligent Multi-Portefeuilles
 class WalletRebalanceCard extends ConsumerWidget {
+  final String? sourceWallet;
+  final String? targetWallet;
+  final double? sourceBalance;
+  final double? recommendedAmount;
   final VoidCallback? onRebalanceConfirmed;
 
   const WalletRebalanceCard({
     super.key,
+    this.sourceWallet,
+    this.targetWallet,
+    this.sourceBalance,
+    this.recommendedAmount,
     this.onRebalanceConfirmed,
   });
 
@@ -23,6 +31,13 @@ class WalletRebalanceCard extends ConsumerWidget {
     ref.watch(currencyProvider);
     final currNotifier = ref.read(currencyProvider.notifier);
     final sikaNotifier = ref.read(sikaProvider.notifier);
+
+    if (sourceWallet == null ||
+        targetWallet == null ||
+        sourceBalance == null ||
+        recommendedAmount == null) {
+      return const SizedBox.shrink();
+    }
 
     return SikaGlassCard(
       padding: const EdgeInsets.all(18),
@@ -56,8 +71,8 @@ class WalletRebalanceCard extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             langNotifier.tr(
-              'Votre compte Wave (${currNotifier.format(15000)}) risque d\'être insuffisant pour vos dépenses de fin de semaine. SIKA suggère de transférer ${currNotifier.format(7000)} depuis Orange Money.',
-              'Your Wave account (${currNotifier.format(15000)}) might fall short for weekend bills. SIKA suggests transferring ${currNotifier.format(7000)} from Orange Money.',
+              'Votre compte $targetWallet (${currNotifier.format(sourceBalance!)}) risque d\'être insuffisant pour vos dépenses de fin de semaine. SIKA suggère de transférer ${currNotifier.format(recommendedAmount!)} depuis $sourceWallet.',
+              'Your $targetWallet account (${currNotifier.format(sourceBalance!)}) might fall short for weekend bills. SIKA suggests transferring ${currNotifier.format(recommendedAmount!)} from $sourceWallet.',
             ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF94A3B8) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
@@ -71,8 +86,8 @@ class WalletRebalanceCard extends ConsumerWidget {
               onPressed: () {
                 sikaNotifier.sendTextMessage(
                   langNotifier.tr(
-                    'Transférer ${currNotifier.format(7000)} de Orange Money vers Wave pour rééquilibrer mes portefeuilles.',
-                    'Transfer ${currNotifier.format(7000)} from Orange Money to Wave to rebalance my wallets.',
+                    'Transférer ${currNotifier.format(recommendedAmount!)} de $sourceWallet vers $targetWallet pour rééquilibrer mes portefeuilles.',
+                    'Transfer ${currNotifier.format(recommendedAmount!)} from $sourceWallet to $targetWallet to rebalance my wallets.',
                   ),
                 );
                 if (onRebalanceConfirmed != null) onRebalanceConfirmed!();

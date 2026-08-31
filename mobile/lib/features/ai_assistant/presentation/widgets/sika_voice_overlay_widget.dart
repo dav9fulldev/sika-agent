@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 
 class SikaVoiceOverlayWidget extends ConsumerStatefulWidget {
@@ -53,6 +54,8 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
   Widget build(BuildContext context) {
     final sikaData = ref.watch(sikaProvider);
     final sikaNotifier = ref.read(sikaProvider.notifier);
+    ref.watch(languageProvider);
+    final langNotifier = ref.read(languageProvider.notifier);
 
     final String recognizedText = sikaData.currentText ?? '';
 
@@ -65,32 +68,32 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
     bool showError = false;
 
     if (sikaData.state == SikaState.idle) {
-      titleText = 'En attente...';
-      subText = 'Appuyez sur l\'orbe pour parler';
+      titleText = langNotifier.tr('En attente...', 'Waiting...');
+      subText = langNotifier.tr('Appuyez sur l\'orbe pour parler', 'Tap the orb to speak');
       hasSubText = true;
     } else if (sikaData.state == SikaState.listening) {
-      titleText = 'Je vous écoute';
-      subText = 'Parlez maintenant...';
+      titleText = langNotifier.tr('Je vous écoute', 'I\'m listening');
+      subText = langNotifier.tr('Parlez maintenant...', 'Speak now...');
       hasSubText = true;
     } else if (sikaData.state == SikaState.processing) {
-      titleText = 'SIKA analyse votre demande';
+      titleText = langNotifier.tr('SIKA analyse votre demande', 'SIKA is analyzing your request');
       subText = '';
       hasSubText = false;
     } else if (sikaData.state == SikaState.speaking) {
-      titleText = 'SIKA parle';
+      titleText = langNotifier.tr('SIKA parle', 'SIKA is speaking');
       subText = '';
       hasSubText = false;
     } else if (sikaData.state == SikaState.waitingVoiceConfirmation) {
-      titleText = 'Confirmation requise';
-      subText = 'Veuillez confirmer l\'opération vocale.';
+      titleText = langNotifier.tr('Confirmation requise', 'Confirmation required');
+      subText = langNotifier.tr('Veuillez confirmer l\'opération vocale.', 'Please confirm the voice operation.');
       hasSubText = true;
     } else if (sikaData.state == SikaState.securityValidation) {
-      titleText = 'Validation de sécurité';
-      subText = 'SIKA sécurise la transaction...';
+      titleText = langNotifier.tr('Validation de sécurité', 'Security validation');
+      subText = langNotifier.tr('SIKA sécurise la transaction...', 'SIKA is securing the transaction...');
       hasSubText = true;
     } else if (sikaData.state == SikaState.error) {
-      titleText = 'Une erreur est survenue';
-      subText = sikaData.errorMessage ?? 'SIKA n\'a pas pu répondre.';
+      titleText = langNotifier.tr('Une erreur est survenue', 'An error occurred');
+      subText = sikaData.errorMessage ?? langNotifier.tr('SIKA n\'a pas pu répondre.', 'SIKA could not respond.');
       hasSubText = true;
       showError = true;
     }
@@ -270,7 +273,9 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                         border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
                       ),
                       child: Text(
-                        showError ? 'Fermer' : 'Annuler',
+                        showError
+                            ? langNotifier.tr('Fermer', 'Close')
+                            : langNotifier.tr('Annuler', 'Cancel'),
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
