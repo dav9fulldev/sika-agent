@@ -93,19 +93,23 @@
               val p = WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT, t, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT)
               p.gravity = Gravity.BOTTOM; p.y = dp(50)
               windowManager?.addView(overlayView, p)
-              handler.postDelayed({ startListening(); speak("Je vous ecoute") }, 500)
+              val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
+              tts?.language = if (isEn) Locale.US else Locale.FRENCH
+              val welcomePhrase = if (isEn) "I am listening" else "Je vous ecoute"
+              handler.postDelayed({ startListening(); speak(welcomePhrase) }, 500)
           }
       }
 
       private fun createSikaView(): View {
+          val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
           val c = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xF0FFFFFF.toInt()); setPadding(dp(20), dp(15), dp(20), dp(20)) }
           val card = CardView(this).apply { radius = dp(30).toFloat(); cardElevation = dp(15).toFloat(); setCardBackgroundColor(Color.WHITE) }
           val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(30), dp(25), dp(30), dp(25)) }
           pulseView = View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(100), dp(100)); background = android.graphics.drawable.GradientDrawable().apply { shape =
   android.graphics.drawable.GradientDrawable.OVAL; setColor(Color.parseColor("#00A86B")) } }
-          statusText = TextView(this).apply { text = "Sika ecoute..."; textSize = 20f; setTextColor(Color.parseColor("#00A86B")); gravity = Gravity.CENTER }
+          statusText = TextView(this).apply { text = if (isEn) "Sika listening..." else "Sika ecoute..."; textSize = 20f; setTextColor(Color.parseColor("#00A86B")); gravity = Gravity.CENTER }
           transcriptText = TextView(this).apply { text = ""; textSize = 16f; setTextColor(Color.parseColor("#333333")); gravity = Gravity.CENTER }
-          val btn = TextView(this).apply { text = "Fermer"; textSize = 14f; setTextColor(Color.GRAY); setOnClickListener { hideOverlay(); stopSelf() } }
+          val btn = TextView(this).apply { text = if (isEn) "Close" else "Fermer"; textSize = 14f; setTextColor(Color.GRAY); setOnClickListener { hideOverlay(); stopSelf() } }
           content.addView(pulseView); content.addView(statusText); content.addView(transcriptText); content.addView(btn)
           card.addView(content); c.addView(card)
           startPulse()
@@ -123,19 +127,20 @@
 
       private fun startListening() {
           if (isListening) return
+          val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
           speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
           speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-              override fun onReadyForSpeech(p: android.os.Bundle?) { isListening = true; upStatus("Ecoute...") }
-              override fun onBeginningOfSpeech() { upStatus("Parlez...") }
+              override fun onReadyForSpeech(p: android.os.Bundle?) { isListening = true; upStatus(if (isEn) "Listening..." else "Ecoute...") }
+              override fun onBeginningOfSpeech() { upStatus(if (isEn) "Speak now..." else "Parlez...") }
               override fun onRmsChanged(r: Float) {}
               override fun onBufferReceived(b: ByteArray?) {}
-              override fun onEndOfSpeech() { upStatus("Analyse...") }
-              override fun onError(e: Int) { isListening = false; upStatus("Erreur"); handler.postDelayed({ restart() }, 2000) }
+              override fun onEndOfSpeech() { upStatus(if (isEn) "Analyzing..." else "Analyse...") }
+              override fun onError(e: Int) { isListening = false; upStatus(if (isEn) "Error" else "Erreur"); handler.postDelayed({ restart() }, 2000) }
               override fun onResults(r: android.os.Bundle?) { isListening = false; r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { upTranscript(it); process(it) } }
               override fun onPartialResults(p: android.os.Bundle?) { p?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { upTranscript(it) } }
               override fun onEvent(t: Int, p: android.os.Bundle?) {}
           })
-          val targetLocale = if (SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true) "en-US" else "fr-FR"
+          val targetLocale = if (isEn) "en-US" else "fr-FR"
           val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
               putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
               putExtra(RecognizerIntent.EXTRA_LANGUAGE, targetLocale)
@@ -148,28 +153,32 @@
       private fun restart() { stopListen(); handler.postDelayed({ startListening() }, 500) }
       private fun upStatus(t: String) { handler.post { statusText?.text = t } }
       private fun upTranscript(t: String) { handler.post { transcriptText?.text = t } }
-      private fun speak(t: String) { tts?.speak(t, TextToSpeech.QUEUE_FLUSH, null, "s") }
+      private fun speak(t: String) {
+          val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
+          tts?.language = if (isEn) Locale.US else Locale.FRENCH
+          tts?.speak(t, TextToSpeech.QUEUE_FLUSH, null, "s")
+      }
 
       private fun process(cmd: String) {
+          val isEn = SikaWakeWordServiceV2.currentLanguage?.startsWith("en", ignoreCase = true) == true
           val l = cmd.lowercase()
-              // detect expense phrases like "ajoute une dépense de 12 euros pour taxi"
-              val resp = when {
-                  l.contains("bonjour") -> "Bonjour!"
-                  l.contains("fermer") -> { handler.postDelayed({ hideOverlay(); stopSelf() }, 1500); "Au revoir!" }
-                  l.contains("ajoute") && (l.contains("dépense") || l.contains("depense")) -> {
-                      val parsed = parseExpense(l)
-                      if (parsed != null) {
-                          savePendingTransaction(parsed.first, parsed.second)
-                          "Dépense enregistrée: ${parsed.first}€ pour ${parsed.second}"
-                      } else {
-                          sendToFlutter(cmd)
-                          "Je n'ai pas compris le montant. Peux-tu répéter ?"
-                      }
+          val resp = when {
+              l.contains("bonjour") || l.contains("hello") || l.contains("hi") -> if (isEn) "Hello!" else "Bonjour!"
+              l.contains("fermer") || l.contains("close") || l.contains("exit") -> { handler.postDelayed({ hideOverlay(); stopSelf() }, 1500); if (isEn) "Goodbye!" else "Au revoir!" }
+              (l.contains("ajoute") || l.contains("add")) && (l.contains("dépense") || l.contains("depense") || l.contains("expense")) -> {
+                  val parsed = parseExpense(l)
+                  if (parsed != null) {
+                      savePendingTransaction(parsed.first, parsed.second)
+                      if (isEn) "Expense saved: ${parsed.first} for ${parsed.second}" else "Dépense enregistrée: ${parsed.first}€ pour ${parsed.second}"
+                  } else {
+                      sendToFlutter(cmd)
+                      if (isEn) "I didn't catch the amount. Could you please repeat?" else "Je n'ai pas compris le montant. Peux-tu répéter ?"
                   }
-                  else -> { sendToFlutter(cmd); "Traitement..." }
               }
-              upStatus(resp); speak(resp)
-              if (!l.contains("fermer")) handler.postDelayed({ restart() }, 3000)
+              else -> { sendToFlutter(cmd); if (isEn) "Processing..." else "Traitement..." }
+          }
+          upStatus(resp); speak(resp)
+          if (!l.contains("fermer") && !l.contains("close") && !l.contains("exit")) handler.postDelayed({ restart() }, 3000)
       }
 
       private fun parseExpense(cmd: String): Pair<Double, String>? {

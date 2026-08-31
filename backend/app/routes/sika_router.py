@@ -214,6 +214,7 @@ def sika_text_to_speech(data: TTSRequest):
     """Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS)."""
     text = data.text or data.speech_text or ""
     voice_name = data.voice_name
+    language_code = data.language_code
     speaking_rate = float(data.speaking_rate)
 
     if not text:
@@ -222,6 +223,7 @@ def sika_text_to_speech(data: TTSRequest):
     res = gcp_tts_service.synthesize_speech(
         text=text,
         voice_name=voice_name,
+        language_code=language_code,
         speaking_rate=speaking_rate
     )
     if not res.get("success"):

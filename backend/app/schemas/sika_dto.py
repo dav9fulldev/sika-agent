@@ -90,7 +90,8 @@ class AuthResetPasswordRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: Optional[str] = None
     speech_text: Optional[str] = None
-    voice_name: str = "fr-FR-Neural2-C"
+    voice_name: Optional[str] = None
+    language_code: Optional[str] = None
     speaking_rate: float = 1.05
 
 class AgentProcessRequest(BaseModel):

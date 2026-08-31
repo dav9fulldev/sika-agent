@@ -521,8 +521,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   Future<void> _speak(String text, {required String ttsLocale}) async {
     final currentRequestId = ++_activeSpeechRequestId;
+    final isEn = ttsLocale.toLowerCase().startsWith('en');
+    final voiceName = isEn ? 'en-US-Neural2-F' : 'fr-FR-Neural2-C';
+    final langCode = isEn ? 'en-US' : 'fr-FR';
+
     debugPrint(
-        '[SIKA TTS] Preparing speech output (ReqID: $currentRequestId, $ttsLocale): "$text"');
+        '[SIKA TTS] Preparing speech output (ReqID: $currentRequestId, $langCode, Voice: $voiceName): "$text"');
 
     // Interrompt tout flux audio précédent
     await stopSpeaking(resetState: false);
@@ -532,7 +536,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
       // 1. MOTEUR PRINCIPAL : Appel de l'endpoint dédié POST /api/v1/sika/tts
       try {
-        final ttsRes = await _apiService.fetchGcpTtsAudio(text);
+        final ttsRes = await _apiService.fetchGcpTtsAudio(
+          text,
+          voiceName: voiceName,
+          languageCode: langCode,
+        );
 
         // Protection anti-course (Race Condition / Stale Request Protection)
         if (currentRequestId != _activeSpeechRequestId) {
@@ -554,7 +562,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       // 2. LECTURE AUDIO GCP TTS MP3
       if (b64 != null && b64.isNotEmpty) {
         debugPrint(
-            '[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets, ReqID: $currentRequestId)');
+            '[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets, ReqID: $currentRequestId, Voice: $voiceName)');
         final bytes = base64Decode(b64);
         await _audioPlayer.play(BytesSource(bytes));
 
@@ -570,8 +578,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       // 3. FALLBACK : flutter_tts
       if (currentRequestId != _activeSpeechRequestId) return;
       debugPrint(
-          '[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale (ReqID: $currentRequestId)');
-      await _flutterTts.setLanguage(ttsLocale);
+          '[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale (ReqID: $currentRequestId, Locale: $langCode)');
+      await _flutterTts.setLanguage(langCode);
       await _flutterTts.speak(text);
     } catch (e) {
       debugPrint('[SIKA TTS] Error in TTS speak: $e');

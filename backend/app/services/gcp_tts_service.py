@@ -10,8 +10,10 @@ class GCPTTSService:
     Génère une synthèse vocale haute-fidélité en Français (ex: fr-FR-Neural2-C) via ADC.
     """
 
-    DEFAULT_VOICE = "fr-FR-Neural2-C"
-    DEFAULT_LANG = "fr-FR"
+    DEFAULT_VOICE_FR = "fr-FR-Neural2-C"
+    DEFAULT_VOICE_EN = "en-US-Neural2-F"
+    DEFAULT_LANG_FR = "fr-FR"
+    DEFAULT_LANG_EN = "en-US"
 
     def __init__(self):
         self._client = None
@@ -28,8 +30,8 @@ class GCPTTSService:
     def synthesize_speech(
         self,
         text: str,
-        voice_name: str = DEFAULT_VOICE,
-        language_code: str = DEFAULT_LANG,
+        voice_name: Optional[str] = None,
+        language_code: Optional[str] = None,
         speaking_rate: float = 1.05,
         pitch: float = 0.0
     ) -> Dict[str, Any]:
@@ -42,11 +44,26 @@ class GCPTTSService:
             return {"success": False, "error": "Service GCP Text-to-Speech non disponible."}
 
         try:
-            # Auto-align language_code with voice_name prefix if needed
-            if voice_name.startswith("en-"):
-                language_code = "-".join(voice_name.split("-")[:2])
-            elif voice_name.startswith("fr-"):
-                language_code = "-".join(voice_name.split("-")[:2])
+            # Détection intelligente de la langue (EN vs FR)
+            is_en_text = False
+            try:
+                from .sika_ai import sika_ai
+                is_en_text = sika_ai._is_english(text)
+            except Exception:
+                pass
+
+            is_en = (language_code and language_code.lower().startswith("en")) or (voice_name and voice_name.startswith("en-")) or is_en_text
+
+            if not voice_name:
+                voice_name = self.DEFAULT_VOICE_EN if is_en else self.DEFAULT_VOICE_FR
+                language_code = self.DEFAULT_LANG_EN if is_en else self.DEFAULT_LANG_FR
+            else:
+                if voice_name.startswith("en-"):
+                    language_code = language_code or "-".join(voice_name.split("-")[:2])
+                elif voice_name.startswith("fr-"):
+                    language_code = language_code or "-".join(voice_name.split("-")[:2])
+                else:
+                    language_code = language_code or (self.DEFAULT_LANG_EN if is_en else self.DEFAULT_LANG_FR)
 
             synthesis_input = texttospeech.SynthesisInput(text=text.strip())
 

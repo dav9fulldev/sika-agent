@@ -517,8 +517,16 @@ class ApiService {
 
   Future<Map<String, dynamic>> fetchGcpTtsAudio(
     String text, {
-    String voiceName = 'fr-FR-Neural2-C',
+    String? voiceName,
+    String? languageCode,
   }) async {
+    final body = <String, dynamic>{
+      'text': text,
+      'speaking_rate': 1.05,
+    };
+    if (voiceName != null) body['voice_name'] = voiceName;
+    if (languageCode != null) body['language_code'] = languageCode;
+
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.sikaTts}'),
@@ -526,11 +534,7 @@ class ApiService {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          body: jsonEncode({
-            'text': text,
-            'voice_name': voiceName,
-            'speaking_rate': 1.05,
-          }),
+          body: jsonEncode(body),
         )
         .timeout(AppConfig.agentTimeout);
 
