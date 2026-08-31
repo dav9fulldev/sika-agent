@@ -165,11 +165,22 @@ class PayMeChapAPIService:
             "Authorization": f"Bearer {token}" if token else "",
             "Content-Type": "application/json",
         }
-        payload = {"pin": str(pin_code), "pinCode": str(pin_code), "code": str(pin_code)}
-        logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint}")
+        payload = {
+            "telephone": clean_phone,
+            "pin": str(pin_code),
+            "pinCode": str(pin_code),
+            "code": str(pin_code),
+        }
+        logger.info(f"[PayMeChap PIN API] Vérification PIN pour {clean_phone} via {endpoint} (payload={payload})")
 
         try:
             resp = requests.post(endpoint, json=payload, headers=headers, timeout=150)
+            if resp.status_code == 404:
+                # Fallback: URL standard sans paramètre de chemin si le téléphone est uniquement dans le corps
+                alt_endpoint = f"{self.base_url}/api/v1/partners/wallets/verify-pin"
+                logger.info(f"[PayMeChap PIN API] Tentative alternative sur {alt_endpoint}")
+                resp = requests.post(alt_endpoint, json=payload, headers=headers, timeout=150)
+
             if resp.status_code in [200, 201]:
                 res_data = resp.json()
                 stat = str(res_data.get("status", "")).upper()
