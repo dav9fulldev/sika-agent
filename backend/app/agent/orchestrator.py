@@ -484,9 +484,17 @@ class SikaAgentOrchestrator:
         parsed_payload = None
         if action_payload_json:
             try:
-                parsed_payload = json.loads(action_payload_json)
+                parsed_payload = json.loads(action_payload_json) if isinstance(action_payload_json, str) else action_payload_json
             except Exception:
                 pass
+
+        if not parsed_payload and action_meta:
+            parsed_payload = action_meta.get("payload") or action_meta.get("result")
+            if isinstance(parsed_payload, str):
+                try:
+                    parsed_payload = json.loads(parsed_payload)
+                except Exception:
+                    pass
 
         if not parsed_payload or not isinstance(parsed_payload, dict):
             try:
