@@ -27,8 +27,8 @@ class ConnectWalletModal extends ConsumerStatefulWidget {
 
 class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
   int _currentStep = 1; // 1 = Phone Number, 2 = 6-Digit OTP
-  String _selectedProvider = '';
-  String _authMethod = '';
+  String _selectedProvider = 'PayMeChap';
+  String _authMethod = 'PAYMECHAP_PARTNER_API';
   String? _sessionId;
 
   final TextEditingController _phoneController = TextEditingController();
@@ -71,12 +71,14 @@ class _ConnectWalletModalState extends ConsumerState<ConnectWalletModal> {
       _localErrorMessage = null;
     });
     final phone = _phoneController.text.trim();
+    final provider = _selectedProvider.isNotEmpty ? _selectedProvider : 'PayMeChap';
+    final authMethod = _authMethod.isNotEmpty ? _authMethod : 'PAYMECHAP_PARTNER_API';
 
     final sessId =
         await ref.read(walletProvider.notifier).initiateWalletConnection(
-              provider: _selectedProvider,
+              provider: provider,
               accountNumber: phone,
-              authMethod: _authMethod,
+              authMethod: authMethod,
             );
 
     if (mounted) {

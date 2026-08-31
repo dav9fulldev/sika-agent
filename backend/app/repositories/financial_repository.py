@@ -28,17 +28,19 @@ class FinancialRepository:
 
     def get_wallets(self, user_id: Any = None) -> List[Dict[str, Any]]:
         """Récupère les portefeuilles connectés depuis la base de données SQL pour un utilisateur."""
+        if user_id is None:
+            return []
+
         db: Session = SessionLocal()
         try:
-            query = db.query(ConnectedWalletModel)
-            if user_id is not None:
-                try:
-                    numeric_user_id = int(user_id)
-                    query = query.filter(ConnectedWalletModel.user_id == numeric_user_id)
-                except (ValueError, TypeError):
-                    # Si user_id n'est pas convertible en entier (ex: identifiant legacy string), aucun wallet SQL ne correspond
-                    return []
-            wallets = query.all()
+            try:
+                numeric_user_id = int(user_id)
+            except (ValueError, TypeError):
+                return []
+
+            wallets = db.query(ConnectedWalletModel).filter(
+                ConnectedWalletModel.user_id == numeric_user_id
+            ).all()
             return [
                 {
                     "id": f"w_{w.id}",

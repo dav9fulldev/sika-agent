@@ -214,12 +214,12 @@ def get_user_coffres(authorization: Optional[str] = Header(None)):
 def initiate_wallet_connection(data: Dict[str, Any], authorization: Optional[str] = Header(None)):
     """Étape 1 : Demande de connexion d'un portefeuille (Déclenchement OTP SMS/API) (Exige JWT)."""
     user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    provider = data.get("provider")
+    provider = data.get("provider") or "PayMeChap"
     account_number = data.get("account_number")
-    auth_method = data.get("auth_method", "OAUTH2_API")
+    auth_method = data.get("auth_method", "PAYMECHAP_PARTNER_API")
 
-    if not provider or not account_number:
-        raise HTTPException(status_code=400, detail="Champs 'provider' et 'account_number' obligatoires.")
+    if not account_number:
+        raise HTTPException(status_code=400, detail="Le numéro de téléphone 'account_number' est obligatoire.")
 
     prov_lower = provider.lower()
     if "paymechap" in prov_lower:

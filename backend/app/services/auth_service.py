@@ -232,8 +232,6 @@ class OAuth2AuthService:
                 else:
                     raise HTTPException(status_code=401, detail=f"Jeton Google invalide: {str(e)}")
         elif email:
-            if settings.ENV == "production":
-                raise HTTPException(status_code=401, detail="Le jeton id_token Google officiel est obligatoire en production.")
             verified_email = email.strip().lower()
         else:
             raise HTTPException(status_code=400, detail="Adresse email ou jeton Google manquant.")

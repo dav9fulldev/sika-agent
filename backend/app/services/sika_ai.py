@@ -1556,8 +1556,17 @@ LANGUE : {lang_instruction}
                     logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name} with args: {call.args}")
                     
                     try:
-                        # Execution via safe tool_registry
-                        tool_res = tool_registry.execute(call.name, call.args)
+                        # Execution via safe tool_registry with signature-aware user isolation
+                        call_args = dict(call.args) if call.args else {}
+                        tool_func = tool_registry.get(call.name)
+                        if tool_func and user_id:
+                            import inspect
+                            sig = inspect.signature(tool_func)
+                            if "user_id" in sig.parameters:
+                                if "user_id" not in call_args or not call_args.get("user_id") or call_args.get("user_id") == "default_user":
+                                    call_args["user_id"] = str(user_id)
+
+                        tool_res = tool_registry.execute(call.name, call_args)
                         res_dict = tool_res.to_dict()
                         step_status = "completed"
                     except Exception as e:
