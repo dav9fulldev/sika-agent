@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
-import '../../../../core/providers/currency_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_prompt_suggestion.dart';
 import '../widgets/sika_thinking_indicator.dart';
 import '../widgets/sika_chat_bubble.dart';
 import '../widgets/sika_input_bar.dart';
 import '../widgets/reconciliation_status_card.dart';
-import '../widgets/human_confirmation_card.dart';
 
 class SikaChatScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBackPressed;
@@ -85,8 +83,6 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     final sikaNotifier = ref.read(sikaProvider.notifier);
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
-    final currState = ref.watch(currencyProvider);
-    final currNotifier = ref.read(currencyProvider.notifier);
 
     final bool isProcessing = sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.agentWorking;
@@ -111,42 +107,6 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
               actionId: sikaData.pendingActionId!,
               onReconcile: sikaNotifier.executeActionReconciliation,
             ),
-
-          // ── HUMAN CONFIRMATION CARD ──────────────────────────────────────
-          // Shown when SIKA has prepared a transfer and is waiting for biometric
-          if (sikaData.pendingActionId != null && isAwaitingConfirmation)
-            Builder(builder: (ctx) {
-              final actionData = sikaData.pendingActionData ?? {};
-              final recipient =
-                  actionData['recipient']?.toString() ??
-                  actionData['destinataire']?.toString() ??
-                  'Destinataire';
-              final amountVal = (actionData['amount'] is num)
-                  ? (actionData['amount'] as num).toDouble()
-                  : 0.0;
-              return HumanConfirmationCard(
-                actionId: sikaData.pendingActionId,
-                actionTitle: langNotifier.tr(
-                    'Validation requise', 'Confirmation Required'),
-                recipientText: recipient,
-                amountText: amountVal > 0
-                    ? currNotifier.format(amountVal)
-                    : (actionData['amount_text']?.toString() ?? '---'),
-                sourceAccount:
-                    actionData['source_wallet']?.toString() ??
-                    langNotifier.tr('Portefeuille Principal', 'Main Wallet'),
-                feeText: actionData['fee'] != null
-                    ? '${actionData['fee']} ${currState.code}'
-                    : '—',
-                platformText:
-                    actionData['platform']?.toString() ??
-                    'PayMeChap / Direct',
-                onConfirm: () =>
-                    sikaNotifier.executeSecurityValidationAndConfirm(
-                        sikaData.pendingActionId!),
-                onCancel: () => sikaNotifier.cancelPendingAction(),
-              ).animate().fade(duration: 350.ms).slideY(begin: 0.06, end: 0);
-            }),
 
           // MESSAGES OR EMPTY STATE
           Expanded(

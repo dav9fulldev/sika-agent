@@ -50,11 +50,16 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
   @override
   void initState() {
     super.initState();
-    // Auto-prompt biometrics once after build
+    // Auto-prompt biometrics once for active confirmation card
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_hasAutoPrompted) {
-        _hasAutoPrompted = true;
-        _handleBiometricConfirmTap(isAuto: true);
+        final sikaData = ref.read(sikaProvider);
+        final bool isObsolete = widget.actionId != null &&
+            sikaData.obsoleteActionIds.contains(widget.actionId);
+        if (!isObsolete) {
+          _hasAutoPrompted = true;
+          _handleBiometricConfirmTap(isAuto: true);
+        }
       }
     });
   }

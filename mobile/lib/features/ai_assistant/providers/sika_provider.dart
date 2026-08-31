@@ -440,7 +440,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
               (actionId != null && (action == 'prepare_transfer' || action == 'transfer'));
       final actionData = response['action_data'] != null
           ? Map<String, dynamic>.from(response['action_data'])
-          : null;
+          : (actionId != null ? <String, dynamic>{} : null);
+      if (actionData != null && actionId != null) {
+        actionData['action_id'] = actionId;
+      }
 
       final bool shouldSpeak =
           (response['should_speak'] == true) || state.isVoiceMode;
@@ -501,7 +504,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
         pendingActionId: actionId,
         pendingActionData: actionData,
         agentSteps: newAgentSteps,
-        activeActionId: actionId ?? state.activeActionId,
+        activeActionId: actionId,
         obsoleteActionIds: updatedObsoleteIds,
       );
 
@@ -633,6 +636,16 @@ class SikaNotifier extends StateNotifier<SikaData> {
         pendingActionId: actionId,
         pendingActionData: state.pendingActionData,
       );
+    } else if (nextState == SikaState.completed || nextState == SikaState.idle) {
+      debugPrint(
+          '[SIKA STATE] Transaction finalized — resetting assistant state to idle for subsequent operations.');
+      state = state.copyWith(
+        state: SikaState.idle,
+        pendingNextState: null,
+        pendingActionId: null,
+        clearActiveAction: true,
+        clearActionData: true,
+      );
     } else {
       state = state.copyWith(
         state: nextState ?? SikaState.idle,
@@ -740,7 +753,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       // CRITICAL FIX: UNKNOWN_RESULT is NOT a failure — it means the status is
       // being verified. Map to reconciling, never to error.
       final SikaState pendingState = isExecuted
-          ? SikaState.completed
+          ? SikaState.idle
           : (status == 'EXPIRED' || status == 'FAILED')
               ? SikaState.error
               : needsReconciliation
@@ -757,6 +770,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         pendingNextState: pendingState,
         // P1.5: conserver l'action_id pour UNKNOWN_RESULT/REQUIRES_RECONCILIATION
         pendingActionId: needsReconciliation ? actionId : null,
+        clearActiveAction: !needsReconciliation,
+        clearActionData: !needsReconciliation,
       );
 
       // P1.1: Rafraîchir le solde immédiatement après exécution réussie
