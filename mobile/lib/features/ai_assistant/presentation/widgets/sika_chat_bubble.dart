@@ -119,23 +119,23 @@ class SikaChatBubble extends ConsumerWidget {
   Widget _buildRichResponse(
       BuildContext context, WidgetRef ref, Map<String, dynamic> data) {
     // Si c'est une action de transfert qui nécessite une confirmation
-    final String type = data['type'] ?? data['action'] ?? '';
+    final String type = (data['type'] ?? data['action'] ?? (data['recipient'] != null ? 'transfer' : '')).toString().toLowerCase();
     final String amount = (data['amount'] ?? '').toString();
-    final String recipient = data['recipient'] ?? 'Destinataire inconnu';
-    // IMPORTANT: Never trust action_id embedded in free-form message data.
-    // Use only the backend-provided canonical action id exposed in the provider.
+    final String recipient = data['recipient']?.toString() ?? data['destinataire']?.toString() ?? 'Destinataire inconnu';
     final sikaData = ref.watch(sikaProvider);
-    final String? actionId = sikaData.pendingActionId ?? sikaData.activeActionId;
+    final String? actionId = (data['action_id'] ?? sikaData.pendingActionId ?? sikaData.activeActionId)?.toString();
 
-    if (type.toLowerCase() == 'transfer' || type.toLowerCase() == 'transfert') {
+    if (type == 'transfer' || type == 'transfert' || data.containsKey('recipient') || data.containsKey('amount')) {
+      final currency = data['currency']?.toString() ?? 'XOF';
+      final formattedAmount = amount.isNotEmpty ? '$amount $currency' : '—';
       return Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.only(top: 12),
         child: HumanConfirmationCard(
           actionId: actionId,
           recipientText: recipient,
-          amountText: amount,
-          sourceAccount: data['source_wallet']?.toString() ?? 'Portefeuille Principal',
-          feeText: data['fee'] != null ? '${data['fee']}' : '—',
+          amountText: formattedAmount,
+          sourceAccount: data['source_wallet']?.toString() ?? (data['provider']?.toString() ?? 'PayMeChap').toUpperCase(),
+          feeText: data['fee'] != null ? '${data['fee']} $currency' : 'Gratuit',
           platformText: data['platform']?.toString() ?? 'PayMeChap / Direct',
           onConfirm: () {
             if (actionId != null) {

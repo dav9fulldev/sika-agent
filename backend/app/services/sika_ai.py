@@ -1482,7 +1482,7 @@ Contexte financier de l'utilisateur :
 RÈGLES STRICTES :
 1. Tu dois aider l'utilisateur à comprendre ses finances, épargner, et transférer de l'argent.
 2. N'invente JAMAIS un solde ou une transaction. Utilise les outils disponibles pour chercher l'information.
-3. Si l'utilisateur veut envoyer de l'argent, utilise `search_contact` pour vérifier le numéro, puis appelle `prepare_transfer`.
+3. Si l'utilisateur demande d'envoyer, transférer ou effectuer une transaction d'argent avec un montant et un destinataire/numéro (ex: "effectue une transaction de 15000 F sur le numéro 0779996927" ou "envoie 5000 à Franck"), tu DOIS OBLIGATOIREMENT appeler immédiatement le tool `prepare_transfer(amount=..., recipient=..., provider='paymechap')`. Ne réponds JAMAIS par un simple texte sans appeler `prepare_transfer`.
 4. Si une information est ambiguë (plusieurs contacts avec le même nom), pose une question courte pour clarifier avant d'agir. Ne demande PAS le numéro si tu l'as déjà trouvé.
 5. Tu ne peux pas exécuter directement une transaction. Appelle `prepare_transfer`, cela mettra la transaction en attente de confirmation humaine.
 6. Réponds de manière concise, naturelle et chaleureuse.
@@ -1663,8 +1663,49 @@ LANGUE : {lang_instruction}
 
                 break
                 
-            step += 1
-            
+        # Fallback déterministe : Si Gemini n'a pas appelé le tool mais que l'utilisateur demandait explicitement un transfert avec montant et numéro
+        if not action_id and not self._is_pure_greeting(user_message):
+            msg_lower = user_message.lower()
+            transfer_keywords = ["transf", "envoi", "envoie", "envoyer", "paye", "payer", "effectue une transaction", "transferer", "verse", "verser", "send", "transfer"]
+            if any(kw in msg_lower for kw in transfer_keywords):
+                phone_match = re.search(r"(\+?225\s*)?(0[1-9]\d{8}|\d{10})", user_message.replace(" ", ""))
+                amount_match = re.search(r"(\d+[\s\d]*)\s*(?:f|cfa|fcfa|xof|francs)?", user_message, re.IGNORECASE)
+                if phone_match and amount_match:
+                    try:
+                        clean_amount_str = re.sub(r"\s+", "", amount_match.group(1))
+                        amount_val = float(clean_amount_str)
+                        recipient_phone = phone_match.group(0).replace(" ", "")
+                        if amount_val > 0 and len(recipient_phone) >= 8:
+                            logger.info(f"[SIKA DETERMINISTIC INTENT] Auto-executing prepare_transfer for {amount_val} to {recipient_phone}")
+                            prep_res = tool_registry.execute("prepare_transfer", {
+                                "amount": amount_val,
+                                "recipient": recipient_phone,
+                                "provider": "paymechap",
+                                "currency": "XOF"
+                            })
+                            prep_dict = prep_res.to_dict()
+                            if prep_res.success:
+                                action_detected = "prepare_transfer"
+                                action_data_detected = prep_dict.get("data", {})
+                                action_data_detected["type"] = "transfer"
+                                action_data_detected["action"] = "transfer"
+                                action_id = action_data_detected.get("action_id")
+                                if action_id:
+                                    from ..agent.orchestrator import sika_orchestrator
+                                    sika_orchestrator.register_action(
+                                        action_id=action_id,
+                                        user_id=int(user_id) if user_id and str(user_id).isdigit() else 1,
+                                        action_type="TRANSFER",
+                                        payload=action_data_detected
+                                    )
+                                    final_response_text = (
+                                        f"I have prepared the transfer of {amount_val:,.0f} XOF to {recipient_phone}. Please confirm."
+                                        if is_english
+                                        else f"Bonjour ! J'ai bien préparé votre transfert de {amount_val:,.0f} XOF vers le numéro {recipient_phone}.\n\nVous pouvez désormais valider cette transaction en toute sécurité directement ici, sur la carte de confirmation qui s'affiche sur votre écran, à l'aide de votre empreinte digitale ou de votre code PIN."
+                                    )
+                    except Exception as prep_err:
+                        logger.warning(f"Deterministic prepare_transfer fallback failed: {prep_err}")
+
         if not final_response_text:
             final_response_text = (
                 "I was unable to complete the analysis."

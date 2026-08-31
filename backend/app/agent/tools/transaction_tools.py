@@ -102,6 +102,8 @@ def prepare_transfer(provider: str, amount: float, recipient: str, currency: str
         requires_confirmation=True,
         data={
             "action_id": action_id,
+            "type": "transfer",
+            "action": "transfer",
             "status": "confirmation_required",
             "provider": provider.lower(),
             "amount": float(amount),
