@@ -72,7 +72,7 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
 
     final bool isAvailable = await biometricService.isBiometricsAvailable();
     if (!isAvailable) {
-      if (!isAuto && mounted) {
+      if (mounted) {
         _showPinModal(context);
       }
       return;
@@ -89,11 +89,11 @@ class _HumanConfirmationCardState extends ConsumerState<HumanConfirmationCard> {
       if (authenticated && mounted) {
         setState(() => _isSubmittingLocally = true);
         widget.onConfirm();
-      } else if (!isAuto && mounted) {
+      } else if (mounted) {
         _showPinModal(context);
       }
     } catch (_) {
-      if (!isAuto && mounted) {
+      if (mounted) {
         _showPinModal(context);
       }
     }
