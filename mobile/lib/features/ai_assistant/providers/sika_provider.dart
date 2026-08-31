@@ -332,6 +332,26 @@ class SikaNotifier extends StateNotifier<SikaData> {
   Future<void> processUserQuery(String query, {String? ttsLocale}) async {
     if (query.trim().isEmpty) return;
 
+    // ─── CONFIRMATION GUARD ────────────────────────────────────────────────
+    // If a transfer is already prepared and awaiting biometric confirmation,
+    // block new queries to prevent re-preparing a new transfer accidentally.
+    if (state.state == SikaState.securityValidation ||
+        state.state == SikaState.executingAction) {
+      final currentLang = _ref.read(languageProvider);
+      final isEn = currentLang.code == 'en';
+      final reminderText = isEn
+          ? 'Please confirm or cancel the pending action before continuing.'
+          : 'Veuillez confirmer ou annuler l\'action en cours avant de continuer.';
+      debugPrint(
+          '[SIKA GUARD] 🛑 Blocked query while awaiting confirmation/execution: "$query"');
+      final reminderMsg = SikaMessage(text: reminderText, isUser: false);
+      state = state.copyWith(
+        messages: List<SikaMessage>.from(state.messages)..add(reminderMsg),
+      );
+      return;
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     final isEnglish = _isEnglishText(query);
     final activeTtsLocale = ttsLocale ?? (isEnglish ? 'en-US' : 'fr-FR');
 

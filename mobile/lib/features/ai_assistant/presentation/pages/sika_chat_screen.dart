@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_prompt_suggestion.dart';
 import '../widgets/sika_thinking_indicator.dart';
 import '../widgets/sika_chat_bubble.dart';
 import '../widgets/sika_input_bar.dart';
 import '../widgets/reconciliation_status_card.dart';
+import '../widgets/human_confirmation_card.dart';
 
 class SikaChatScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBackPressed;
@@ -67,6 +69,13 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
         }
       }
 
+      // Auto-scroll when confirmation card appears/disappears
+      if (previous?.state != next.state &&
+          (next.state == SikaState.securityValidation ||
+           previous?.state == SikaState.securityValidation)) {
+        _scrollToBottom();
+      }
+
       if (previous?.messages.length != next.messages.length) {
         _scrollToBottom();
       }
@@ -76,9 +85,16 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
     final sikaNotifier = ref.read(sikaProvider.notifier);
     ref.watch(languageProvider);
     final langNotifier = ref.read(languageProvider.notifier);
+    final currState = ref.watch(currencyProvider);
+    final currNotifier = ref.read(currencyProvider.notifier);
 
     final bool isProcessing = sikaData.state == SikaState.processing ||
         sikaData.state == SikaState.agentWorking;
+
+    // Lock input when biometric confirmation is waiting
+    final bool isAwaitingConfirmation =
+        sikaData.state == SikaState.securityValidation ||
+        sikaData.state == SikaState.executingAction;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -94,6 +110,42 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
               actionId: sikaData.pendingActionId!,
               onReconcile: sikaNotifier.executeActionReconciliation,
             ),
+
+          // ── HUMAN CONFIRMATION CARD ──────────────────────────────────────
+          // Shown when SIKA has prepared a transfer and is waiting for biometric
+          if (sikaData.pendingActionId != null && isAwaitingConfirmation)
+            Builder(builder: (ctx) {
+              final actionData = sikaData.pendingActionData ?? {};
+              final recipient =
+                  actionData['recipient']?.toString() ??
+                  actionData['destinataire']?.toString() ??
+                  'Destinataire';
+              final amountVal = (actionData['amount'] is num)
+                  ? (actionData['amount'] as num).toDouble()
+                  : 0.0;
+              return HumanConfirmationCard(
+                actionId: sikaData.pendingActionId,
+                actionTitle: langNotifier.tr(
+                    'Validation requise', 'Confirmation Required'),
+                recipientText: recipient,
+                amountText: amountVal > 0
+                    ? currNotifier.format(amountVal)
+                    : (actionData['amount_text']?.toString() ?? '---'),
+                sourceAccount:
+                    actionData['source_wallet']?.toString() ??
+                    langNotifier.tr('Portefeuille Principal', 'Main Wallet'),
+                feeText: actionData['fee'] != null
+                    ? '${actionData['fee']} ${currState.code}'
+                    : '—',
+                platformText:
+                    actionData['platform']?.toString() ??
+                    'PayMeChap / Direct',
+                onConfirm: () =>
+                    sikaNotifier.executeSecurityValidationAndConfirm(
+                        sikaData.pendingActionId!),
+                onCancel: () => sikaNotifier.cancelPendingAction(),
+              ).animate().fade(duration: 350.ms).slideY(begin: 0.06, end: 0);
+            }),
 
           // MESSAGES OR EMPTY STATE
           Expanded(
@@ -120,20 +172,27 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           if (sikaData.state == SikaState.error && sikaData.pendingActionId == null)
             _buildConnectionError(context, sikaData.errorMessage, langNotifier),
 
-          // INPUT BAR
-          SikaInputBar(
-            controller: _textController,
-            isListening: sikaData.state == SikaState.listening,
-            isSpeaking: sikaData.state == SikaState.speaking,
-            onMicTap: () {
-              if (sikaData.state == SikaState.speaking) {
-                sikaNotifier.stopSpeaking();
-              } else {
-                sikaNotifier.toggleListening();
-              }
-            },
-            onSendTap: () => _handleSend(sikaNotifier),
-            onSubmitted: (_) => _handleSend(sikaNotifier),
+          // INPUT BAR — disabled while waiting for biometric confirmation
+          IgnorePointer(
+            ignoring: isAwaitingConfirmation,
+            child: AnimatedOpacity(
+              opacity: isAwaitingConfirmation ? 0.4 : 1.0,
+              duration: const Duration(milliseconds: 250),
+              child: SikaInputBar(
+                controller: _textController,
+                isListening: sikaData.state == SikaState.listening,
+                isSpeaking: sikaData.state == SikaState.speaking,
+                onMicTap: () {
+                  if (sikaData.state == SikaState.speaking) {
+                    sikaNotifier.stopSpeaking();
+                  } else {
+                    sikaNotifier.toggleListening();
+                  }
+                },
+                onSendTap: () => _handleSend(sikaNotifier),
+                onSubmitted: (_) => _handleSend(sikaNotifier),
+              ),
+            ),
           ).animate().slideY(begin: 0.1, end: 0),
         ],
       ),
