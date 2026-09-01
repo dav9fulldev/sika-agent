@@ -416,7 +416,7 @@ When running in an Android emulator, connect to the backend using Android's loop
 | `GET` | `/api/v1/wallets/me` | Retrieves user's connected wallets & live balances | Yes (JWT) |
 | `POST` | `/api/v1/wallets/connect` | Initiates wallet connection (OTP challenge) | Yes (JWT) |
 | `POST` | `/api/v1/wallets/verify-otp` | Verifies OTP code and enrolls wallet in DB | Yes (JWT) |
-| `POST` | `/api/v1/sika/auth/login` | Authenticates user and issues OAuth2 Bearer token | No |
+| `POST` | `/api/v1/sika/auth/login` | Authenticates user and issues OAuth2 Bearer token | Yes (JWT) |
 | `POST` | `/api/v1/sika/auth/logout` | Revokes JWT token in real-time deny-list | Yes (JWT) |
 
 ---
