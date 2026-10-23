@@ -16,7 +16,7 @@ class PayMeChapAPIService:
     """Service d'intégration partenaire directe avec l'API PayMeChap v1 sur Render."""
 
     def __init__(self):
-        self.base_url = os.getenv("PAYMECHAP_API_URL", "https://gimwallet-api.onrender.com")
+        self.base_url = os.getenv("PAYMECHAP_API_URL", "http://testbed.gimdigital.com/paymechapAPI").rstrip("/")
         self.client_id = os.getenv("PAYMECHAP_CLIENT_ID", "paymechap_partner")
         self.client_secret = os.getenv("PAYMECHAP_CLIENT_SECRET", "PaymeChap@2026#Secret")
         self.grant_type = "paymechap_credentials"
@@ -132,7 +132,7 @@ class PayMeChapAPIService:
                     "success": True,
                     "accessToken": data.get("accessToken") or data.get("token") or f"pmc_token_{clean_phone}",
                     "refreshToken": data.get("refreshToken"),
-                    "message": data.get("message") or "✅ Code OTP vérifié avec succès sur PayMeChap API !",
+                    "message": data.get("message") or "Code OTP vérifié avec succès sur PayMeChap API !",
                 }
             else:
                 err_data = {}

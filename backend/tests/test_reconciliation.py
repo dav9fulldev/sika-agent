@@ -51,7 +51,8 @@ def db_session():
 @pytest.fixture(autouse=True)
 def prevent_financial_execution():
     with patch('app.services.wallet_integrations.paymechap_api_service.PayMeChapAPIService.execute_payout') as mock_payout, \
-         patch('app.services.wallet_integrations.paymechap_api_service.PayMeChapAPIService.deposit_to_coffre') as mock_deposit:
+         patch('app.services.wallet_integrations.paymechap_api_service.PayMeChapAPIService.deposit_to_coffre') as mock_deposit, \
+         patch('app.services.wallet_integrations.paymechap_api_service.PayMeChapAPIService.get_partner_access_token', return_value="mock_partner_token"):
         
         mock_payout.side_effect = Exception("SECURITY-5 CRITICAL FAILURE: execute_payout MUST NEVER BE CALLED DURING RECONCILIATION")
         mock_deposit.side_effect = Exception("SECURITY-5 CRITICAL FAILURE: deposit_to_coffre MUST NEVER BE CALLED DURING RECONCILIATION")
