@@ -162,6 +162,7 @@ def test_11_readonly_tools_cannot_trigger_execution(monkeypatch):
     monkeypatch.setattr(financial_tools.financial_repository, "get_wallets", lambda uid=None: [
         {"provider": "paymechap", "external_wallet_id": "0701020304", "id": "w1", "status": "connected"}
     ])
+    monkeypatch.setattr(financial_tools.paymechap_api_service, "get_partner_access_token", lambda: "mock_partner_token")
     monkeypatch.setattr(financial_tools.paymechap_api_service, "fetch_live_balance", lambda token, account_number=None: {"balance": 50000.0, "currency": "XOF"})
     monkeypatch.setattr(financial_tools.paymechap_api_service, "fetch_live_transactions", lambda token, account_number=None, limit=200: [
         {"id": "tx1", "provider": "paymechap", "amount": 5000.0, "type": "DEBIT", "timestamp": now_str}

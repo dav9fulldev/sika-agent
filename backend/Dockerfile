@@ -7,7 +7,8 @@ RUN useradd -m -u 1000 appuser
 
 # 2. Mettre à jour le repo apt, appliquer les correctifs de sécurité (upgrade), et installer des dépendances système
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get -y install libpq-dev gcc && \
+    apt-get -y install --no-install-recommends ca-certificates libpq-dev gcc && \
+    update-ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Définir le dossier de travail
