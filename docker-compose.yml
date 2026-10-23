@@ -7,6 +7,10 @@ services:
     ports:
       - "8001:8080"
       - "8080:8080"
+    # PayPal sandbox credentials, PUBLIC_BASE_URL and optional GEMINI_API_KEY are read from backend/.env (never committed)
+    env_file:
+      - path: ./backend/.env
+        required: false
     environment:
       - ENV=development
       - PORT=8080

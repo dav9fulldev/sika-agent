@@ -8,7 +8,6 @@ import '../widgets/sika_prompt_suggestion.dart';
 import '../widgets/sika_thinking_indicator.dart';
 import '../widgets/sika_chat_bubble.dart';
 import '../widgets/sika_input_bar.dart';
-import '../widgets/reconciliation_status_card.dart';
 
 class SikaChatScreen extends ConsumerStatefulWidget {
   final VoidCallback? onBackPressed;
@@ -100,14 +99,6 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
       appBar: _buildAppBar(context, isDark, isProcessing, sikaNotifier, langNotifier),
       body: Column(
         children: [
-          // RECONCILIATION CARD — shown for UNKNOWN_RESULT / REQUIRES_RECONCILIATION
-          if (sikaData.pendingActionId != null &&
-              sikaData.state == SikaState.reconciling)
-            ReconciliationStatusCard(
-              actionId: sikaData.pendingActionId!,
-              onReconcile: sikaNotifier.executeActionReconciliation,
-            ),
-
           // MESSAGES OR EMPTY STATE
           Expanded(
             child: sikaData.messages.isEmpty
@@ -304,8 +295,8 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           
           Text(
             langNotifier.tr(
-              'Je suis SIKA, votre assistant financier intelligent.\nJe peux vous aider à comprendre vos dépenses et à mieux gérer votre budget.',
-              'I am SIKA, your smart financial assistant.\nI can help you understand your spending and better manage your budget.',
+              'Je suis SIKA Pay. Dites-moi ce que vous voulez acheter et votre budget :\nje vérifie, je prépare le paiement PayPal (sandbox) et vous décidez.',
+              'I am SIKA Pay. Tell me what you want to buy and your budget:\nI check, prepare the PayPal (sandbox) payment, and you decide.',
             ),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -315,26 +306,31 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           ).animate().fade(delay: 400.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 40),
           
-          // Suggestions
+          // Suggestions SIKA Pay
           SikaPromptSuggestion(
-            text: langNotifier.tr('Analyser mes dépenses', 'Analyze my spending'),
-            icon: Icons.analytics_outlined,
+            text: langNotifier.tr('Acheter un cours Excel à moins de 50 \$', 'Buy an Excel course under \$50'),
+            icon: Icons.shopping_bag_outlined,
             delay: 500.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Analyser mes dépenses', 'Analyze my spending')),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
+                'Aide-moi à acheter un cours Excel sans dépasser 50 dollars.',
+                'Help me buy an Excel course without going over 50 dollars.')),
           ),
           const SizedBox(height: 12),
           SikaPromptSuggestion(
-            text: langNotifier.tr('Quel est mon solde ?', 'What\'s my balance?'),
-            icon: Icons.account_balance_wallet_outlined,
+            text: langNotifier.tr('Du stockage cloud, budget 40 \$', 'Cloud storage, \$40 budget'),
+            icon: Icons.cloud_outlined,
             delay: 600.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Quel est mon solde ?', 'What\'s my balance?')),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
+                'Je veux acheter du stockage cloud, mon budget est de 40 dollars.',
+                'I want to buy cloud storage, my budget is 40 dollars.')),
           ),
           const SizedBox(height: 12),
           SikaPromptSuggestion(
-            text: langNotifier.tr('Comment puis-je économiser ?', 'How can I save money?'),
-            icon: Icons.savings_outlined,
+            text: langNotifier.tr('Où en est mon dernier paiement ?', 'Did my last payment go through?'),
+            icon: Icons.fact_check_outlined,
             delay: 700.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr('Comment puis-je économiser ?', 'How can I save money?')),
+            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
+                'Où en est mon dernier paiement ?', 'Did my last payment go through?')),
           ),
         ],
       ),

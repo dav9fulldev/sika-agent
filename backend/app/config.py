@@ -13,6 +13,9 @@ else:
 
 logger = logging.getLogger("AppConfig")
 
+# Version de l'API (SemVer) — voir CHANGELOG.md
+APP_VERSION = "2.0.0"
+
 
 class Settings:
     """
@@ -85,7 +88,55 @@ class Settings:
         self.MAX_REQUEST_BODY_SIZE: int = int(overrides.get("MAX_REQUEST_BODY_SIZE", os.getenv("MAX_REQUEST_BODY_SIZE", str(1024 * 1024))))  # 1MB
         self.MAX_FINANCIAL_AMOUNT: float = float(overrides.get("MAX_FINANCIAL_AMOUNT", os.getenv("MAX_FINANCIAL_AMOUNT", "50000000.0")))  # 50M FCFA
 
+        # Gemini Developer API key (optionnel) — alternative à Vertex AI/ADC pour les reviewers
+        self.GEMINI_API_KEY: Optional[str] = overrides.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY") or None)
+
+        # =====================================================================
+        # PayPal (fournisseur de paiement principal) — SANDBOX UNIQUEMENT
+        # Les identifiants restent exclusivement côté backend (jamais dans l'APK).
+        # =====================================================================
+        self.PAYPAL_ENV: str = overrides.get("PAYPAL_ENV", os.getenv("PAYPAL_ENV", "sandbox")).lower().strip()
+        self.PAYPAL_API_BASE: str = overrides.get(
+            "PAYPAL_API_BASE", os.getenv("PAYPAL_API_BASE", "https://api-m.sandbox.paypal.com")
+        ).rstrip("/")
+        self.PAYPAL_CLIENT_ID: Optional[str] = overrides.get("PAYPAL_CLIENT_ID", os.getenv("PAYPAL_CLIENT_ID") or None)
+        self.PAYPAL_CLIENT_SECRET: Optional[str] = overrides.get("PAYPAL_CLIENT_SECRET", os.getenv("PAYPAL_CLIENT_SECRET") or None)
+        # URL publique du backend, utilisée pour les redirections return/cancel de PayPal
+        self.PUBLIC_BASE_URL: str = overrides.get("PUBLIC_BASE_URL", os.getenv("PUBLIC_BASE_URL", "http://localhost:8001")).rstrip("/")
+        self.PAYPAL_RETURN_URL: str = overrides.get(
+            "PAYPAL_RETURN_URL", os.getenv("PAYPAL_RETURN_URL", f"{self.PUBLIC_BASE_URL}/api/v1/paypal/return")
+        )
+        self.PAYPAL_CANCEL_URL: str = overrides.get(
+            "PAYPAL_CANCEL_URL", os.getenv("PAYPAL_CANCEL_URL", f"{self.PUBLIC_BASE_URL}/api/v1/paypal/cancel")
+        )
+        self.PAYPAL_BRAND_NAME: str = overrides.get("PAYPAL_BRAND_NAME", os.getenv("PAYPAL_BRAND_NAME", "SIKA Demo Store"))
+        raw_currencies = overrides.get("PAYPAL_ALLOWED_CURRENCIES", os.getenv("PAYPAL_ALLOWED_CURRENCIES", "USD"))
+        self.PAYPAL_ALLOWED_CURRENCIES: List[str] = (
+            raw_currencies if isinstance(raw_currencies, list)
+            else [c.strip().upper() for c in raw_currencies.split(",") if c.strip()]
+        )
+        self.PAYPAL_MAX_ORDER_AMOUNT: float = float(overrides.get("PAYPAL_MAX_ORDER_AMOUNT", os.getenv("PAYPAL_MAX_ORDER_AMOUNT", "500")))
+        # Durée de validité d'un checkout préparé par l'agent avant confirmation utilisateur
+        self.PAYPAL_CONFIRMATION_TTL_SECONDS: int = int(
+            overrides.get("PAYPAL_CONFIRMATION_TTL_SECONDS", os.getenv("PAYPAL_CONFIRMATION_TTL_SECONDS", "900"))
+        )
+        self.PAYPAL_HTTP_TIMEOUT_SECONDS: float = float(
+            overrides.get("PAYPAL_HTTP_TIMEOUT_SECONDS", os.getenv("PAYPAL_HTTP_TIMEOUT_SECONDS", "30"))
+        )
+
         self._validate_production_constraints()
+        self._validate_paypal_constraints()
+
+    def _validate_paypal_constraints(self):
+        """SIKA Pay ne parle qu'au sandbox PayPal : aucun paiement réel ne doit être possible."""
+        if self.PAYPAL_ENV != "sandbox":
+            raise ValueError("[SECURITY FATAL] PAYPAL_ENV doit valoir 'sandbox'. Les paiements réels ne sont pas supportés.")
+        if "sandbox.paypal.com" not in self.PAYPAL_API_BASE:
+            raise ValueError("[SECURITY FATAL] PAYPAL_API_BASE doit pointer vers l'API sandbox PayPal (api-m.sandbox.paypal.com).")
+
+    @property
+    def paypal_configured(self) -> bool:
+        return bool(self.PAYPAL_CLIENT_ID and self.PAYPAL_CLIENT_SECRET)
 
     def _resolve_secrets(self, overrides: Dict[str, Any]) -> Dict[str, str]:
         """Tente de récupérer les secrets depuis Google Secret Manager si activé."""

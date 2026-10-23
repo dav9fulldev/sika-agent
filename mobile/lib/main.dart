@@ -9,7 +9,6 @@ import 'features/splash/splash_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/ai_assistant/presentation/pages/sika_main_navigation_page.dart';
-import 'features/wallet/providers/wallet_provider.dart';
 import 'features/ai_assistant/providers/sika_provider.dart';
 
 void main() async {
@@ -74,8 +73,7 @@ class _SikaAppState extends ConsumerState<SikaApp> {
         ref.listen<AuthState>(authProvider, (previous, next) {
           if ((previous?.isAuthenticated ?? false) && !next.isAuthenticated) {
             debugPrint(
-                '[AUTH] Déconnexion détectée — vidage du wallet et de SIKA.');
-            ref.read(walletProvider.notifier).clearData();
+                '[AUTH] Déconnexion détectée — vidage de la conversation SIKA.');
             ref.read(sikaProvider.notifier).clearConversation();
           }
         });

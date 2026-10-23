@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sika_assistant_mobile/core/providers/auth_provider.dart';
 import 'package:sika_assistant_mobile/core/providers/api_service_provider.dart';
-import 'package:sika_assistant_mobile/features/wallet/providers/wallet_provider.dart';
 import 'package:sika_assistant_mobile/features/ai_assistant/providers/sika_provider.dart';
 
 void main() {
@@ -77,52 +76,6 @@ void main() {
       expect(container.read(authProvider).accessToken, isNull);
       expect(container.read(authProvider).user, isNull);
       expect(prefs.getString('sika_access_token'), isNull);
-    });
-
-    test('WalletNotifier.clearData resets all wallet balances and movements',
-        () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      final walletNotifier = container.read(walletProvider.notifier);
-      walletNotifier.state = WalletState(
-        wallets: [
-          ConnectedWalletItem(
-            id: 'w1',
-            provider: 'Wave',
-            accountNumber: '0701020304',
-            balance: 50000.0,
-            currency: 'XOF',
-            authMethod: 'OAUTH2_API',
-            isActive: true,
-            lastSyncedAt: '2026-08-20T12:00:00Z',
-          ),
-        ],
-        movements: [
-          WalletMovementItem(
-            id: 'm1',
-            type: 'transfer',
-            amount: 10000.0,
-            currency: 'XOF',
-            category: 'Transfert',
-            recipient: 'Kouamé',
-            description: 'Envoi',
-            status: 'COMPLETED',
-            timestamp: '2026-08-20T12:00:00Z',
-            walletProvider: 'Wave',
-          ),
-        ],
-      );
-
-      expect(container.read(walletProvider).wallets.length, equals(1));
-      expect(container.read(walletProvider).totalBalanceFcfa, equals(50000.0));
-
-      // Exécuter le nettoyage de déconnexion
-      walletNotifier.clearData();
-
-      expect(container.read(walletProvider).wallets.isEmpty, isTrue);
-      expect(container.read(walletProvider).movements.isEmpty, isTrue);
-      expect(container.read(walletProvider).totalBalanceFcfa, equals(0.0));
     });
 
     test('SikaNotifier.clearConversation resets pending action and messages',

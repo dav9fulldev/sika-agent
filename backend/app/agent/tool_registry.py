@@ -24,7 +24,8 @@ class SikaToolRegistry:
         from .tools import register_all_sika_tools
         register_all_sika_tools(self)
 
-    def register(self, func: Callable, name: str, description: str, risk_level: RiskLevel = RiskLevel.READ_ONLY, input_schema: dict = None, output_schema: dict = None):
+    def register(self, func: Callable, name: str, description: str, risk_level: RiskLevel = RiskLevel.READ_ONLY, input_schema: dict = None, output_schema: dict = None,
+                 agent_exposed: bool = True):
         """Enregistre un tool avec sa définition et son niveau de risque."""
         self._tools[name] = func
         self._definitions[name] = ToolDefinition(
@@ -32,7 +33,8 @@ class SikaToolRegistry:
             description=description,
             risk_level=risk_level,
             input_schema=input_schema or {},
-            output_schema=output_schema or {}
+            output_schema=output_schema or {},
+            agent_exposed=agent_exposed,
         )
         logger.info(f"[SIKA REGISTRY] Tool enregistré: {name} (Risque: {risk_level.value})")
 
@@ -115,12 +117,45 @@ class SikaToolRegistry:
                 error_message=f"Erreur interne lors de l'exécution du tool: {e}"
             )
 
-    def get_gemini_tools(self) -> list:
-        """Returns a list of callable tools safe for Gemini (READ_ONLY and CONFIRMATION_REQUIRED)."""
-        safe_tools = []
+    def agent_tool_names(self) -> List[str]:
+        """Noms des tools que le modèle IA a le droit d'appeler.
+
+        Jamais EXECUTION ; jamais les outils de maintenance internes.
+        """
+        names = []
         for name, def_item in self._definitions.items():
-            if def_item.risk_level in [RiskLevel.READ_ONLY, RiskLevel.CONFIRMATION_REQUIRED]:
+            if def_item.risk_level not in [RiskLevel.READ_ONLY, RiskLevel.CONFIRMATION_REQUIRED]:
+                continue
+            if not def_item.agent_exposed:
+                continue
+            names.append(name)
+        return names
+
+    def get_gemini_tools(self) -> list:
+        """Returns the tools safe for Gemini (READ_ONLY and CONFIRMATION_REQUIRED).
+
+        Les tools disposant d'un input_schema explicite sont exposés sous forme de
+        FunctionDeclaration stricte (le modèle ne voit jamais `user_id`) ; les autres
+        restent des callables (comportement historique).
+        """
+        safe_tools = []
+        declarations = []
+        for name in self.agent_tool_names():
+            def_item = self._definitions[name]
+            if def_item.input_schema:
+                declarations.append({
+                    "name": name,
+                    "description": def_item.description,
+                    "parameters": def_item.input_schema,
+                })
+            else:
                 safe_tools.append(self._tools[name])
+        if declarations:
+            try:
+                from google.genai import types
+                safe_tools.append(types.Tool(function_declarations=[types.FunctionDeclaration(**d) for d in declarations]))
+            except Exception as e:  # SDK absent : les déclarations ne peuvent pas être construites
+                logger.warning(f"[SIKA REGISTRY] FunctionDeclaration indisponible: {e}")
         return safe_tools
 
 # Instance globale du registre

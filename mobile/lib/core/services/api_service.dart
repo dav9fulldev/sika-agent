@@ -320,164 +320,98 @@ class ApiService {
   }
 
   // ============================================================================
-  // WALLET & TRANSACTION ENDPOINTS (AUTHENTICATED)
+  // SIKA PAY — PAYPAL CHECKOUTS (SANDBOX)
+  // Le backend calcule les montants et parle à PayPal ; l'application ne fait
+  // qu'afficher les statuts renvoyés et transmettre les décisions de l'utilisateur.
   // ============================================================================
 
-  Future<Map<String, dynamic>> fetchMyWallets() async {
-    final response = await http
-        .get(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsMe}'),
-          headers: _headers,
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception('Failed to fetch wallets: ${response.statusCode}');
-  }
-
-  Future<Map<String, dynamic>> fetchWalletTransactionHistory(
-      {int limit = 30}) async {
-    final response = await http
-        .get(
-          Uri.parse(
-              '$safeBaseUrl${ApiConstants.walletsTxHistory}?limit=$limit'),
-          headers: _headers,
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception(
-        'Failed to fetch transaction movements: ${response.statusCode}');
-  }
-
-  Future<Map<String, dynamic>> fetchUserCoffres() async {
-    final response = await http
-        .get(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsCoffres}'),
-          headers: _headers,
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception('Failed to fetch user coffres: ${response.statusCode}');
-  }
-
-  Future<Map<String, dynamic>> connectWallet({
-    required String provider,
-    required String accountNumber,
-    required String authMethod,
-  }) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsConnect}'),
-          headers: _headers,
-          body: jsonEncode({
-            'provider': provider,
-            'account_number': accountNumber,
-            'auth_method': authMethod,
-          }),
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    String errorMsg =
-        'Échec de la demande de connexion (${response.statusCode})';
-    try {
-      final errObj = jsonDecode(response.body);
-      if (errObj is Map && errObj['detail'] != null) {
-        errorMsg = errObj['detail'].toString();
-      }
-    } catch (_) {}
-    throw Exception(errorMsg);
-  }
-
-  Future<Map<String, dynamic>> verifyWalletOtp({
-    required String sessionId,
-    required String otpCode,
-    required String provider,
-    required String accountNumber,
-  }) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsVerifyOtp}'),
-          headers: _headers,
-          body: jsonEncode({
-            'session_id': sessionId,
-            'otp_code': otpCode,
-            'provider': provider,
-            'account_number': accountNumber,
-          }),
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    String errorMsg = 'Échec de la validation OTP (${response.statusCode})';
-    try {
-      final errObj = jsonDecode(response.body);
-      if (errObj is Map && errObj['detail'] != null) {
-        errorMsg = errObj['detail'].toString();
-      }
-    } catch (_) {}
-    throw Exception(errorMsg);
-  }
-
-  Future<Map<String, dynamic>> verifyWalletPin({
-    required String pin,
-    String? accountNumber,
-  }) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsVerifyPin}'),
-          headers: _headers,
-          body: jsonEncode({
-            'pin': pin,
-            if (accountNumber != null && accountNumber.isNotEmpty)
-              'account_number': accountNumber,
-          }),
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
+  Map<String, dynamic> _decodePayPal(http.Response response) {
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(jsonDecode(response.body));
     }
     _handleStatusCode(response.statusCode);
-    String errorMsg = 'Code PIN PayMeChap incorrect (${response.statusCode})';
+    String code = 'HTTP_${response.statusCode}';
+    String message = 'SIKA Pay request failed (${response.statusCode}).';
+    Map<String, dynamic>? checkout;
     try {
-      final errObj = jsonDecode(response.body);
-      if (errObj is Map && errObj['detail'] != null) {
-        errorMsg = errObj['detail'].toString();
+      final body = jsonDecode(response.body);
+      final detail = body is Map ? body['detail'] : null;
+      if (detail is Map) {
+        code = detail['error_code']?.toString() ?? code;
+        message = detail['message']?.toString() ?? message;
+        if (detail['checkout'] is Map) {
+          checkout = Map<String, dynamic>.from(detail['checkout']);
+        }
+      } else if (detail != null) {
+        message = detail.toString();
       }
     } catch (_) {}
-    throw Exception(errorMsg);
+    throw PayPalApiException(code, message, response.statusCode, checkout: checkout);
   }
 
-  Future<Map<String, dynamic>> syncWallets() async {
+  Future<Map<String, dynamic>> getPayPalStatus() async {
     final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.walletsSync}'),
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalStatus}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> getPayPalCheckout(String checkoutId, {bool sync = false}) async {
+    final response = await http
+        .get(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalCheckouts}/$checkoutId${sync ? '?sync=true' : ''}'),
           headers: _headers,
         )
-        .timeout(AppConfig.defaultTimeout);
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
 
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    String errorMsg = 'Échec de la synchronisation (${response.statusCode})';
-    try {
-      final errObj = jsonDecode(response.body);
-      if (errObj is Map && errObj['detail'] != null) {
-        errorMsg = errObj['detail'].toString();
-      }
-    } catch (_) {}
-    throw Exception(errorMsg);
+  Future<List<dynamic>> listPayPalCheckouts({int limit = 20}) async {
+    final response = await http
+        .get(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalCheckouts}?limit=$limit'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.agentTimeout);
+    return (_decodePayPal(response)['checkouts'] as List<dynamic>? ?? []);
+  }
+
+  /// Confirmation explicite : le backend crée la commande PayPal sandbox et renvoie le lien d'approbation.
+  Future<Map<String, dynamic>> confirmPayPalCheckout(String checkoutId, String detailsHash) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalCheckouts}/$checkoutId/confirm'),
+          headers: _headers,
+          body: jsonEncode({'details_hash': detailsHash}),
+        )
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  /// Capture : refusée par le backend tant que PayPal ne confirme pas l'approbation.
+  Future<Map<String, dynamic>> capturePayPalCheckout(String checkoutId) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalCheckouts}/$checkoutId/capture'),
+          headers: _headers,
+        )
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> cancelPayPalCheckout(String checkoutId) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalCheckouts}/$checkoutId/cancel'),
+          headers: _headers,
+          body: jsonEncode({'reason': 'USER_CANCELLED_IN_APP'}),
+        )
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
   }
 
   // ============================================================================
-  // SMS PERCEPTION
+  // PERCEPTION (notifications SMS interceptées par l'application)
   // ============================================================================
 
   Future<Map<String, dynamic>> perceiveSms({
@@ -495,52 +429,6 @@ class ApiService {
     if (response.statusCode == 200) return jsonDecode(response.body);
     _handleStatusCode(response.statusCode);
     throw Exception('Failed to send SMS perception: ${response.statusCode}');
-  }
-
-  Future<Map<String, dynamic>> simulateSmsPerception(String smsText) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.perceptionSimulate}'),
-          headers: _headers,
-          body: jsonEncode({'sms_text': smsText, 'sender': 'WAVE'}),
-        )
-        .timeout(AppConfig.defaultTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception(
-        'Failed to simulate SMS perception: ${response.statusCode}');
-  }
-
-  // ============================================================================
-  // AGENT FINANCIAL ACTIONS (CONFIRM / RECONCILE)
-  // ============================================================================
-
-  Future<Map<String, dynamic>> sikaAgentConfirm(String actionId) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl${ApiConstants.sikaAgentConfirm}'),
-          headers: _headers,
-          body: jsonEncode({'action_id': actionId}),
-        )
-        .timeout(AppConfig.agentTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception('Failed to confirm agent action: ${response.statusCode}');
-  }
-
-  Future<Map<String, dynamic>> sikaReconcileAction(String actionId) async {
-    final response = await http
-        .post(
-          Uri.parse('$safeBaseUrl/api/v1/sika/actions/$actionId/reconcile'),
-          headers: _headers,
-        )
-        .timeout(AppConfig.agentTimeout);
-
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    _handleStatusCode(response.statusCode);
-    throw Exception('Failed to reconcile agent action: ${response.statusCode}');
   }
 
   // ============================================================================
@@ -573,4 +461,17 @@ class ApiService {
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Failed to generate GCP TTS audio: ${response.statusCode}');
   }
+}
+
+/// Erreur métier renvoyée par les endpoints SIKA Pay (code stable + message lisible).
+class PayPalApiException implements Exception {
+  final String code;
+  final String message;
+  final int statusCode;
+  final Map<String, dynamic>? checkout;
+
+  PayPalApiException(this.code, this.message, this.statusCode, {this.checkout});
+
+  @override
+  String toString() => message;
 }

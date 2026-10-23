@@ -20,7 +20,7 @@ class BiometricService {
   }
 
   Future<bool> authenticate({
-    String localizedReason = 'Veuillez authentifier votre empreinte digitale ou Face ID pour valider cette transaction PayMeChap.',
+    String localizedReason = 'Veuillez vous authentifier pour valider ce paiement SIKA Pay.',
   }) async {
     try {
       final bool isAvailable = await isBiometricsAvailable();

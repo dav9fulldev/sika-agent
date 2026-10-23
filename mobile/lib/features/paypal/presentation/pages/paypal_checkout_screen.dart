@@ -1,0 +1,443 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/services/biometric_service.dart';
+import '../../providers/paypal_checkout_provider.dart';
+import '../widgets/sika_pay_ui.dart';
+
+/// Parcours de paiement SIKA Pay piloté uniquement par les statuts renvoyés par le backend :
+/// détails -> confirmation -> approbation sur PayPal -> paiement final -> résultat vérifié.
+class PayPalCheckoutScreen extends ConsumerStatefulWidget {
+  final String checkoutId;
+  const PayPalCheckoutScreen({super.key, required this.checkoutId});
+
+  static Future<void> open(BuildContext context, String checkoutId) {
+    return Navigator.of(context).push(MaterialPageRoute(builder: (_) => PayPalCheckoutScreen(checkoutId: checkoutId)));
+  }
+
+  @override
+  ConsumerState<PayPalCheckoutScreen> createState() => _PayPalCheckoutScreenState();
+}
+
+class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Toujours partir du statut vérifié par le serveur
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifier.refresh(widget.checkoutId));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  PayPalCheckoutsNotifier get _notifier => ref.read(paypalCheckoutsProvider.notifier);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Retour depuis le navigateur PayPal : revérification immédiate auprès de PayPal
+    if (state == AppLifecycleState.resumed) {
+      final v = ref.read(paypalCheckoutsProvider)[widget.checkoutId];
+      if (v != null && const ['AWAITING_PAYPAL_APPROVAL', 'UNKNOWN_RESULT', 'PENDING'].contains(v.status)) {
+        _notifier.refresh(widget.checkoutId);
+      }
+    }
+  }
+
+  Future<void> _confirm(LanguageNotifier lang) async {
+    final bio = ref.read(biometricServiceProvider);
+    if (await bio.isBiometricsAvailable()) {
+      final ok = await bio.authenticate(
+        localizedReason: lang.tr('Confirmez pour créer la commande PayPal sandbox.', 'Confirm to create the PayPal sandbox order.'),
+      );
+      if (!ok) return; // aucune commande créée sans authentification réussie
+    }
+    await _notifier.confirmAndOpenPayPal(widget.checkoutId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = ref.read(languageProvider.notifier);
+    ref.watch(languageProvider);
+    final v = ref.watch(paypalCheckoutsProvider)[widget.checkoutId];
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(_title(v?.status, lang), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        centerTitle: true,
+        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: Center(child: SandboxBadge(compact: true)))],
+      ),
+      body: v == null
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: () => _notifier.refresh(widget.checkoutId),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                children: [
+                  if (v.status == 'COMPLETED') ..._result(v, lang) else ..._flow(v, lang),
+                  if (v.errorMessage != null) _errorBanner(v, lang),
+                  const SizedBox(height: 16),
+                  _actions(v, lang),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Text(lang.tr('Mode Sandbox • Test uniquement — aucun argent réel', 'Sandbox mode • Test only — no real money'),
+                        style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45))),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  String _title(String? status, LanguageNotifier lang) {
+    if (status == 'COMPLETED') return lang.tr('Résultat', 'Result');
+    if (status == 'AWAITING_PAYPAL_APPROVAL' || status == 'APPROVED' || status == 'CAPTURING') return 'PayPal';
+    return lang.tr('Détails du paiement', 'Payment details');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Étapes en cours
+  // ---------------------------------------------------------------------------
+
+  List<Widget> _flow(PayPalCheckoutView v, LanguageNotifier lang) {
+    final item = v.item;
+    final budget = v.budget;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final waitingPayPal = v.status == 'AWAITING_PAYPAL_APPROVAL' || v.status == 'CREATING_ORDER';
+
+    return [
+      if (waitingPayPal || v.status == 'APPROVED' || v.status == 'CAPTURING' || v.status == 'UNKNOWN_RESULT' || v.status == 'PENDING')
+        _statusHero(v, lang),
+      if (!waitingPayPal) ...[
+        SikaPayCard(
+          child: Row(children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(color: AppColors.brandPrimary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
+              child: Icon(categoryIcon(item['category']?.toString()), color: AppColors.brandPrimary, size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(height: 4),
+                Text('${v.merchant['name']} · ${lang.tr('boutique de démonstration', 'demo store')}',
+                    style: TextStyle(fontSize: 12.5, color: onSurface.withValues(alpha: 0.55))),
+              ]),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        SikaPayCard(
+          child: Column(children: [
+            InfoRow(label: lang.tr("Prix de l'article", 'Item price'), value: '${v.unitAmount} ${v.currency}'),
+            InfoRow(label: lang.tr('Quantité', 'Quantity'), value: '${v.quantity}'),
+            InfoRow(label: lang.tr('Frais connus', 'Known fees'), value: lang.tr('Aucun (produit numérique)', 'None (digital product)')),
+            const Divider(height: 18),
+            InfoRow(label: 'Total', value: '${v.total} ${v.currency}', strong: true),
+            if (budget['limit'] != null)
+              InfoRow(
+                label: lang.tr('Votre budget', 'Your budget'),
+                value: '',
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(budget['within_budget'] == true ? Icons.check_circle_rounded : Icons.warning_rounded,
+                      size: 16, color: budget['within_budget'] == true ? AppColors.success : AppColors.error),
+                  const SizedBox(width: 6),
+                  Text('${budget['limit']} ${budget['currency']} · ${lang.tr('reste', 'left')} ${budget['remaining_after_purchase']}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+      ],
+      _paypalBox(v, lang),
+      const SizedBox(height: 12),
+      _provenance(v, lang),
+    ];
+  }
+
+  Widget _statusHero(PayPalCheckoutView v, LanguageNotifier lang) {
+    final busy = v.busy != null || v.status == 'CREATING_ORDER' || v.status == 'CAPTURING';
+    String title;
+    String body;
+    switch (v.status) {
+      case 'APPROVED':
+        title = lang.tr('Approuvé sur PayPal', 'Approved on PayPal');
+        body = lang.tr('PayPal confirme votre approbation. Rien n\'est encore payé : finalisez le paiement ci-dessous.',
+            'PayPal confirms your approval. Nothing is paid yet: complete the payment below.');
+        break;
+      case 'CAPTURING':
+        title = lang.tr('Paiement en cours', 'Completing payment');
+        body = lang.tr('SIKA finalise le paiement auprès de PayPal…', 'SIKA is completing the payment with PayPal…');
+        break;
+      case 'UNKNOWN_RESULT':
+        title = lang.tr('Résultat à vérifier', 'Result to verify');
+        body = v.lastError?['message']?.toString() ??
+            lang.tr('Vérifiez le statut auprès de PayPal avant toute nouvelle tentative.', 'Verify with PayPal before any retry.');
+        break;
+      case 'PENDING':
+        title = lang.tr('Capture en attente', 'Capture pending');
+        body = v.lastError?['message']?.toString() ?? '';
+        break;
+      default:
+        title = lang.tr('Approuvez sur PayPal', 'Approve on PayPal');
+        body = lang.tr('Connectez-vous avec votre compte acheteur sandbox et approuvez la commande, puis revenez dans SIKA.',
+            'Log in with your sandbox buyer account, approve the order, then come back to SIKA.');
+    }
+    final st = statusStyle(v.status);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: SikaPayCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(children: [
+          if (busy)
+            const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(strokeWidth: 3, color: SikaPayColors.paypalBlue))
+          else
+            Icon(st.icon, color: st.color, size: 42),
+          const SizedBox(height: 12),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17), textAlign: TextAlign.center),
+          const SizedBox(height: 6),
+          Text(body,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13.5, height: 1.4, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65))),
+          const SizedBox(height: 16),
+          CheckoutStepper(status: v.status, lang: lang),
+        ]),
+      ).animate().fade(duration: 250.ms),
+    );
+  }
+
+  Widget _paypalBox(PayPalCheckoutView v, LanguageNotifier lang) {
+    final p = v.paypal;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: SikaPayColors.paypalBlue.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: SikaPayColors.paypalBlue.withValues(alpha: 0.18)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const PayPalWordmark(size: 16),
+          const Spacer(),
+          StatusChip(status: v.status, lang: lang),
+        ]),
+        const SizedBox(height: 6),
+        Text(lang.tr('Paiement sécurisé via PayPal (Sandbox)', 'Secure payment via PayPal (Sandbox)'),
+            style: const TextStyle(fontSize: 12.5, color: SikaPayColors.paypalBlue, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        InfoRow(label: lang.tr('Bénéficiaire', 'Payee'), value: '${v.merchant['name']} (sandbox)'),
+        InfoRow(label: lang.tr('Devise', 'Currency'), value: v.currency),
+        InfoRow(label: lang.tr('Méthode', 'Method'), value: 'PayPal'),
+        if (p['order_id'] != null) InfoRow(label: lang.tr('ID de commande PayPal', 'PayPal order ID'), value: p['order_id'].toString()),
+        if (p['order_status'] != null) InfoRow(label: lang.tr('Statut PayPal', 'PayPal status'), value: p['order_status'].toString()),
+      ]),
+    );
+  }
+
+  Widget _provenance(PayPalCheckoutView v, LanguageNotifier lang) {
+    final prov = v.provenance;
+    List<String> list(String k) => (prov[k] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+    Widget section(IconData icon, Color color, String title, List<String> lines) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 6), Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))]),
+            ...lines.map((l) => Padding(padding: const EdgeInsets.only(left: 22, top: 4), child: Text('• $l', style: const TextStyle(fontSize: 12.5, height: 1.35)))),
+          ]),
+        );
+    return SikaPayCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          leading: const Icon(Icons.auto_awesome_rounded, color: AppColors.brandPrimary),
+          title: Text(lang.tr('Ce que SIKA a vérifié', 'What SIKA verified'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          children: [
+            section(Icons.verified_rounded, AppColors.success, lang.tr('Vérifié', 'Verified'), list('verified')),
+            section(Icons.person_rounded, AppColors.brandPrimary, lang.tr('Fourni par vous', 'Provided by you'), list('user_provided')),
+            section(Icons.lightbulb_outline_rounded, AppColors.warning, lang.tr('Hypothèses', 'Assumptions'), list('assumptions')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Résultat (statut capturé réellement renvoyé par PayPal)
+  // ---------------------------------------------------------------------------
+
+  List<Widget> _result(PayPalCheckoutView v, LanguageNotifier lang) {
+    final p = v.paypal;
+    final updated = DateTime.tryParse(v.data['updated_at']?.toString() ?? '')?.toLocal();
+    return [
+      const SizedBox(height: 12),
+      Center(
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+          child: const Icon(Icons.check_rounded, color: Colors.white, size: 44),
+        ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
+      ),
+      const SizedBox(height: 16),
+      Center(child: Text(lang.tr('Paiement capturé !', 'Payment captured!'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800))),
+      const SizedBox(height: 6),
+      Center(
+        child: Text(
+          lang.tr('PayPal a confirmé la capture du paiement en sandbox.', 'PayPal confirmed the payment capture in the sandbox.'),
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+        ),
+      ),
+      const SizedBox(height: 20),
+      SikaPayCard(
+        child: Column(children: [
+          const Row(children: [PayPalWordmark(size: 16), Spacer(), SandboxBadge(compact: true)]),
+          const SizedBox(height: 8),
+          InfoRow(label: lang.tr('Article', 'Item'), value: v.item['name']?.toString() ?? ''),
+          InfoRow(label: lang.tr('Montant capturé', 'Captured amount'), value: '${p['captured_amount']} ${p['captured_currency']}'),
+          InfoRow(label: lang.tr('Statut', 'Status'), value: '', trailing: StatusChip(status: v.status, lang: lang)),
+          InfoRow(label: lang.tr('Statut capture PayPal', 'PayPal capture status'), value: '${p['capture_status']}'),
+          InfoRow(label: lang.tr('ID de commande', 'Order ID'), value: '${p['order_id']}'),
+          InfoRow(label: lang.tr('ID de capture', 'Capture ID'), value: '${p['capture_id']}'),
+          if (updated != null) InfoRow(label: 'Date', value: DateFormat('d MMM yyyy, HH:mm').format(updated)),
+        ]),
+      ),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Actions (une action réelle par bouton)
+  // ---------------------------------------------------------------------------
+
+  Widget _actions(PayPalCheckoutView v, LanguageNotifier lang) {
+    final busy = v.busy != null;
+    final id = widget.checkoutId;
+
+    Widget primary(String label, VoidCallback? onTap, {Color color = SikaPayColors.paypalBlue}) => SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: color, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            onPressed: busy ? null : onTap,
+            child: busy
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          ),
+        );
+    Widget secondary(String label, VoidCallback? onTap) => SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+                foregroundColor: SikaPayColors.paypalBlue,
+                side: const BorderSide(color: SikaPayColors.paypalBlue),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            onPressed: busy ? null : onTap,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        );
+    const gap = SizedBox(height: 10);
+
+    switch (v.status) {
+      case 'AWAITING_USER_CONFIRMATION':
+        return Column(children: [
+          primary(lang.tr('Confirmer et payer avec PayPal', 'Confirm and pay with PayPal'), () => _confirm(lang)),
+          gap,
+          secondary(lang.tr('Annuler', 'Cancel'), () => _notifier.cancel(id)),
+        ]);
+      case 'AWAITING_PAYPAL_APPROVAL':
+        return Column(children: [
+          primary(lang.tr('Ouvrir PayPal', 'Open PayPal'), () => _notifier.openApproval(id)),
+          gap,
+          secondary(lang.tr("J'ai approuvé — vérifier", "I've approved — check"), () => _notifier.refresh(id)),
+          gap,
+          TextButton(onPressed: busy ? null : () => _notifier.cancel(id), child: Text(lang.tr('Annuler le paiement', 'Cancel payment'))),
+        ]);
+      case 'APPROVED':
+        return Column(children: [
+          primary(lang.tr('Payer ${v.total} ${v.currency} maintenant', 'Pay ${v.total} ${v.currency} now'), () => _notifier.capture(id),
+              color: AppColors.success),
+          gap,
+          secondary(lang.tr('Annuler', 'Cancel'), () => _notifier.cancel(id)),
+        ]);
+      case 'UNKNOWN_RESULT':
+      case 'PENDING':
+        return primary(lang.tr('Vérifier auprès de PayPal', 'Verify with PayPal'), () => _notifier.refresh(id));
+      case 'COMPLETED':
+        return Column(children: [
+          primary(lang.tr('Voir le détail', 'View details'), () => _showTimeline(v, lang)),
+          gap,
+          secondary(lang.tr("Retour à l'accueil", 'Back to home'), () => Navigator.of(context).popUntil((r) => r.isFirst)),
+        ]);
+      case 'CREATING_ORDER':
+      case 'CAPTURING':
+        return const SizedBox.shrink();
+      default:
+        return Column(children: [
+          SikaPayCard(
+            child: Row(children: [
+              Icon(statusStyle(v.status).icon, color: statusStyle(v.status).color),
+              const SizedBox(width: 10),
+              Expanded(child: Text(v.lastError?['message']?.toString() ?? v.statusLabel)),
+            ]),
+          ),
+          gap,
+          secondary(lang.tr('Fermer', 'Close'), () => Navigator.of(context).maybePop()),
+        ]);
+    }
+  }
+
+  Widget _errorBanner(PayPalCheckoutView v, LanguageNotifier lang) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text(v.errorMessage!, style: const TextStyle(fontSize: 13, height: 1.35))),
+      ]),
+    );
+  }
+
+  void _showTimeline(PayPalCheckoutView v, LanguageNotifier lang) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          children: [
+            Text(lang.tr("Journal d'audit", 'Audit trail'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            const SizedBox(height: 8),
+            ...v.events.map((e) {
+              final at = DateTime.tryParse(e['created_at']?.toString() ?? '')?.toLocal();
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(statusStyle(e['new_status']?.toString() ?? '').icon, color: statusStyle(e['new_status']?.toString() ?? '').color),
+                title: Text(e['event_type']?.toString() ?? ''),
+                subtitle: Text('${e['previous_status'] ?? '—'} → ${e['new_status']}${at != null ? '  ·  ${DateFormat('HH:mm:ss').format(at)}' : ''}'),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}

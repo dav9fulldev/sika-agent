@@ -26,18 +26,11 @@ class ApiConstants {
   static const String sikaHealth = '/api/v1/sika/health';
   static const String sikaChat = '/api/v1/sika/chat';
   static const String sikaAgentProcess = '/api/v1/sika/agent/process';
-  static const String sikaAgentConfirm = '/api/v1/sika/agent/confirm';
-  static const String sikaAgentCancel = '/api/v1/sika/agent/cancel';
   static const String sikaTts = '/api/v1/sika/tts';
 
-  // Wallets
-  static const String walletsMe = '/api/v1/wallets/me';
-  static const String walletsTxHistory = '/api/v1/wallets/transactions/history';
-  static const String walletsCoffres = '/api/v1/wallets/coffres';
-  static const String walletsConnect = '/api/v1/wallets/connect';
-  static const String walletsVerifyOtp = '/api/v1/wallets/verify-otp';
-  static const String walletsVerifyPin = '/api/v1/wallets/verify-pin';
-  static const String walletsSync = '/api/v1/wallets/sync';
+  // SIKA Pay — PayPal (sandbox)
+  static const String paypalStatus = '/api/v1/paypal/status';
+  static const String paypalCheckouts = '/api/v1/paypal/checkouts';
 
   // Perception SMS
   static const String perceptionSms = '/api/v1/perception/sms';
