@@ -11,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 class SikaAIService:
     """
-    Service IA principal de SIKA.
+    Service IA principal de SIKA Pay.
 
     Architecture :
-    - Gemini via Vertex AI
-    - Authentification Google Cloud (ADC)
-    - Pas de GEMINI_API_KEY
-    - Fallback vers le moteur métier local si Gemini est indisponible
+    - Gemini via Vertex AI (ADC) ou via une clé Gemini Developer API (GEMINI_API_KEY)
+    - Function Calling vers les tools SIKA Pay (catalogue, préparation de checkout PayPal, statut)
+    - Repli déterministe local si Gemini est indisponible (jamais de résultat PayPal simulé)
     """
 
     def __init__(self):
@@ -63,6 +62,14 @@ class SikaAIService:
         """
 
         try:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if api_key:
+                # Alternative reviewers : clé Gemini Developer API (Google AI Studio), sans projet GCP
+                self.client = genai.Client(api_key=api_key)
+                self.provider = "gemini_api"
+                logger.info(f"🤖 SIKA connecté à Gemini Developer API | model={self.model}")
+                return
+
             self.client = genai.Client(
                 vertexai=True,
                 project=self.project,
@@ -120,7 +127,10 @@ class SikaAIService:
             "check", "spending", "spent", "expenses", "expense", "send", "transfer",
             "savings", "safe", "deposit", "withdraw", "hello", "hi", "hey", "please",
             "can", "you", "show", "recent", "analyze", "analysis", "money", "wallet",
-            "wallets", "account", "accounts", "thanks", "thank"
+            "wallets", "account", "accounts", "thanks", "thank",
+            # SIKA Pay (commerce)
+            "i", "want", "buy", "purchase", "order", "help", "need", "the", "to", "for", "under",
+            "dollar", "dollars", "course", "pay", "payment", "did", "through", "without", "over", "cheaper"
         }
 
         french_words = {
@@ -132,7 +142,10 @@ class SikaAIService:
             "portefeuilles", "analyse", "analyser", "récent", "recents", "récentes", "recentes",
             "merci", "argent", "fonds", "fais", "fait", "effectue", "rapide", "vite",
             "stp", "svp", "franc", "francs", "cfa", "fcfa", "xof", "un", "une", "des",
-            "du", "au", "aux", "sur", "vers", "pour", "avec", "de", "le", "la", "les"
+            "du", "au", "aux", "sur", "vers", "pour", "avec", "de", "le", "la", "les",
+            # SIKA Pay (commerce)
+            "je", "veux", "acheter", "achète", "achete", "aide", "aide-moi", "cours", "moins", "paiement",
+            "commander", "payer", "dépasser", "depasser", "sans"
         }
 
         tokens = set(re.findall(r"\b[a-zA-Z'’àâäéèêëîïôöùûüç]+\b", msg_lower))
@@ -169,1232 +182,6 @@ class SikaAIService:
         display_currency = symbol if symbol else code
         return f"{int(amount):,} {display_currency}".replace(",", " ").strip()
 
-    def _extract_action(
-        self,
-        response: str,
-        user_message: str
-    ) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-        """
-        Détecte une intention d'action financière.
-        """
-
-        res_lower = response.lower()
-        msg_lower = user_message.lower()
-
-        transfer_keywords = [
-            "transfert",
-            "transférer",
-            "envoie",
-            "envoyer",
-            "transfer",
-            "rebalance",
-        ]
-
-        if any(
-            word in msg_lower or word in res_lower
-            for word in transfer_keywords
-        ):
-            return (
-                "prepare_transfer",
-                {},
-            )
-
-        expense_keywords = [
-            "dépense",
-            "dépensé",
-            "acheté",
-            "spent",
-            "buy",
-            "purchase",
-        ]
-
-        if any(
-            word in msg_lower or word in res_lower
-            for word in expense_keywords
-        ):
-            return (
-                "add_transaction",
-                {}
-            )
-
-        return None, None
-
-    # ------------------------------------------------------------------
-    # Providers dont l'intégration est vérifiée et peut être appelée.
-    # Les providers NOT_VERIFIED ne doivent jamais être appelés.
-    # ------------------------------------------------------------------
-    _VERIFIED_PROVIDERS: frozenset = frozenset({"paymechap"})
-
-    def _select_wallet(
-        self,
-        wallets: List[Dict[str, Any]],
-        user_message: str,
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        """
-        Sélectionne le wallet approprié selon les règles métier SIKA.
-
-        Retourne (wallet, None) si sélection claire.
-        Retourne (None, message_clarification) si clarification nécessaire.
-        Retourne (None, message_indisponibilité) si provider NOT_VERIFIED.
-
-        Règles :
-          - 0 wallet  → Aucun portefeuille connecté.
-          - 1 wallet  → sélection automatique (VERIFIED seulement).
-          - N wallets avec provider mentionné → sélection par provider.
-            Si plusieurs wallets ont le même provider et ne sont pas distingués → clarification.
-          - N wallets sans provider → demande de clarification (ask_wallet).
-          - Provider mentionné mais NOT_VERIFIED → indisponibilité.
-          - Jamais wallets[0] comme fallback arbitraire.
-        """
-        msg_lower = user_message.lower()
-
-        if not wallets:
-            return None, "Aucun portefeuille connecté."
-
-        # 1. Chercher si un compte ou provider spécifique est mentionné dans le message
-        matching_wallets: List[Dict[str, Any]] = []
-        for w in wallets:
-            prov = (w.get("provider") or "").lower()
-            acc = str(w.get("account_number") or w.get("external_wallet_id") or "").lower()
-            if acc and acc in msg_lower:
-                matching_wallets.append(w)
-            elif prov and prov in msg_lower:
-                matching_wallets.append(w)
-
-        if matching_wallets:
-            if len(matching_wallets) == 1:
-                selected = matching_wallets[0]
-                prov_lower = (selected.get("provider") or "").lower()
-                if prov_lower not in self._VERIFIED_PROVIDERS:
-                    provider_display = selected.get("provider", prov_lower)
-                    return None, (
-                        f"Le portefeuille {provider_display} n'est actuellement "
-                        "pas disponible dans SIKA."
-                    )
-                return selected, None
-
-            # Plusieurs wallets correspondent au provider mentionné (ex: 2 PayMeChap sans compte précisé)
-            # Vérifier si l'un d'eux est distingué par son numéro de compte
-            account_matches = [
-                w for w in matching_wallets
-                if str(w.get("account_number") or w.get("external_wallet_id") or "").lower() in msg_lower
-                and str(w.get("account_number") or w.get("external_wallet_id") or "").strip()
-            ]
-            if len(account_matches) == 1:
-                selected = account_matches[0]
-                prov_lower = (selected.get("provider") or "").lower()
-                if prov_lower not in self._VERIFIED_PROVIDERS:
-                    provider_display = selected.get("provider", prov_lower)
-                    return None, (
-                        f"Le portefeuille {provider_display} n'est actuellement "
-                        "pas disponible dans SIKA."
-                    )
-                return selected, None
-
-            first_prov = matching_wallets[0].get("provider", "PayMeChap")
-            accounts = ", ".join([
-                str(w.get("account_number") or w.get("external_wallet_id") or w.get("id"))
-                for w in matching_wallets
-            ])
-            return None, (
-                f"Vous avez plusieurs portefeuilles {first_prov} ({accounts}). "
-                "Quel portefeuille souhaitez\u2011vous utiliser ?"
-            )
-
-        # 2. Aucun provider mentionné dans le message
-        if len(wallets) == 1:
-            prov_lower = (wallets[0].get("provider") or "").lower()
-            if prov_lower not in self._VERIFIED_PROVIDERS:
-                provider_display = wallets[0].get("provider", prov_lower)
-                return None, (
-                    f"Le portefeuille {provider_display} n'est actuellement "
-                    "pas disponible dans SIKA."
-                )
-            return wallets[0], None
-
-        # Plusieurs wallets, aucun provider mentionné → clarification
-        prov_options = ", ".join(
-            sorted({w.get("provider") for w in wallets if w.get("provider")})
-        )
-        return None, (
-            f"Vous avez plusieurs portefeuilles actifs ({prov_options}). "
-            "Quel portefeuille souhaitez\u2011vous utiliser ?"
-        )
-
-    def _extract_transfer_amount(self, message: str) -> float:
-        """
-        Extrait et normalise le montant d'un transfert depuis le message utilisateur.
-        Supporte les formats :
-          - '10 000 FCFA', '10000 FCFA', '10.000 FCFA', '10,000 FCFA'
-          - '10000', '10 000'
-          - Montants négatifs '-100 FCFA'
-        """
-        # 1. Vérifier d'abord les montants explicitement négatifs
-        neg_match = re.search(r"-\s*(\d+[\d\s.,]*)", message)
-        if neg_match:
-            return -1.0
-
-        # 2. Chercher avec devise (FCFA, XOF, F, etc.)
-        match_unit = re.search(r"(\d+[\d\s.,]*)\s*(?:fcfa|xof|f\b|francs?)", message, re.IGNORECASE)
-        if match_unit:
-            raw_str = match_unit.group(1).strip()
-        else:
-            # 3. Chercher le premier groupe numérique
-            match_num = re.search(r"\b(\d+[\d\s.,]*)\b", message)
-            if match_num:
-                raw_str = match_num.group(1).strip()
-            else:
-                return 0.0
-
-        # Nettoyage des espaces
-        cleaned = raw_str.replace(" ", "")
-        # Si format millier 10.000 ou 10,000 (ex: 3 chiffres après le séparateur sans autre décimale)
-        if re.match(r"^\d{1,3}[.,]\d{3}$", cleaned):
-            cleaned = re.sub(r"[.,]", "", cleaned)
-        else:
-            cleaned = cleaned.replace(",", ".")
-
-        try:
-            return float(cleaned)
-        except (ValueError, TypeError):
-            return 0.0
-
-    def _chat_basic(
-        self,
-        user_message: str,
-        financial_context: Dict[str, Any],
-        user_firstname: str,
-        is_english: bool,
-        user_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Moteur métier local SIKA.
-
-        Ce moteur reste fonctionnel même si Vertex AI
-        ou Gemini devient temporairement indisponible.
-        """
-
-        msg_lower = user_message.lower()
-
-        action, action_data = self._extract_action(
-            "",
-            user_message
-        )
-
-        # =========================================================
-        # RÉCUPÉRATION DES WALLETS CONNECTÉS
-        # =========================================================
-
-        active_wallets = [
-            wallet
-            for wallet in financial_context.get("wallets", [])
-            if wallet.get("is_active", True)
-        ]
-
-        total_balance_fcfa = sum(
-            wallet.get("balance", 0.0)
-            for wallet in active_wallets
-        )
-
-        fmt_total = self._format_currency(
-            total_balance_fcfa,
-            financial_context,
-        )
-
-        # =========================================================
-        # 1. CONSULTATION DU SOLDE
-        # =========================================================
-
-        financial_intent_keywords = [
-            "solde",
-            "combien j'ai",
-            "combien sur",
-            "mon solde",
-            "total balance",
-            "how much money",
-            "combien d'argent",
-            "état de mes comptes",
-            "portefeuilles",
-            "wallet balance",
-            "my balance",
-            "balance",
-            "what is my balance",
-            "what's my balance",
-            "whats my balance",
-        ]
-
-        if any(
-            keyword in msg_lower
-            for keyword in financial_intent_keywords
-        ):
-
-            if not active_wallets:
-
-                if is_english:
-
-                    response = (
-                        f"Hi {user_firstname}! "
-                        "You don't have any connected wallets yet. "
-                        "Connect PayMeChap, Wave, Orange Money "
-                        "or MTN MoMo to let me help you manage them."
-                    )
-
-                    suggestions = [
-                        "Connect a wallet",
-                        "How does SIKA work?",
-                        "Help",
-                    ]
-
-                else:
-
-                    response = (
-                        f"Salut {user_firstname} ! "
-                        "Tu n'as encore aucun portefeuille connecté. "
-                        "Connecte PayMeChap, Wave, Orange Money "
-                        "ou MTN MoMo pour que je puisse t'aider "
-                        "à gérer tes finances."
-                    )
-
-                    suggestions = [
-                        "Connecter un compte",
-                        "Comment fonctionne SIKA ?",
-                        "Aide",
-                    ]
-
-            elif len(active_wallets) == 1:
-                # Un seul wallet : sélection automatique
-                selected_w, wallet_clarif = self._select_wallet(active_wallets, user_message)
-                if wallet_clarif:
-                    # Provider NOT_VERIFIED
-                    return {
-                        "response": wallet_clarif,
-                        "action": "wallet_unavailable",
-                        "action_data": {"provider": active_wallets[0].get("provider")},
-                        "sentiment": "neutral",
-                        "suggestions": [],
-                        "provider": "VERTEX_AI",
-                        "model": self.model,
-                    }
-                fmt_bal = self._format_currency(
-                    selected_w.get("balance", 0.0), financial_context
-                )
-                prov_name = selected_w.get("provider", "Wallet")
-                acc = selected_w.get("account_number", "")
-                acc_info = f" ({acc})" if acc else ""
-                response = (
-                    f"Ton solde {prov_name}{acc_info} est de {fmt_bal}."
-                    if not is_english
-                    else f"Your {prov_name}{acc_info} balance is {fmt_bal}."
-                )
-                suggestions = [
-                    "Voir mes dépenses récentes",
-                    "Effectuer un transfert",
-                ] if not is_english else [
-                    "View recent expenses",
-                    "Make a transfer",
-                ]
-
-            else:
-                # Plusieurs wallets
-                selected_w, wallet_clarif = self._select_wallet(active_wallets, user_message)
-                if wallet_clarif:
-                    # Provider NOT_VERIFIED ou clarification nécessaire
-                    action_key = (
-                        "ask_wallet"
-                        if "plusieurs" in wallet_clarif or "multiple" in wallet_clarif.lower()
-                        else "wallet_unavailable"
-                    )
-                    return {
-                        "response": wallet_clarif,
-                        "action": action_key,
-                        "action_data": {"available_wallets": [w.get("provider") for w in active_wallets]},
-                        "sentiment": "neutral",
-                        "suggestions": [],
-                        "provider": "VERTEX_AI",
-                        "model": self.model,
-                    }
-                # Provider sélectionné
-                fmt_bal = self._format_currency(
-                    selected_w.get("balance", 0.0), financial_context
-                )
-                prov_name = selected_w.get("provider", "Wallet")
-                acc = selected_w.get("account_number", "")
-                acc_info = f" ({acc})" if acc else ""
-                response = (
-                    f"Ton solde {prov_name}{acc_info} est de {fmt_bal}."
-                    if not is_english
-                    else f"Your {prov_name}{acc_info} balance is {fmt_bal}."
-                )
-                suggestions = [
-                    "Voir mes dépenses récentes",
-                    "Effectuer un transfert",
-                ] if not is_english else [
-                    "View recent expenses",
-                    "Make a transfer",
-                ]
-
-            return {
-                "response": response,
-                "action": "get_total_balance",
-                "action_data": action_data,
-                "sentiment": "positive",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-            }
-
-        # =========================================================
-        # 2. COFFRES D'ÉPARGNE
-        # =========================================================
-
-        coffre_keywords = [
-            "coffre",
-            "safe",
-            "étude",
-            "etude",
-            "déposer",
-            "depot",
-            "dépôt",
-            "deposit",
-            "deposited",
-            "withdraw",
-            "withdrawn",
-            "retrait",
-            "retirer",
-            "épargne",
-            "epargne",
-            "verser",
-            "ajouter au coffre",
-        ]
-
-        if any(
-            keyword in msg_lower
-            for keyword in coffre_keywords
-        ):
-
-            from .wallet_integrations.paymechap_api_service import (
-                paymechap_api_service
-            )
-
-            numbers = re.findall(
-                r"\d+[\d\s,.]*",
-                user_message,
-            )
-
-            raw_amount = 10000.0
-
-            if numbers:
-
-                try:
-
-                    clean_num_str = (
-                        numbers[0]
-                        .replace(" ", "")
-                        .replace(",", "")
-                    )
-
-                    if clean_num_str.count(".") > 1:
-
-                        clean_num_str = clean_num_str.replace(
-                            ".",
-                            ""
-                        )
-
-                    parsed_value = float(
-                        clean_num_str
-                    )
-
-                    if parsed_value > 0:
-
-                        raw_amount = parsed_value
-
-                except Exception:
-
-                    logger.warning(
-                        "Impossible d'extraire le montant "
-                        "du message utilisateur."
-                    )
-
-            is_deposit_action = any(
-                keyword in msg_lower
-                for keyword in [
-                    "déposer",
-                    "depot",
-                    "dépôt",
-                    "deposit",
-                    "deposited",
-                    "verser",
-                    "ajouter",
-                    "mettre",
-                ]
-            )
-
-            is_withdraw_action = any(
-                keyword in msg_lower
-                for keyword in [
-                    "withdraw",
-                    "withdrawn",
-                    "retrait",
-                    "retirer",
-                    "récupérer",
-                    "cassage",
-                    "casse",
-                    "sortir",
-                ]
-            )
-
-            active_paymechap_wallets = [
-                wallet
-                for wallet in active_wallets
-                if "paymechap"
-                in wallet.get(
-                    "provider",
-                    ""
-                ).lower()
-            ]
-
-            target_account = (
-                active_paymechap_wallets[0].get(
-                    "account_number"
-                )
-                if active_paymechap_wallets
-                else financial_context.get(
-                    "account_number",
-                    ""
-                )
-            )
-
-            live_coffres = (
-                paymechap_api_service.fetch_user_coffres(
-                    "",
-                    account_number=target_account,
-                )
-            )
-
-            coffre_item: Dict[str, Any] = {}
-
-            if live_coffres:
-
-                for coffre in live_coffres:
-
-                    coffre_name = str(
-                        coffre.get("nom", "")
-                    ).lower()
-
-                    if coffre_name in msg_lower:
-
-                        coffre_item = coffre
-                        break
-
-                if not coffre_item:
-
-                    coffre_item = live_coffres[0]
-
-            target_coffre_id = coffre_item.get("id")
-
-            coffre_name = (
-                coffre_item.get("nom")
-                or "Épargne"
-            )
-
-            coffre_balance = float(
-                coffre_item.get("solde")
-                or 0.0
-            )
-
-            coffre_target = float(
-                coffre_item.get("objectif")
-                or 0.0
-            )
-
-            # -----------------------------------------------------
-            # RETRAIT
-            # -----------------------------------------------------
-
-            if (
-                is_withdraw_action
-                and target_coffre_id is not None
-            ):
-
-                formatted_balance = self._format_currency(
-                    coffre_balance,
-                    financial_context,
-                )
-
-                formatted_target = self._format_currency(
-                    coffre_target,
-                    financial_context,
-                )
-
-                percentage = (
-                    coffre_balance
-                    / coffre_target
-                    * 100
-                    if coffre_target > 0
-                    else 0.0
-                )
-
-                if is_english:
-
-                    response = (
-                        f"Your '{coffre_name}' safe currently "
-                        f"holds {formatted_balance} out of "
-                        f"{formatted_target} "
-                        f"({percentage:.1f}% reached). "
-                        "Withdrawal from the safe is not yet "
-                        "available through the PayMeChap API."
-                    )
-
-                    suggestions = [
-                        "Check total balance",
-                        "View savings goal",
-                        "View recent expenses",
-                    ]
-
-                else:
-
-                    response = (
-                        f"Votre coffre '{coffre_name}' "
-                        f"contient actuellement "
-                        f"{formatted_balance} sur "
-                        f"{formatted_target} "
-                        f"({percentage:.1f}% atteint). "
-                        "Le retrait depuis les coffres "
-                        "n'est pas encore disponible "
-                        "sur l'API PayMeChap."
-                    )
-
-                    suggestions = [
-                        "Vérifier mon solde total",
-                        "Voir mon objectif d'épargne",
-                        "Voir mes dépenses",
-                    ]
-
-                return {
-                    "response": response,
-                    "action": "check_savings_goal",
-                    "action_data": {
-                        "coffre_id": target_coffre_id,
-                        "amount": raw_amount,
-                        "coffre_name": coffre_name,
-                    },
-                    "sentiment": "neutral",
-                    "suggestions": suggestions,
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-
-            # -----------------------------------------------------
-            # DÉPÔT
-            # -----------------------------------------------------
-
-            if (
-                is_deposit_action
-                and target_coffre_id is not None
-            ):
-
-                deposit_result = (
-                    paymechap_api_service.deposit_to_coffre(
-                        "",
-                        coffre_id=target_coffre_id,
-                        montant=raw_amount,
-                        account_number=target_account,
-                    )
-                )
-
-                updated_coffres = (
-                    paymechap_api_service.fetch_user_coffres(
-                        "",
-                        account_number=target_account,
-                    )
-                )
-
-                if updated_coffres:
-
-                    updated_item = updated_coffres[0]
-
-                    coffre_name = (
-                        updated_item.get("nom")
-                        or coffre_name
-                    )
-
-                    coffre_balance = float(
-                        updated_item.get("solde")
-                        or 0.0
-                    )
-
-                    coffre_target = float(
-                        updated_item.get("objectif")
-                        or 0.0
-                    )
-
-                formatted_deposit = self._format_currency(
-                    raw_amount,
-                    financial_context,
-                )
-
-                formatted_balance = self._format_currency(
-                    coffre_balance,
-                    financial_context,
-                )
-
-                formatted_target = self._format_currency(
-                    coffre_target,
-                    financial_context,
-                )
-
-                percentage = (
-                    coffre_balance
-                    / coffre_target
-                    * 100
-                    if coffre_target > 0
-                    else 0.0
-                )
-
-                message = (
-                    deposit_result.get("message")
-                    or "OK"
-                )
-
-                if is_english:
-
-                    response = (
-                        f"Deposit of {formatted_deposit} completed. "
-                        f"PayMeChap response: {message}. "
-                        f"Your '{coffre_name}' safe now contains "
-                        f"{formatted_balance} out of "
-                        f"{formatted_target} "
-                        f"({percentage:.1f}%)."
-                    )
-
-                    suggestions = [
-                        "View savings goal",
-                        "Check total balance",
-                    ]
-
-                else:
-
-                    response = (
-                        f"Dépôt de {formatted_deposit} effectué. "
-                        f"Réponse PayMeChap : {message}. "
-                        f"Votre coffre '{coffre_name}' contient "
-                        f"maintenant {formatted_balance} sur "
-                        f"{formatted_target} "
-                        f"({percentage:.1f}%)."
-                    )
-
-                    suggestions = [
-                        "Voir l'objectif d'épargne",
-                        "Vérifier mon solde",
-                    ]
-
-                return {
-                    "response": response,
-                    "action": "deposit_to_coffre",
-                    "action_data": {
-                        "coffre_id": target_coffre_id,
-                        "amount": raw_amount,
-                        "coffre_name": coffre_name,
-                    },
-                    "sentiment": "positive",
-                    "suggestions": suggestions,
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-
-            # -----------------------------------------------------
-            # CONSULTATION DU COFFRE
-            # -----------------------------------------------------
-
-            formatted_balance = self._format_currency(
-                coffre_balance,
-                financial_context,
-            )
-
-            formatted_target = self._format_currency(
-                coffre_target,
-                financial_context,
-            )
-
-            percentage = (
-                coffre_balance
-                / coffre_target
-                * 100
-                if coffre_target > 0
-                else 0.0
-            )
-
-            if is_english:
-
-                response = (
-                    f"Your '{coffre_name}' safe currently "
-                    f"contains {formatted_balance} out of "
-                    f"{formatted_target} "
-                    f"({percentage:.1f}% of your target)."
-                )
-
-                suggestions = [
-                    "Deposit into safe",
-                    "Check total balance",
-                    "View recent expenses",
-                ]
-
-            else:
-
-                response = (
-                    f"Votre coffre d'épargne '{coffre_name}' "
-                    f"contient actuellement "
-                    f"{formatted_balance} sur un objectif de "
-                    f"{formatted_target} "
-                    f"({percentage:.1f}% de votre objectif)."
-                )
-
-                suggestions = [
-                    "Déposer dans le coffre",
-                    "Vérifier mon solde",
-                    "Voir mes dépenses",
-                ]
-
-            return {
-                "response": response,
-                "action": "check_savings_goal",
-                "action_data": {
-                    "coffre_id": target_coffre_id,
-                    "amount": raw_amount,
-                    "coffre_name": coffre_name,
-                },
-                "sentiment": "positive",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-            }
-
-        # =========================================================
-        # 3. SALUTATIONS
-        # =========================================================
-
-        greeting_keywords = [
-            "bonjour",
-            "salut",
-            "coucou",
-            "bonsoir",
-            "comment tu vas",
-            "ça va",
-            "ca va",
-            "comment vas-tu",
-            "tu vas bien",
-            "est-ce que tu vas bien",
-            "hello",
-            "hi",
-            "hey",
-            "how are you",
-            "say hello",
-            "are you okay",
-            "are you fine",
-            "are you good",
-            "you okay",
-            "how are you doing",
-            "what's up",
-            "whats up",
-        ]
-
-        if any(
-            keyword in msg_lower
-            for keyword in greeting_keywords
-        ):
-
-            if is_english:
-
-                response = (
-                    f"Hello {user_firstname}! "
-                    "I am ready to help you manage your finances. "
-                    "What would you like to check today?"
-                )
-
-                suggestions = [
-                    "How much money do I have in total?",
-                    "Analyze my recent expenses",
-                    "How is my savings goal progressing?",
-                ]
-
-            else:
-
-                response = (
-                    f"Bonjour {user_firstname} ! "
-                    "Je suis prêt à t'aider à gérer tes finances. "
-                    "Que souhaites-tu vérifier aujourd'hui ?"
-                )
-
-                suggestions = [
-                    "Quel est mon solde total ?",
-                    "Analyser mes dépenses récentes",
-                    "Comment avance mon épargne ?",
-                ]
-
-            return {
-                "response": response,
-                "action": None,
-                "action_id": None,
-                "action_data": None,
-                "sentiment": "positive",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-                "requires_confirmation": False,
-                "status": "PROCESSED",
-                "language": "en" if is_english else "fr",
-            }
-
-        # =========================================================
-        # 4. TRANSFERT
-        # =========================================================
-
-        if any(
-            keyword in msg_lower
-            for keyword in [
-                "transfert",
-                "envoie",
-                "envoyer",
-                "transférer",
-                "paye",
-                "kouamé",
-                "transfer",
-                "rebalance",
-            ]
-        ):
-            # Resolve wallet according to business rules (0/1/multiple)
-            from ..agent.tools import wallet_tools, transaction_tools
-            wallets_result = wallet_tools.get_wallets(user_id=user_id)
-            wallets = wallets_result.data.get("wallets", [])
-            selected_wallet, wallet_msg = self._select_wallet(wallets, user_message)
-            if wallet_msg:
-                return {
-                    "response": wallet_msg,
-                    "action": "ask_wallet",
-                    "action_data": {"available_wallets": [w.get("provider") for w in wallets]},
-                    "sentiment": "neutral",
-                    "suggestions": [],
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-            # Resolve recipient contact
-            import re
-            contact_match = re.search(r"(?:à|to)\s+([A-Za-z0-9_\-+]+)", user_message, re.IGNORECASE)
-            contact_name = contact_match.group(1) if contact_match else None
-            if not contact_name:
-                return {
-                    "response": "Veuillez préciser le destinataire du transfert.",
-                    "action": "ask_contact",
-                    "action_data": {},
-                    "sentiment": "neutral",
-                    "suggestions": [],
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-            contacts_res = wallet_tools.search_contact(contact_name)
-            contacts = contacts_res.data.get("contacts", [])
-            if not contacts:
-                return {
-                    "response": f"Je ne trouve pas '{contact_name}' dans vos contacts. Pouvez-vous préciser son numéro ou vérifier le nom du bénéficiaire ?",
-                    "action": "ask_contact",
-                    "action_data": {"query": contact_name},
-                    "sentiment": "neutral",
-                    "suggestions": [],
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-            if len(contacts) > 1:
-                options = ", ".join([c.get("name", "") for c in contacts])
-                return {
-                    "response": f"Plusieurs contacts correspondent à '{contact_name}'. Veuillez préciser : {options}.",
-                    "action": "ask_contact",
-                    "action_data": {"candidates": contacts},
-                    "sentiment": "neutral",
-                    "suggestions": [],
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-            recipient = contacts[0]
-            recipient_value = recipient.get("phone") or recipient.get("id") or recipient.get("name")
-            # Extract amount with robust multi-format support
-            amount = self._extract_transfer_amount(user_message)
-            provider = selected_wallet.get("provider")
-            # Prepare transfer (no execution yet)
-            wallet_code = financial_context.get("wallet_currency_code") or "XOF"
-            prepare_res = transaction_tools.prepare_transfer(
-                provider=provider,
-                amount=amount,
-                recipient=recipient_value,
-                currency=wallet_code,
-            )
-            if not prepare_res.success:
-                return {
-                    "response": prepare_res.error_message or "Erreur lors de la préparation du transfert.",
-                    "action": "error",
-                    "action_data": {},
-                    "sentiment": "negative",
-                    "suggestions": [],
-                    "provider": "VERTEX_AI",
-                    "model": self.model,
-                }
-            action_id = prepare_res.data.get("action_id")
-            if action_id:
-                from ..agent.orchestrator import sika_orchestrator
-                numeric_uid = int(user_id) if user_id and str(user_id).isdigit() else 1
-                sika_orchestrator.register_action(
-                    action_id=action_id,
-                    user_id=numeric_uid,
-                    action_type="TRANSFER",
-                    payload=prepare_res.data,
-                )
-            suggestions = ["Je confirme le transfert", "Annuler le transfert"]
-            return {
-                "response": prepare_res.data.get("summary", "Préparation du transfert prête."),
-                "action": "prepare_transfer",
-                "action_id": action_id,
-                "action_data": prepare_res.data,
-                "requires_confirmation": True,
-                "status": "WAITING_CONFIRMATION",
-                "should_speak": True,
-                "sentiment": "neutral",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-            }
-
-        # =========================================================
-        # 5. OBJECTIF D'ÉPARGNE
-        # =========================================================
-
-        if any(
-            keyword in msg_lower
-            for keyword in [
-                "épargne",
-                "objectif",
-                "économiser",
-                "avancement",
-                "save",
-                "savings",
-                "goal",
-                "de côté",
-                "reçu",
-            ]
-        ):
-
-            if (
-                "combien" in msg_lower
-                or "de côté" in msg_lower
-                or "reçu" in msg_lower
-            ):
-
-                if is_english:
-
-                    response = (
-                        f"Based on your financial context, "
-                        "setting aside some money could be a good option. "
-                        "Would you like me to prepare a deposit?"
-                    )
-
-                    suggestions = [
-                        "Deposit into safe",
-                        "Check total balance",
-                    ]
-
-                else:
-
-                    response = (
-                        f"En tenant compte de ton contexte financier "
-                        f"{user_firstname}, mettre de l'argent de côté "
-                        "pourrait être une bonne option. "
-                        "Souhaites-tu que je prépare le dépôt ?"
-                    )
-
-                    suggestions = [
-                        "Déposer dans le coffre",
-                        "Vérifier mon solde",
-                    ]
-
-            else:
-
-                if is_english:
-
-                    response = (
-                        "I can help you analyze the progress "
-                        "of your savings goal and recommend "
-                        "the next action."
-                    )
-
-                    suggestions = [
-                        "Check savings progress",
-                        "Add money to savings",
-                    ]
-
-                else:
-
-                    response = (
-                        "Je peux analyser l'avancement de ton "
-                        "objectif d'épargne et te recommander "
-                        "la prochaine action."
-                    )
-
-                    suggestions = [
-                        "Voir l'avancement",
-                        "Ajouter à l'épargne",
-                    ]
-
-            return {
-                "response": response,
-                "action": "check_savings_goal",
-                "action_data": action_data,
-                "sentiment": "positive",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-            }
-
-        # =========================================================
-        # 6. ANALYSE DES DÉPENSES
-        # =========================================================
-
-        if any(
-            keyword in msg_lower
-            for keyword in [
-                "dépense",
-                "dépensé",
-                "acheté",
-                "budget",
-                "analyze",
-                "recent",
-                "expenses",
-                "spending",
-            ]
-        ):
-
-            if is_english:
-
-                response = (
-                    "I can analyze your recent spending "
-                    f"based on your connected financial data. "
-                    f"Your currently aggregated balance is "
-                    f"{fmt_total}."
-                )
-
-                suggestions = [
-                    "Set spending limit",
-                    "View transaction history",
-                ]
-
-            else:
-
-                response = (
-                    "Je peux analyser tes dépenses récentes "
-                    "à partir de tes données financières connectées. "
-                    f"Ton solde agrégé actuel est de {fmt_total}."
-                )
-
-                suggestions = [
-                    "Définir une limite",
-                    "Voir l'historique",
-                ]
-
-            return {
-                "response": response,
-                "action": "get_spending_summary",
-                "action_data": action_data,
-                "sentiment": "neutral",
-                "suggestions": suggestions,
-                "provider": "VERTEX_AI",
-                "model": self.model,
-            }
-
-        # =========================================================
-        # 7. FALLBACK
-        # =========================================================
-
-        if is_english:
-
-            response = (
-                f"Sorry {user_firstname}, "
-                "I didn't fully understand that. "
-                "You can ask me about your balance, "
-                "expenses, savings or transfers."
-            )
-
-            suggestions = [
-                "How much money do I have in total?",
-                "How is my savings goal progressing?",
-                "Analyze my recent expenses",
-            ]
-
-        else:
-
-            response = (
-                f"Pardon {user_firstname}, "
-                "je n'ai pas bien compris. "
-                "Tu peux me demander ton solde, "
-                "analyser tes dépenses, ton épargne "
-                "ou préparer un transfert."
-            )
-
-            suggestions = [
-                "Quel est mon solde total ?",
-                "Comment avance mon épargne ?",
-                "Analyser mes dépenses",
-            ]
-
-        return {
-            "response": response,
-            "action": None,
-            "action_data": None,
-            "sentiment": "neutral",
-            "suggestions": suggestions,
-            "provider": "VERTEX_AI",
-            "model": self.model,
-        }
-
-    def _format_response(
-        self,
-        sika_response: str,
-        user_message: str,
-        financial_context: Dict[str, Any],
-        is_english: bool,
-    ) -> Dict[str, Any]:
-        """Formate une réponse générée par Gemini."""
-
-        # Clean markdown artifacts for clean UI/TTS rendering
-        clean_response = sika_response.replace("**", "").replace("*", "")
-
-        action, action_data = self._extract_action(
-            sika_response,
-            user_message,
-        )
-
-        return {
-            "response": clean_response,
-            "action": action,
-            "action_data": action_data,
-            "sentiment": "positive",
-            "suggestions": [
-                (
-                    "How much money do I have in total?"
-                    if is_english
-                    else "Quel est mon solde total ?"
-                ),
-                (
-                    "How is my savings goal progressing?"
-                    if is_english
-                    else "Comment avance mon épargne ?"
-                ),
-                (
-                    "Analyze recent expenses"
-                    if is_english
-                    else "Analyser mes dépenses"
-                ),
-            ],
-            "provider": "VERTEX_AI",
-            "model": self.model,
-        }
-
     def _is_pure_greeting(self, message: str) -> bool:
         """
         Détecte si un message utilisateur est une salutation pure sans intention financière explicite
@@ -1416,6 +203,205 @@ class SikaAIService:
             return True
         return False
 
+    # ==================================================================
+    # SIKA Pay — Agent de commerce PayPal (sandbox)
+    # ==================================================================
+
+    def _sika_pay_instruction(self, firstname: str, lang_instruction: str) -> str:
+        return f"""
+You are SIKA Pay, a personal AI payment agent. You help {firstname} make informed, controlled purchases
+with PayPal (SANDBOX test environment — no real money moves).
+
+The merchant is "SIKA Demo Store", a fictional demo store. Its catalog is demo data priced in USD.
+
+HOW YOU WORK:
+1. Understand what the user wants to buy, their budget and the quantity.
+2. ALWAYS call `search_demo_catalog` before suggesting or preparing a purchase. Never invent a product, SKU or price.
+3. If several products match and the user's choice is unclear, list at most 3 options (name, price) and ask which one.
+   If one product clearly matches the request, go ahead.
+4. If an essential parameter is ambiguous (which product, quantity, budget currency), ask ONE short question instead of guessing.
+5. To prepare the purchase, call `prepare_paypal_checkout(sku, quantity, budget_limit, budget_currency)`.
+   - `sku` must come from a search result. `budget_limit` only if the user stated a budget. Use quantity 1 if unspecified.
+   - You never pass an amount: the backend computes the price and checks the budget.
+   - If it fails (for example OVER_BUDGET), explain why and propose the alternatives it returned. Do not retry with another product
+     unless the user asks.
+6. Preparing a checkout does NOT create a PayPal order and charges nothing. The user must review the confirmation card in the app,
+   confirm, approve on PayPal, then complete the payment. You cannot create, approve or capture a PayPal payment yourself.
+7. To answer "did my payment go through?" call `get_paypal_checkout_status` or `list_recent_paypal_checkouts` and report ONLY the
+   statuses they return. "Order created", "approved" and "captured/completed" are different states: never merge them.
+8. Separate clearly: what is verified (catalog price, backend total, PayPal statuses), what the user said (budget, quantity),
+   and your assumptions.
+9. SIKA never converts currencies. If the budget is not in USD, ask the user for a USD budget.
+10. SIKA Pay only pays with PayPal (sandbox). Do not offer any other payment provider.
+11. Be concise and warm: 2 to 5 short sentences, no markdown tables.
+
+LANGUAGE: {lang_instruction}
+"""
+
+    def _checkout_summary_text(self, checkout: Dict[str, Any], is_english: bool) -> str:
+        item = (checkout.get("item") or {}).get("name", "")
+        total = f"{checkout.get('total_amount')} {checkout.get('currency')}"
+        budget = checkout.get("budget") or {}
+        if is_english:
+            budget_txt = (
+                f" It fits your budget of {budget.get('limit')} {budget.get('currency')} "
+                f"({budget.get('remaining_after_purchase')} left)." if budget.get("limit") else ""
+            )
+            return (f"I prepared a PayPal sandbox checkout for {checkout.get('quantity')} × {item}: {total}, price taken from the "
+                    f"demo store catalog.{budget_txt} Nothing has been charged and no PayPal order exists yet. "
+                    "Review the card and tap Confirm to continue on PayPal.")
+        budget_txt = (
+            f" C'est dans votre budget de {budget.get('limit')} {budget.get('currency')} "
+            f"(reste {budget.get('remaining_after_purchase')})." if budget.get("limit") else ""
+        )
+        return (f"J'ai préparé un paiement PayPal sandbox pour {checkout.get('quantity')} × {item} : {total}, prix issu du "
+                f"catalogue de démonstration.{budget_txt} Rien n'a été débité et aucune commande PayPal n'existe encore. "
+                "Vérifiez la carte puis touchez Confirmer pour continuer sur PayPal.")
+
+    async def _explain_prepared_checkout(self, messages: list, system_instruction: str, checkout: Dict[str, Any],
+                                         is_english: bool) -> str:
+        """Laisse Gemini expliquer le checkout préparé (sans aucun tool disponible), avec repli déterministe."""
+        fallback = self._checkout_summary_text(checkout or {}, is_english)
+        if not self.client or not checkout:
+            return fallback
+        from google.genai import types
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=messages,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction + (
+                        "\nThe checkout is now prepared. Explain it in 2-4 short sentences: item, total and currency, "
+                        "the budget check result. Mention which facts are verified and which come from the user. "
+                        "Say clearly that nothing has been charged and no PayPal order exists yet, and that the user "
+                        "must review the card and tap Confirm. Do not call any tool."
+                    ),
+                    temperature=0.2,
+                ),
+            )
+            text = (response.text or "").strip()
+            return text or fallback
+        except Exception as e:
+            logger.warning(f"[SIKA PAY] Explanation generation failed, deterministic summary used: {e}")
+            return fallback
+
+    def _chat_sika_pay_fallback(self, user_message: str, firstname: str, is_english: bool,
+                                user_id: Optional[str], greeting: bool = False) -> Dict[str, Any]:
+        """Moteur local déterministe SIKA Pay (sans LLM). Il ne simule jamais PayPal : il prépare au plus un checkout."""
+        from decimal import Decimal
+        from . import demo_catalog
+        from ..agent.tool_registry import tool_registry
+
+        def reply(text: str, action: str = "chat", action_id=None, action_data=None, steps=None) -> Dict[str, Any]:
+            prepared = bool(action == "prepare_paypal_checkout" and action_id)
+            return {
+                "response": text,
+                "action": action,
+                "action_id": action_id,
+                "action_data": action_data,
+                "sentiment": "positive",
+                "suggestions": [],
+                "provider": "SIKA_LOCAL_FALLBACK",
+                "model": "deterministic-rules",
+                "requires_confirmation": prepared,
+                "requires_biometric": prepared,
+                "requires_security_validation": prepared,
+                "status": "WAITING_CONFIRMATION" if prepared else "PROCESSED",
+                "should_speak": True,
+                "agent_steps": steps or [],
+                "language": "en" if is_english else "fr",
+            }
+
+        if greeting:
+            return reply(
+                f"Hi {firstname}! I'm SIKA Pay. Tell me what you want to buy and your budget — for example "
+                "\"Help me buy an Excel course under $50\" — and I'll prepare a PayPal sandbox checkout for you to approve."
+                if is_english else
+                f"Bonjour {firstname} ! Je suis SIKA Pay. Dites-moi ce que vous voulez acheter et votre budget — par exemple "
+                "« Aide-moi à acheter un cours Excel à moins de 50 dollars » — et je prépare un paiement PayPal sandbox à approuver."
+            )
+
+        msg = user_message.lower()
+        uid = str(user_id) if user_id else None
+
+        if any(k in msg for k in ["status", "statut", "went through", "did my payment", "mon paiement", "history", "historique"]):
+            res = tool_registry.execute("list_recent_paypal_checkouts", {"limit": 3, "user_id": uid})
+            rows = res.data.get("checkouts", []) if res.success else []
+            steps = [{"id": "step_1", "type": "list_recent_paypal_checkouts", "label": "Reading your SIKA Pay history", "status": "completed"}]
+            if not rows:
+                return reply("You have no SIKA Pay checkout yet." if is_english else "Vous n'avez encore aucun paiement SIKA Pay.", steps=steps)
+            last = rows[0]
+            return reply(
+                f"Your latest checkout ({last['item']}, {last['total_amount']} {last['currency']}) is: {last['status_label']}."
+                if is_english else
+                f"Votre dernier paiement ({last['item']}, {last['total_amount']} {last['currency']}) : {last['status_label']}.",
+                steps=steps,
+            )
+
+        purchase_words = ["buy", "purchase", "order", "pay for", "acheter", "achète", "achete", "commander", "payer", "paye"]
+        if not any(k in msg for k in purchase_words):
+            return reply(
+                "My AI reasoning engine is unavailable right now, but I can still prepare a PayPal sandbox purchase from the "
+                "demo store. Tell me what to buy and your budget."
+                if is_english else
+                "Mon moteur de raisonnement IA est indisponible pour le moment, mais je peux préparer un achat PayPal sandbox "
+                "dans la boutique de démonstration. Dites-moi quoi acheter et votre budget."
+            )
+
+        budget = None
+        m = re.search(r"(?:under|below|less than|max(?:imum)?|budget(?: of)?|moins de|pas plus de|maximum|budget de)\s*\$?\s*(\d+(?:[.,]\d{1,2})?)", msg) \
+            or re.search(r"\$\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:\$|usd|dollars?)", msg)
+        if m:
+            raw = next(g for g in m.groups() if g)
+            budget = Decimal(raw.replace(",", "."))
+
+        steps = [{"id": "step_1", "type": "search_demo_catalog", "label": "Searching the demo store catalog", "status": "completed"}]
+        n_tokens = max(len(demo_catalog.query_tokens(user_message)), 1)
+        # Correspondances fortes uniquement (au moins la moitié des mots-clés), budget appliqué ensuite par le backend
+        ranked = [(s, p) for s, p in demo_catalog.rank_products(user_message, max_price=None, limit=5) if s * 3 >= n_tokens]
+        if not ranked:
+            return reply(
+                "I couldn't identify the product in the demo store. What would you like: a course, an e-book, software, "
+                "cloud storage or a website pack?" if is_english
+                else "Je n'ai pas identifié le produit dans la boutique de démonstration. Que voulez-vous : un cours, un e-book, "
+                     "un logiciel, du stockage cloud ou un pack site web ?",
+                action="ask_ambiguity", steps=steps,
+            )
+        top_score = ranked[0][0]
+        ranked = [(s, p) for s, p in ranked if s == top_score][:3]
+        if len(ranked) > 1:
+            options = "; ".join(f"{p['name']} ({p['unit_price']} {p['currency']})" for _, p in ranked)
+            return reply(
+                f"I found several options: {options}. Which one do you want?" if is_english
+                else f"J'ai trouvé plusieurs options : {options}. Laquelle voulez-vous ?",
+                action="ask_ambiguity", steps=steps,
+            )
+
+        product = ranked[0][1]
+        res = tool_registry.execute("prepare_paypal_checkout", {
+            "sku": product["sku"], "quantity": 1,
+            "budget_limit": float(budget) if budget is not None else None,
+            "budget_currency": "USD" if budget is not None else None,
+            "user_id": uid, "user_request": user_message,
+        })
+        steps.append({"id": "step_2", "type": "prepare_paypal_checkout",
+                      "label": "Checking budget & preparing PayPal checkout", "status": "completed" if res.success else "failed"})
+        if not res.success:
+            alternatives = res.data.get("alternatives_within_budget") or []
+            alt_txt = ""
+            if alternatives:
+                listed = "; ".join(f"{p['name']} ({p['unit_price']} {p['currency']})" for p in alternatives)
+                alt_txt = (f" Options within your budget: {listed}." if is_english else f" Options dans votre budget : {listed}.")
+            return reply((res.error_message or "I could not prepare this checkout.") + alt_txt, steps=steps)
+        checkout = res.data["checkout"]
+        return reply(
+            self._checkout_summary_text(checkout, is_english),
+            action="prepare_paypal_checkout",
+            action_id=checkout["checkout_id"],
+            action_data={"type": "paypal_checkout", "action_id": checkout["checkout_id"], "checkout": checkout},
+            steps=steps,
+        )
+
     async def chat(
         self,
         user_message: str,
@@ -1425,93 +411,35 @@ class SikaAIService:
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Point d'entrée principal SIKA (Agent Taskmaster).
-        Utilise une boucle ReAct avec Function Calling dynamique.
+        Point d'entrée principal de l'agent SIKA Pay.
+        Boucle ReAct bornée avec Function Calling Gemini ; chaque tool passe par le ToolRegistry.
         """
         context = financial_context or {}
-        firstname = user_firstname or context.get("user_firstname") or "David"
+        firstname = user_firstname or context.get("user_firstname") or "there"
         is_english = self._is_english(user_message)
 
-        # Salutation pure : Réponse directe sans exécuter de transaction de l'historique
+        # Salutation pure : réponse directe, aucun tool
         if self._is_pure_greeting(user_message):
-            return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
+            return self._chat_sika_pay_fallback(user_message, firstname, is_english, user_id, greeting=True)
 
         if not self.client:
-            return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
+            return self._chat_sika_pay_fallback(user_message, firstname, is_english, user_id)
 
         from ..agent.tool_registry import tool_registry
         from google.genai import types
 
-        # Some deployed revisions may not implement `get_gemini_tools` yet.
-        # Use a safe fallback to build the list of safe tools when missing.
-        try:
-            safe_tools = tool_registry.get_gemini_tools()
-        except AttributeError:
-            safe_tools = []
-            defs = getattr(tool_registry, "_definitions", {}) or {}
-            for name, def_item in defs.items():
-                # Accept READ_ONLY and CONFIRMATION_REQUIRED tools as safe
-                if getattr(def_item, 'risk_level', None) and getattr(def_item.risk_level, 'value', '') in [
-                    'READ_ONLY',
-                    'CONFIRMATION_REQUIRED',
-                ]:
-                    func = getattr(tool_registry, '_tools', {}).get(name)
-                    if func:
-                        safe_tools.append(func)
+        safe_tools = tool_registry.get_gemini_tools()
+        lang_instruction = "Answer ONLY in English." if is_english else "Réponds UNIQUEMENT en français."
+        system_instruction = self._sika_pay_instruction(firstname, lang_instruction)
 
-        active_wallets = [w for w in context.get("wallets", []) if w.get("is_active", True)]
-        total_balance = sum(w.get("balance", 0.0) for w in active_wallets)
-        
-        # 3-Tier Currency Architecture mapping
-        display_code = context.get("display_currency_code") or "XOF"
-        display_sym = context.get("display_currency_symbol") or "FCFA"
-        wallet_code = context.get("wallet_currency_code") or "XOF"
-        wallet_sym = context.get("wallet_currency_symbol") or "FCFA"
-        
-        context_str = f"Solde total brut des portefeuilles : {total_balance} {wallet_sym}\n"
-        context_str += f"Devise d'affichage UI : {display_code} ({display_sym})\n"
-        context_str += f"Devise de base du portefeuille : {wallet_code} ({wallet_sym})\n"
-        context_str += "Comptes: " + ", ".join([f"{w.get('provider', 'Compte')} ({w.get('balance', 0.0)} {wallet_sym})" for w in active_wallets])
-
-        lang_instruction = "Réponds UNIQUEMENT en anglais." if is_english else "Réponds UNIQUEMENT en français."
-
-        system_instruction = f"""
-            RÈGLE CRITIQUE — ACTIONS FINANCIÈRES ET TOOLS :
-
-Tu es SIKA, un agent financier intelligent pour PayMeChap.
-Utilisateur : {firstname}
-
-Contexte financier de l'utilisateur :
-{context_str}
-
-RÈGLES STRICTES :
-1. Tu dois aider l'utilisateur à comprendre ses finances, épargner, et transférer de l'argent.
-2. N'invente JAMAIS un solde ou une transaction. Utilise les outils disponibles pour chercher l'information.
-3. Si l'utilisateur demande d'envoyer, transférer ou effectuer une transaction d'argent avec un montant et un destinataire/numéro (ex: "effectue une transaction de 15000 F sur le numéro 0779996927" ou "envoie 5000 à Franck"), tu DOIS OBLIGATOIREMENT appeler immédiatement le tool `prepare_transfer(amount=..., recipient=..., provider='paymechap')`. Ne réponds JAMAIS par un simple texte sans appeler `prepare_transfer`.
-4. Si une information est ambiguë (plusieurs contacts avec le même nom), pose une question courte pour clarifier avant d'agir. Ne demande PAS le numéro si tu l'as déjà trouvé.
-5. Tu ne peux pas exécuter directement une transaction. Appelle `prepare_transfer`, cela mettra la transaction en attente de confirmation humaine.
-6. Réponds de manière concise, naturelle et chaleureuse.
-7. Tu ne dois JAMAIS inventer un `action_id` ni générer un identifiant commençant par "act_" dans une réponse texte si `prepare_transfer` n'a pas été appelé avec succès.
-8. Ne génère jamais un texte du type "action_id : act_xxxxx" si `prepare_transfer` n'a pas été appelé et validé.
-9. RÈGLE DES DEVISES : Gemini ne doit JAMAIS effectuer de conversion monétaire ou de calcul de taux de change. Si la devise d'affichage ({display_code}) est différente de la devise du portefeuille ({wallet_code}) et qu'aucun taux n'est fourni par le backend, annonce clairement les valeurs dans la devise de base du portefeuille ({wallet_code}) pour éviter toute incohérence.
-10. RÈGLE SALUTATIONS : Si le message utilisateur est une simple salutation (ex: hello, bonjour, hi), réponds de façon chaleureuse et présente tes capacités d'assistance. N'appelle JAMAIS de tool financier (prepare_transfer, etc.), même si l'historique conversationnel mentionnait un transfert antérieur.
-11. RÈGLE CONFIRMATION ET PAIEMENT : Tu ne dois JAMAIS dire à l'utilisateur d'ouvrir l'application PayMeChap pour valider. La validation sécurisée par biométrie (Face ID / empreinte) ou code PIN se fait DIRECTEMENT dans l'application SIKA sur la carte de confirmation qui s'affiche à l'écran.
-
-LANGUE : {lang_instruction}
-"""
-        
         messages = []
-        if conversation_history:
-            for msg in conversation_history:
-                messages.append(types.Content(
-                    role="model" if msg.get("role") == "model" else "user",
-                    parts=[types.Part.from_text(text=msg.get("content", ""))]
-                ))
-        
-        messages.append(
-            types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
-        )
-        
+        for msg in conversation_history or []:
+            messages.append(types.Content(
+                role="model" if msg.get("role") == "model" else "user",
+                parts=[types.Part.from_text(text=msg.get("content", ""))]
+            ))
+        messages.append(types.Content(role="user", parts=[types.Part.from_text(text=user_message)]))
+
         max_steps = 5
         step = 0
         final_response_text = ""
@@ -1520,206 +448,93 @@ LANGUE : {lang_instruction}
         action_id = None
         agent_steps: list[dict] = []
 
-        # Safe, observable labels for each tool — never expose internal reasoning
+        # Libellés observables des étapes (jamais le raisonnement interne du modèle)
         _TOOL_LABELS = {
-            "get_financial_context": "Analyse de votre situation financière",
-            "search_contact": "Recherche du bénéficiaire",
-            "prepare_transfer": "Préparation du transfert",
-            "get_transaction_history": "Lecture de l'historique des transactions",
-            "get_spending_analysis": "Analyse de vos dépenses",
-            "get_budget_status": "Vérification de votre budget",
-            "get_savings_goals": "Lecture de vos objectifs d'épargne",
+            "search_demo_catalog": "Searching the demo store catalog" if is_english else "Recherche dans le catalogue",
+            "prepare_paypal_checkout": "Checking budget & preparing PayPal checkout" if is_english else "Vérification du budget et préparation PayPal",
+            "get_paypal_checkout_status": "Verifying the status with PayPal" if is_english else "Vérification du statut auprès de PayPal",
+            "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
+            "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
         }
-        
+        allowed_tool_names = set(tool_registry.agent_tool_names())
+        gen_config = types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            tools=safe_tools,
+            temperature=0.2,
+            # Les tools passent TOUJOURS par le ToolRegistry (contrôles, user_id serveur) : pas d'AFC SDK
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
+
         while step < max_steps:
+            step += 1
             try:
                 response = await self.client.aio.models.generate_content(
                     model=self.model,
                     contents=messages,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        tools=safe_tools,
-                        temperature=0.2
-                    )
+                    config=gen_config,
                 )
             except Exception as e:
                 logger.error(f"Gemini error during generation: {e}")
-                return self._chat_basic(user_message, context, firstname, is_english, user_id=user_id)
+                return self._chat_sika_pay_fallback(user_message, firstname, is_english, user_id)
 
-            # Add model response to history
             if getattr(response, 'candidates', None) and len(response.candidates) > 0:
                 messages.append(response.candidates[0].content)
 
-            if response.function_calls:
-                # If there are function calls, execute them
-                for call in response.function_calls:
-                    logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name} with args: {call.args}")
-                    
-                    try:
-                        # Execution via safe tool_registry with signature-aware user isolation
-                        call_args = dict(call.args) if call.args else {}
-                        tool_func = tool_registry.get(call.name)
-                        if tool_func and user_id:
-                            import inspect
-                            sig = inspect.signature(tool_func)
-                            if "user_id" in sig.parameters:
-                                if "user_id" not in call_args or not call_args.get("user_id") or call_args.get("user_id") == "default_user":
-                                    call_args["user_id"] = str(user_id)
-
-                        tool_res = tool_registry.execute(call.name, call_args)
-                        res_dict = tool_res.to_dict()
-                        step_status = "completed"
-                    except Exception as e:
-                        logger.error(f"Tool execution failed: {e}")
-                        res_dict = {"error": str(e)}
-                        step_status = "failed"
-
-                    # Record this as a safe, observable agent step
-                    agent_steps.append({
-                        "id": f"step_{len(agent_steps) + 1}",
-                        "type": call.name,
-                        "label": _TOOL_LABELS.get(call.name, "Analyse en cours"),
-                        "status": step_status,
-                    })
-
-                    # Append function result
-                    messages.append(
-                        types.Content(
-                            role="function", 
-                            parts=[
-                                types.Part.from_function_response(
-                                    name=call.name,
-                                    response=res_dict
-                                )
-                            ]
-                        )
-                    )
-                    
-                    # If this was a CONFIRMATION_REQUIRED tool like prepare_transfer, we can yield back to the user
-                    tool_def = tool_registry.get_definition(call.name)
-                    if tool_def and tool_def.risk_level.value == "CONFIRMATION_REQUIRED":
-                        action_detected = call.name
-                        action_data_detected = res_dict.get("data", {})
-                        action_id = action_data_detected.get("action_id")
-                        if action_id:
-                            # Enregistrement dans l'orchestrateur sécurisé SIKA
-                            from ..agent.orchestrator import sika_orchestrator
-                            sika_orchestrator.register_action(
-                                action_id=action_id,
-                                user_id=int(user_id) if user_id and user_id.isdigit() else 1,
-                                action_type="TRANSFER" if call.name == "prepare_transfer" else "GENERIC_ACTION",
-                                payload=action_data_detected
-                            )
-                            final_response_text = (
-                                "I have prepared the transfer. Would you like to confirm?"
-                                if is_english
-                                else "J'ai préparé l'opération. Veux-tu confirmer ?"
-                            )
-                        break
-                
-                if action_detected == "prepare_transfer":
-                    break
-            else:
-                # No function calls, so it's a final text response
-                final_response_text = response.text
-
-                # Defensive fallback: if the model produced a textual action_id like "act_...",
-                # only accept it if we can verify the action exists (in-memory or DB).
-                try:
-                    match = re.search(r"(act_[A-Za-z0-9_-]{6,})", final_response_text)
-                    if match and not action_id:
-                        candidate = match.group(1)
-                        from ..agent.orchestrator import sika_orchestrator
-
-                        # 1) Check in-memory action store
-                        if sika_orchestrator.action_store.get(candidate):
-                            action_detected = "prepare_transfer"
-                            action_id = candidate
-                            action_data_detected = sika_orchestrator.action_store[candidate].get("result") or {}
-                            final_response_text = (
-                                "I have prepared the transfer. Would you like to confirm?"
-                                if is_english
-                                else "J'ai préparé l'opération. Veux-tu confirmer ?"
-                            )
-                        else:
-                            # 2) Fallback: check persistent DB for a matching action
-                            try:
-                                from sqlalchemy.orm import Session
-                                from ..database import engine
-                                from ..models.sika_action import SikaActionModel
-
-                                with Session(engine) as db:
-                                    act = db.query(SikaActionModel).filter(SikaActionModel.action_id == candidate).first()
-                                    if act:
-                                        action_detected = "prepare_transfer"
-                                        action_id = candidate
-                                        try:
-                                            action_data_detected = json.loads(act.payload_json) if act.payload_json else {}
-                                        except Exception:
-                                            action_data_detected = {}
-                                        # Mirror into in-memory store for subsequent checks
-                                        sika_orchestrator.action_store[candidate] = {
-                                            "action_id": candidate,
-                                            "user_id": act.user_id,
-                                            "action_type": act.action_type,
-                                            "status": act.status,
-                                            "payload": action_data_detected,
-                                            "result": action_data_detected,
-                                        }
-                                        final_response_text = (
-                                            "I have prepared the transfer. Would you like to confirm?"
-                                            if is_english
-                                            else "J'ai préparé l'opération. Veux-tu confirmer ?"
-                                        )
-                            except Exception as e:
-                                logger.warning(f"Fallback DB lookup failed for action_id {candidate}: {e}")
-                except Exception as e:
-                    logger.warning(f"Fallback action_id verification failed: {e}")
-
+            if not response.function_calls:
+                final_response_text = response.text or ""
                 break
-                
-        # Fallback déterministe : Si Gemini n'a pas appelé le tool mais que l'utilisateur demandait explicitement un transfert avec montant et numéro
-        if not action_id and not self._is_pure_greeting(user_message):
-            msg_lower = user_message.lower()
-            transfer_keywords = ["transf", "envoi", "envoie", "envoyer", "paye", "payer", "effectue une transaction", "transferer", "verse", "verser", "send", "transfer"]
-            if any(kw in msg_lower for kw in transfer_keywords):
-                phone_match = re.search(r"(\+?225\s*)?(0[1-9]\d{8}|\d{10})", user_message.replace(" ", ""))
-                amount_match = re.search(r"(\d+[\s\d]*)\s*(?:f|cfa|fcfa|xof|francs)?", user_message, re.IGNORECASE)
-                if phone_match and amount_match:
-                    try:
-                        clean_amount_str = re.sub(r"\s+", "", amount_match.group(1))
-                        amount_val = float(clean_amount_str)
-                        recipient_phone = phone_match.group(0).replace(" ", "")
-                        if amount_val > 0 and len(recipient_phone) >= 8:
-                            logger.info(f"[SIKA DETERMINISTIC INTENT] Auto-executing prepare_transfer for {amount_val} to {recipient_phone}")
-                            prep_res = tool_registry.execute("prepare_transfer", {
-                                "amount": amount_val,
-                                "recipient": recipient_phone,
-                                "provider": "paymechap",
-                                "currency": "XOF"
-                            })
-                            prep_dict = prep_res.to_dict()
-                            if prep_res.success:
-                                action_detected = "prepare_transfer"
-                                action_data_detected = prep_dict.get("data", {})
-                                action_data_detected["type"] = "transfer"
-                                action_data_detected["action"] = "transfer"
-                                action_id = action_data_detected.get("action_id")
-                                if action_id:
-                                    from ..agent.orchestrator import sika_orchestrator
-                                    sika_orchestrator.register_action(
-                                        action_id=action_id,
-                                        user_id=int(user_id) if user_id and str(user_id).isdigit() else 1,
-                                        action_type="TRANSFER",
-                                        payload=action_data_detected
-                                    )
-                                    final_response_text = (
-                                        f"I have prepared the transfer of {amount_val:,.0f} XOF to {recipient_phone}. Please confirm."
-                                        if is_english
-                                        else f"Bonjour ! J'ai bien préparé votre transfert de {amount_val:,.0f} XOF vers le numéro {recipient_phone}.\n\nVous pouvez désormais valider cette transaction en toute sécurité directement ici, sur la carte de confirmation qui s'affiche sur votre écran, à l'aide de votre empreinte digitale ou de votre code PIN."
-                                    )
-                    except Exception as prep_err:
-                        logger.warning(f"Deterministic prepare_transfer fallback failed: {prep_err}")
+
+            for call in response.function_calls:
+                logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name} with args: {call.args}")
+                try:
+                    if call.name not in allowed_tool_names:
+                        raise PermissionError(f"Tool '{call.name}' is not available to the agent.")
+                    call_args = dict(call.args) if call.args else {}
+                    tool_func = tool_registry.get(call.name)
+                    if tool_func:
+                        import inspect
+                        sig = inspect.signature(tool_func)
+                        if "user_id" in sig.parameters:
+                            # Toujours l'identité authentifiée côté serveur, jamais celle proposée par le modèle
+                            call_args["user_id"] = str(user_id) if user_id else None
+                        if "user_request" in sig.parameters:
+                            call_args["user_request"] = user_message
+
+                    tool_res = tool_registry.execute(call.name, call_args)
+                    res_dict = tool_res.to_dict()
+                    step_status = "completed" if tool_res.success else "failed"
+                except Exception as e:
+                    logger.error(f"Tool execution failed: {e}")
+                    res_dict = {"success": False, "error_message": str(e)}
+                    step_status = "failed"
+
+                agent_steps.append({
+                    "id": f"step_{len(agent_steps) + 1}",
+                    "type": call.name,
+                    "label": _TOOL_LABELS.get(call.name, "Analysing" if is_english else "Analyse en cours"),
+                    "status": step_status,
+                })
+
+                messages.append(
+                    types.Content(
+                        role="user",
+                        parts=[types.Part.from_function_response(name=call.name, response=res_dict)]
+                    )
+                )
+
+                # Un checkout préparé rend la main à l'utilisateur : confirmation humaine obligatoire
+                if call.name == "prepare_paypal_checkout" and res_dict.get("success"):
+                    data = res_dict.get("data", {})
+                    action_id = data.get("action_id")
+                    action_detected = call.name
+                    action_data_detected = {"type": "paypal_checkout", "action_id": action_id, "checkout": data.get("checkout")}
+                    final_response_text = await self._explain_prepared_checkout(
+                        messages, system_instruction, action_data_detected["checkout"], is_english
+                    )
+                    break
+
+            if action_id:
+                break
 
         if not final_response_text:
             final_response_text = (
@@ -1728,7 +543,7 @@ LANGUE : {lang_instruction}
                 else "Je n'ai pas pu terminer l'analyse."
             )
 
-        is_transfer_action = bool(action_detected == "prepare_transfer" and action_id)
+        prepared = bool(action_detected == "prepare_paypal_checkout" and action_id)
         return {
             "response": final_response_text,
             "action": action_detected,
@@ -1736,12 +551,12 @@ LANGUE : {lang_instruction}
             "action_data": action_data_detected,
             "sentiment": "positive",
             "suggestions": [],
-            "provider": "VERTEX_AI_AGENT",
+            "provider": "GEMINI_API_AGENT" if self.provider == "gemini_api" else "VERTEX_AI_AGENT",
             "model": self.model,
-            "requires_confirmation": is_transfer_action,
-            "requires_biometric": is_transfer_action,
-            "requires_security_validation": is_transfer_action,
-            "status": "WAITING_CONFIRMATION" if is_transfer_action else "PROCESSED",
+            "requires_confirmation": prepared,
+            "requires_biometric": prepared,
+            "requires_security_validation": prepared,
+            "status": "WAITING_CONFIRMATION" if prepared else "PROCESSED",
             "should_speak": True,
             "agent_steps": agent_steps,
             "language": "en" if is_english else "fr",

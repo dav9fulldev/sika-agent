@@ -4,9 +4,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_voice_overlay_widget.dart';
-import 'agent_hub_screen.dart';
 import 'sika_chat_screen.dart';
-import 'insights_screen.dart';
+import '../../../paypal/presentation/pages/sika_pay_home_screen.dart';
+import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
 import '../../../profile/presentation/pages/profile_screen.dart';
 
 class SikaMainNavigationPage extends ConsumerStatefulWidget {
@@ -62,11 +62,11 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
     });
 
     final List<Widget> pages = [
-      AgentHubScreen(
+      SikaPayHomeScreen(
         onOpenChat: () => setState(() => _currentIndex = 2),
-        onOpenInsights: () => setState(() => _currentIndex = 1),
+        onOpenHistory: () => setState(() => _currentIndex = 1),
       ),
-      const InsightsScreen(),
+      const SikaPayHistoryScreen(),
       SikaChatScreen(
         onBackPressed: () => setState(() => _currentIndex = 0),
       ),
@@ -116,23 +116,23 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
           children: [
             _buildNavItem(
                 index: 0,
-                icon: Icons.grid_view_rounded,
-                activeIcon: Icons.grid_view_rounded,
-                label: 'Hub'),
-            _buildNavItem(
-                index: 1,
-                icon: Icons.donut_small_rounded,
-                activeIcon: Icons.donut_small_rounded,
-                label: 'Analyse'),
-            
-            // Central SIKA AI Button
-            _buildCentralSikaButton(isListening, isProcessing, currentAppLang, sikaNotifier),
-            
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                label: langNotifier.tr('Accueil', 'Home')),
             _buildNavItem(
                 index: 2,
                 icon: Icons.forum_outlined,
                 activeIcon: Icons.forum_rounded,
-                label: 'Chat'),
+                label: langNotifier.tr('Assistant', 'Assistant')),
+
+            // Central SIKA AI Button
+            _buildCentralSikaButton(isListening, isProcessing, currentAppLang, sikaNotifier),
+
+            _buildNavItem(
+                index: 1,
+                icon: Icons.receipt_long_outlined,
+                activeIcon: Icons.receipt_long_rounded,
+                label: langNotifier.tr('Transactions', 'Transactions')),
             _buildNavItem(
                 index: 3,
                 icon: Icons.face_rounded,
@@ -224,7 +224,7 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutExpo,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? activeColor.withValues(alpha: 0.1)
@@ -246,17 +246,15 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
                 size: 24,
               ),
             ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Container(
-                width: 4,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: activeColor,
-                  shape: BoxShape.circle,
-                ),
-              )
-            ]
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
+            ),
           ],
         ),
       ),

@@ -267,7 +267,7 @@ def test_database_cascade_deletion_cleans_child_records():
     with Session(engine) as db:
         wallet = ConnectedWalletModel(
             user_id=user.id,
-            provider="PayMeChap",
+            provider="Wave CI",
             external_wallet_id="0700000000",
             connection_status="connected"
         )
@@ -311,7 +311,10 @@ def test_alembic_migrations_schema_integrity():
     migration_files = list(versions_dir.glob("*.py"))
     assert len(migration_files) >= 1
 
-    content = migration_files[0].read_text()
+    # La migration initiale est celle sans révision parente (l'ordre de glob() n'est pas garanti)
+    initial = [f for f in migration_files if "down_revision: Union[str, Sequence[str], None] = None" in f.read_text()]
+    assert len(initial) == 1
+    content = initial[0].read_text()
     assert "users" in content
     assert "connected_wallets" in content
     assert "sika_actions" in content
@@ -321,6 +324,11 @@ def test_alembic_migrations_schema_integrity():
     assert "ondelete='CASCADE'" in content or "ondelete=\"CASCADE\"" in content
     assert "chk_sika_action_status_valid" in content
     assert "chk_connected_wallet_status_valid" in content
+
+    paypal = [f for f in migration_files if "create_table('paypal_checkouts'" in f.read_text()]
+    assert len(paypal) == 1
+    assert "chk_paypal_checkout_status_valid" in paypal[0].read_text()
+    assert "ondelete='CASCADE'" in paypal[0].read_text()
 
 
 # =============================================================================

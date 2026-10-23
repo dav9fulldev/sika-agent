@@ -6,13 +6,14 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config import settings
+from app.config import settings, APP_VERSION
 from app.services.logging_sanitizer import setup_secure_logging
 from app.routes.sika_router import router as sika_router
-from app.routes.wallet_router import router as wallet_router
 from app.routes.perception_router import router as perception_router
 from app.routes.user_router import router as user_router
+from app.routes.paypal_router import router as paypal_router
 from app.database import Base, engine
+from app import models as _all_models  # noqa: F401  (enregistre toutes les tables avant create_all)
 
 """
 Point d'entrée principal de l'API SIKA AI Standalone.
@@ -43,8 +44,8 @@ openapi_url = "/openapi.json" if settings.DOCS_ENABLED else None
 
 app = FastAPI(
     title="SIKA AI API",
-    description="Microservice indépendant et sécurisé pour l'Assistant Vocal et Financier SIKA",
-    version="1.0.0",
+    description="SIKA Pay — AI payment agent API (PayPal Orders v2 sandbox + Gemini)",
+    version=APP_VERSION,
     docs_url=docs_url,
     redoc_url=redoc_url,
     openapi_url=openapi_url,
@@ -147,7 +148,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(sika_router)
-app.include_router(wallet_router)
+app.include_router(paypal_router)
 app.include_router(perception_router)
 app.include_router(user_router)
 
@@ -156,7 +157,7 @@ app.include_router(user_router)
 def read_root():
     return {
         "message": "Bienvenue sur l'API SIKA Assistant Vocal",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "environment": settings.ENV,
         "database": "SQL Database Connected",
         "status": "running"
@@ -169,7 +170,7 @@ def health_check():
     return {
         "status": "healthy",
         "environment": settings.ENV,
-        "version": "1.0.0"
+        "version": APP_VERSION
     }
 
 

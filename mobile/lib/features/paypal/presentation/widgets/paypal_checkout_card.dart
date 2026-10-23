@@ -1,0 +1,116 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../providers/paypal_checkout_provider.dart';
+import '../pages/paypal_checkout_screen.dart';
+import 'sika_pay_ui.dart';
+
+/// Carte de checkout affichée dans la conversation, juste après la préparation par l'agent.
+/// Elle reflète en direct le statut vérifié par le backend et ouvre l'écran de paiement.
+class PayPalCheckoutCard extends ConsumerStatefulWidget {
+  final Map<String, dynamic> initialCheckout;
+  const PayPalCheckoutCard({super.key, required this.initialCheckout});
+
+  @override
+  ConsumerState<PayPalCheckoutCard> createState() => _PayPalCheckoutCardState();
+}
+
+class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(paypalCheckoutsProvider.notifier).seed(widget.initialCheckout);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = ref.read(languageProvider.notifier);
+    ref.watch(languageProvider);
+    final id = widget.initialCheckout['checkout_id']?.toString() ?? '';
+    final v = ref.watch(paypalCheckoutsProvider)[id] ?? PayPalCheckoutView(data: widget.initialCheckout);
+    final item = v.item;
+    final budget = v.budget;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final inactive = v.isTerminal && v.status != 'COMPLETED';
+
+    return Opacity(
+      opacity: inactive ? 0.6 : 1,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: SikaPayCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const PayPalWordmark(size: 14),
+              const SizedBox(width: 8),
+              const SandboxBadge(compact: true),
+              const Spacer(),
+              StatusChip(status: v.status, lang: lang),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(color: AppColors.brandPrimary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(categoryIcon(item['category']?.toString()), color: AppColors.brandPrimary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(item['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  const SizedBox(height: 3),
+                  Text('${v.quantity} × ${v.unitAmount} ${v.currency}  ·  ${v.merchant['name']}',
+                      style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.55))),
+                ]),
+              ),
+              Text('${v.total} ${v.currency}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ]),
+            if (budget['limit'] != null) ...[
+              const SizedBox(height: 10),
+              Row(children: [
+                Icon(budget['within_budget'] == true ? Icons.check_circle_rounded : Icons.warning_rounded,
+                    size: 15, color: budget['within_budget'] == true ? AppColors.success : AppColors.error),
+                const SizedBox(width: 6),
+                Text(
+                  lang.tr('Budget ${budget['limit']} ${budget['currency']} respecté · reste ${budget['remaining_after_purchase']}',
+                      'Within your ${budget['limit']} ${budget['currency']} budget · ${budget['remaining_after_purchase']} left'),
+                  style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.7)),
+                ),
+              ]),
+            ],
+            if (v.status == 'CANCELLED' && v.lastError?['code'] == 'REPLACED_BY_NEW_REQUEST') ...[
+              const SizedBox(height: 8),
+              Text(lang.tr('Remplacé par une demande plus récente.', 'Replaced by a newer request.'),
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: onSurface.withValues(alpha: 0.6))),
+            ],
+            if (!inactive) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: SikaPayColors.paypalBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: id.isEmpty ? null : () => PayPalCheckoutScreen.open(context, id),
+                  child: Text(
+                    v.status == 'COMPLETED'
+                        ? lang.tr('Voir le reçu', 'View receipt')
+                        : v.status == 'AWAITING_USER_CONFIRMATION'
+                            ? lang.tr('Vérifier et payer', 'Review and pay')
+                            : lang.tr('Continuer le paiement', 'Continue payment'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}

@@ -8,7 +8,7 @@ from ..schemas.sika_dto import (
     SikaQueryDTO, SikaResponseDTO,
     AuthLoginRequest, AuthRegisterRequest, AuthGoogleRequest,
     AuthForgotPasswordRequest, AuthResetPasswordRequest,
-    TTSRequest, AgentProcessRequest, AgentConfirmRequest, AgentCancelRequest
+    TTSRequest, AgentProcessRequest
 )
 from ..services.sika_ai import SikaAI
 from ..services.sika_nlp import SikaNLP
@@ -146,16 +146,6 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
     ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
     firstname = ctx_dict.get("user_firstname", "David")
 
-    # Fetch user wallets to provide context to the AI
-    from .wallet_router import get_my_wallets
-    active_wallets = []
-    try:
-        wallets_res = get_my_wallets(authorization=authorization)
-        active_wallets = wallets_res.get("wallets", [])
-    except Exception:
-        pass
-            
-    ctx_dict["wallets"] = active_wallets
 
     from ..agent.session_manager import sika_session_manager
     session = sika_session_manager.get_user_session(str(user_id))
@@ -245,58 +235,5 @@ async def sika_agent_process(data: AgentProcessRequest, authorization: Optional[
     security_rate_limiter.check_ai_rate_limit(str(user_id))
     query = data.query
     return await sika_orchestrator.process_user_request(user_id=user_id, query=query)
-
-
-@router.post("/agent/confirm", summary="Agent Confirm", description="Endpoint de validation humaine pour l'agent SIKA (Exige JWT + protection anti-flood).")
-async def sika_agent_confirm(data: AgentConfirmRequest, authorization: Optional[str] = Header(None)):
-    """Endpoint de validation humaine pour l'agent SIKA (Exige JWT + protection anti-flood)."""
-    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    security_rate_limiter.check_confirm_rate_limit(str(user_id))
-    action_id = data.action_id
-    res = await sika_orchestrator.confirm_action(action_id=action_id, user_id=user_id)
-    if res.get("status") == "UNAUTHORIZED_USER":
-        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
-    if res.get("status") == "NOT_FOUND":
-        raise HTTPException(status_code=404, detail="Action financière introuvable.")
-    return res
-
-
-@router.post("/agent/cancel", summary="Agent Cancel", description="Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT).")
-async def sika_agent_cancel(data: AgentCancelRequest, authorization: Optional[str] = Header(None)):
-    """Endpoint d'annulation d'action pour l'agent SIKA (Exige JWT)."""
-    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    action_id = data.action_id
-    res = sika_orchestrator.cancel_action(action_id=action_id, user_id=user_id, reason=data.reason)
-    if res.get("status") == "UNAUTHORIZED_USER":
-        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
-    if res.get("status") == "NOT_FOUND":
-        raise HTTPException(status_code=404, detail="Action financière introuvable.")
-    return res
-
-
-@router.post("/actions/{action_id}/reconcile")
-async def sika_reconcile_action(action_id: str, data: Optional[Dict[str, Any]] = None, authorization: Optional[str] = Header(None)):
-    """Endpoint de réconciliation d'une transaction au statut incertain UNKNOWN_RESULT auprès de PayMeChap (Exige JWT)."""
-    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    res = await sika_orchestrator.reconcile_action(action_id=action_id, user_id=user_id)
-    if res.get("status") == "UNAUTHORIZED_USER":
-        raise HTTPException(status_code=403, detail="Action financière introuvable ou accès non autorisé.")
-    if res.get("status") == "NOT_FOUND":
-        raise HTTPException(status_code=404, detail="Action financière introuvable.")
-    return res
-
-
-@router.post("/actions/cleanup-stale")
-def sika_cleanup_stale_actions(authorization: Optional[str] = Header(None)):
-    """Endpoint de nettoyage périodique / arrière-plan des actions expirées."""
-    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
-    expired_ids = sika_orchestrator.cleanup_stale_actions(user_id=user_id)
-    return {
-        "success": True,
-        "expired_count": len(expired_ids),
-        "expired_action_ids": expired_ids
-    }
-
-
 
 

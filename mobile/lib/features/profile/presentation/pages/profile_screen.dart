@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
-import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/sika_glass_card.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
 import '../../../auth/presentation/pages/login_screen.dart';
-import '../../../wallet/providers/wallet_provider.dart';
-import '../../../wallet/presentation/widgets/my_wallets_modal.dart';
-import '../../../../core/widgets/sika_empty_state.dart';
+import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
 import 'personal_information_screen.dart';
 import 'payment_methods_screen.dart';
 import 'kyc_verification_screen.dart';
@@ -85,252 +81,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showMovementsModal(
-      BuildContext context, WidgetRef ref, LanguageNotifier langNotifier) {
-    String selectedProviderFilter = 'ALL';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          final walletState = ref.watch(walletProvider);
-          final currency = ref.watch(currencyProvider);
-          final movements = walletState.movements;
-          final connectedWallets = walletState.wallets;
-
-          final List<WalletMovementItem> filteredMovements =
-              selectedProviderFilter == 'ALL'
-                  ? movements
-                  : movements.where((m) {
-                      final p = m.walletProvider.toLowerCase();
-                      final target = selectedProviderFilter.toLowerCase();
-                      return p.contains(target) || target.contains(p);
-                    }).toList();
-
-          return Container(
-            height: MediaQuery.of(context).size.height * 0.85,
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-              border: Border.all(
-                color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-              ),
-            ),
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      langNotifier.tr('Historique des Mouvements',
-                          'Transactions & History'),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: AppColors.cyan),
-                      onPressed: () async {
-                        await ref
-                            .read(walletProvider.notifier)
-                            .fetchMovements();
-                        setModalState(() {});
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  langNotifier.tr(
-                    'Synchronisation automatique en temps réel de vos portefeuilles connectés.',
-                    'Real-time automated sync across your connected wallets.',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.7),
-                      ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                // DROPDOWN FILTER BY WALLET
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.08)),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedProviderFilter,
-                      isExpanded: true,
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                          color: AppColors.cyan),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: 'ALL',
-                          child: Text(
-                            '${langNotifier.tr('Tous les comptes', 'All Accounts')} (${movements.length})',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ),
-                        ...connectedWallets.map((w) {
-                          final label = '${w.provider} (${w.accountNumber})';
-                          return DropdownMenuItem<String>(
-                            value: w.provider,
-                            child: Text(
-                              label,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setModalState(() {
-                            selectedProviderFilter = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                Expanded(
-                  child: filteredMovements.isEmpty
-                      ? SikaEmptyState(
-                          icon: Icons.history_rounded,
-                          title: langNotifier.tr(
-                              'Aucun mouvement trouvé', 'No movements found'),
-                          message: langNotifier.tr(
-                            'Vos transactions apparaîtront ici.',
-                            'Your transactions will appear here.',
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: filteredMovements.length,
-                          separatorBuilder: (ctx, i) =>
-                              const Divider(color: AppColors.border),
-                          itemBuilder: (ctx, index) {
-                            final item = filteredMovements[index];
-                            final isDeposit = item.type == 'deposit';
-                            final amountVal =
-                                (item.amount * currency.rateFromFcfa)
-                                    .toStringAsFixed(
-                              currency == AppCurrency.fcfa ? 0 : 2,
-                            );
-
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: CircleAvatar(
-                                backgroundColor: isDeposit
-                                    ? AppColors.emerald.withValues(alpha: 0.15)
-                                    : AppColors.rose.withValues(alpha: 0.15),
-                                child: Icon(
-                                  isDeposit
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward,
-                                  color: isDeposit
-                                      ? AppColors.emerald
-                                      : AppColors.rose,
-                                  size: 18,
-                                ),
-                              ),
-                              title: Text(
-                                item.recipient.isNotEmpty
-                                    ? item.recipient
-                                    : item.description,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              subtitle: Text(
-                                '${item.walletProvider} • ${item.category}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.7),
-                                    ),
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${isDeposit ? "+" : "-"}$amountVal ${currency.symbol}',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: isDeposit
-                                              ? AppColors.emerald
-                                              : Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).cardColor,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      item.status,
-                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                            color: AppColors.cyan,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(languageProvider);
@@ -343,8 +93,6 @@ class ProfileScreen extends ConsumerWidget {
     final initialLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
     final isKycVerified = user?.isKycVerified ?? false;
 
-    final walletState = ref.watch(walletProvider);
-    final connectedCount = walletState.wallets.length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -572,17 +320,6 @@ class ProfileScreen extends ConsumerWidget {
                     Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
                     _buildMenuItem(
                       context,
-                      icon: Icons.account_balance_wallet_outlined,
-                      title: langNotifier.tr('Mes portefeuilles', 'My Wallets'),
-                      trailingText:
-                          '$connectedCount ${langNotifier.tr('connectés', 'connected')}',
-                      onTap: () {
-                        MyWalletsModal.show(context);
-                      },
-                    ),
-                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
-                    _buildMenuItem(
-                      context,
                       icon: Icons.credit_card_outlined,
                       title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
                       onTap: () {
@@ -597,12 +334,12 @@ class ProfileScreen extends ConsumerWidget {
                     _buildMenuItem(
                       context,
                       icon: Icons.history,
-                      title: langNotifier.tr(
-                          'Historique des transactions', 'Transaction History'),
-                      trailingText:
-                          '${walletState.movements.length} ${langNotifier.tr('mouvements', 'movements')}',
+                      title: langNotifier.tr('Historique SIKA Pay', 'SIKA Pay history'),
                       onTap: () {
-                        _showMovementsModal(context, ref, langNotifier);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SikaPayHistoryScreen()),
+                        );
                       },
                     ),
                   ],

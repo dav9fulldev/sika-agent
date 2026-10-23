@@ -11,7 +11,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/sika_native_service.dart';
-import '../../wallet/providers/wallet_provider.dart';
+import '../../paypal/providers/paypal_checkout_provider.dart';
 
 enum SikaState {
   idle,
@@ -455,8 +455,14 @@ class SikaNotifier extends StateNotifier<SikaData> {
           '[SIKA API] Action detected: $action | Action ID: $actionId | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
 
       SikaState pendingNextState = SikaState.idle;
+      final bool isPayPalCheckout = actionData?['type'] == 'paypal_checkout';
 
-      if (actionId != null && (requiresSecurity || action == 'prepare_transfer')) {
+      if (isPayPalCheckout) {
+        // SIKA Pay : la carte de checkout porte sa propre confirmation. La conversation reste
+        // ouverte pour que l'utilisateur puisse modifier sa demande (le backend invalide alors
+        // la préparation précédente).
+        pendingNextState = SikaState.idle;
+      } else if (actionId != null && (requiresSecurity || action == 'prepare_transfer')) {
         pendingNextState = SikaState.securityValidation;
       } else if (action == 'ask_ambiguity' ||
           status == 'NEEDS_CLARIFICATION' ||
@@ -490,6 +496,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
       final Set<String> updatedObsoleteIds = Set<String>.from(state.obsoleteActionIds);
       if (actionId != null && previousActiveActionId != null && previousActiveActionId != actionId) {
         updatedObsoleteIds.add(previousActiveActionId);
+        if (previousActiveActionId.startsWith('chk_')) {
+          // Le backend a annulé l'ancienne préparation : on affiche son statut réel
+          _ref.read(paypalCheckoutsProvider.notifier).refresh(previousActiveActionId, sync: false);
+        }
         debugPrint('[SIKA ACTIONS] Previous action $previousActiveActionId marked OBSOLETE. New active: $actionId');
       }
 
@@ -537,6 +547,59 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
       await _speak(fallbackText, ttsLocale: activeTtsLocale);
     }
+  }
+
+  final Set<String> _reportedPayPalOutcomes = {};
+
+  /// SIKA explique le résultat réellement vérifié par le backend auprès de PayPal.
+  /// Le texte est construit uniquement à partir des champs renvoyés (statut, montants, identifiants).
+  Future<void> reportPayPalOutcome(Map<String, dynamic> checkout) async {
+    final id = checkout['checkout_id']?.toString() ?? '';
+    final status = checkout['status']?.toString() ?? '';
+    if (id.isEmpty || !_reportedPayPalOutcomes.add('$id:$status')) return;
+    if (!const ['APPROVED', 'COMPLETED', 'DECLINED', 'FAILED', 'CANCELLED', 'EXPIRED', 'UNKNOWN_RESULT', 'PENDING']
+        .contains(status)) {
+      return;
+    }
+    final isEn = _ref.read(languageProvider).code == 'en';
+    final item = (checkout['item'] as Map?)?['name']?.toString() ?? '';
+    final paypal = Map<String, dynamic>.from(checkout['paypal'] as Map? ?? {});
+    final total = '${checkout['total_amount']} ${checkout['currency']}';
+    final err = (checkout['last_error'] as Map?)?['message']?.toString();
+    String text;
+    switch (status) {
+      case 'APPROVED':
+        text = isEn
+            ? 'PayPal confirms you approved the order for $item. Nothing is charged yet: tap "Pay $total now" to complete it.'
+            : 'PayPal confirme votre approbation pour $item. Rien n\'est encore payé : touchez « Payer $total maintenant » pour finaliser.';
+        break;
+      case 'COMPLETED':
+        text = isEn
+            ? 'Done. PayPal captured ${paypal['captured_amount']} ${paypal['captured_currency']} for $item (sandbox). Order ${paypal['order_id']}, capture ${paypal['capture_id']}, status ${paypal['capture_status']}.'
+            : 'C\'est fait. PayPal a capturé ${paypal['captured_amount']} ${paypal['captured_currency']} pour $item (sandbox). Commande ${paypal['order_id']}, capture ${paypal['capture_id']}, statut ${paypal['capture_status']}.';
+        break;
+      case 'UNKNOWN_RESULT':
+      case 'PENDING':
+        text = isEn
+            ? 'The payment result for $item is not confirmed yet. ${err ?? ''} I will only report it once PayPal confirms it.'
+            : 'Le résultat du paiement pour $item n\'est pas encore confirmé. ${err ?? ''} Je ne l\'annoncerai qu\'une fois confirmé par PayPal.';
+        break;
+      case 'CANCELLED':
+      case 'EXPIRED':
+        text = isEn
+            ? 'The payment for $item was not made (${status.toLowerCase()}). ${err ?? ''}'
+            : 'Le paiement pour $item n\'a pas été effectué (${status == 'CANCELLED' ? 'annulé' : 'expiré'}). ${err ?? ''}';
+        break;
+      default:
+        text = isEn
+            ? 'PayPal did not complete the payment for $item. ${err ?? ''} No funds were captured.'
+            : 'PayPal n\'a pas finalisé le paiement pour $item. ${err ?? ''} Aucun montant n\'a été capturé.';
+    }
+    state = state.copyWith(
+      messages: List<SikaMessage>.from(state.messages)..add(SikaMessage(text: text.trim(), isUser: false)),
+      clearActiveAction: status != 'APPROVED' && state.activeActionId == id,
+    );
+    await _speak(text.trim(), ttsLocale: isEn ? 'en-US' : 'fr-FR');
   }
 
   Future<void> sendTextMessage(String text, {String? ttsLocale}) async {
@@ -679,191 +742,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
       clearActiveAction: true,
       obsoleteActionIds: updatedObsolete,
     );
-  }
-
-  Future<void> executeSecurityValidationAndConfirm(String actionId) async {
-    final currentLang = _ref.read(languageProvider);
-    final isEnglish = currentLang.code == 'en';
-
-    // DOUBLE-CONFIRMATION GUARD: Prevent multiple in-flight confirmation requests
-    if (state.state == SikaState.executingAction) {
-      debugPrint('[SIKA SECURITY] ⚠️ Confirmation already in progress. Ignoring duplicate request.');
-      return;
-    }
-
-    // OBSOLETE ACTION GUARD: Refuse to confirm an action that has been superseded
-    if (state.obsoleteActionIds.contains(actionId)) {
-      debugPrint('[SIKA SECURITY] ⛔ Refusing confirmation of OBSOLETE action: $actionId');
-      final msg = isEnglish
-          ? 'This action has been replaced by a newer request. Please confirm the latest action.'
-          : 'Cette action a été remplacée par une nouvelle demande. Veuillez confirmer la dernière action préparée.';
-      final sikaMessage = SikaMessage(text: msg, isUser: false);
-      state = state.copyWith(
-        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
-        state: SikaState.idle,
-      );
-      return;
-    }
-
-    // ACTIVE ACTION GUARD: Ensure action matches the currently active action if defined
-    if (state.activeActionId != null && state.activeActionId != actionId) {
-      debugPrint('[SIKA SECURITY] ⛔ Action ID $actionId does not match active action ${state.activeActionId}. Aborting.');
-      final msg = isEnglish
-          ? 'This action is no longer active. Please confirm the latest request.'
-          : 'Cette action n\'est plus active. Veuillez confirmer la dernière demande.';
-      final sikaMessage = SikaMessage(text: msg, isUser: false);
-      state = state.copyWith(
-        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
-        state: SikaState.idle,
-      );
-      return;
-    }
-
-    try {
-      state = state.copyWith(state: SikaState.executingAction);
-      debugPrint(
-          '[PAYMECHAP EXECUTION] Executing real payout confirmation via POST /api/v1/sika/agent/confirm for action_id: $actionId');
-
-      final confirmRes = await _apiService.sikaAgentConfirm(actionId);
-      final String status = (confirmRes['status'] as String?) ?? '';
-
-      // P1.5: détermination du message et de l'état suivant selon le statut backend
-      final String sikaText = (confirmRes['speech_text'] as String?) ??
-          (confirmRes['message'] as String?) ??
-          (status == 'EXPIRED'
-              ? (isEnglish
-                  ? 'This transaction request has expired. Please try again.'
-                  : 'Cette demande de transaction a expiré. Veuillez recommencer l\'opération.')
-              : status == 'REQUIRES_RECONCILIATION'
-                  ? (isEnglish
-                      ? 'The transaction status must be verified before any new attempt.'
-                      : 'Le statut de cette opération doit être vérifié avant toute nouvelle tentative.')
-                  : status == 'UNKNOWN_RESULT'
-                      ? (isEnglish
-                          ? 'Transaction status uncertain. I will check with PayMeChap.'
-                          : 'Statut de la transaction incertain. Je vérifie auprès de PayMeChap.')
-                      : (isEnglish
-                          ? 'Operation confirmed and completed successfully on PayMeChap!'
-                          : 'Opération confirmée et exécutée avec succès sur PayMeChap !'));
-
-      final bool isExecuted = status == 'EXECUTED';
-      final bool needsReconciliation =
-          status == 'UNKNOWN_RESULT' || status == 'REQUIRES_RECONCILIATION';
-
-      // CRITICAL FIX: UNKNOWN_RESULT is NOT a failure — it means the status is
-      // being verified. Map to reconciling, never to error.
-      final SikaState pendingState = isExecuted
-          ? SikaState.idle
-          : (status == 'EXPIRED' || status == 'FAILED')
-              ? SikaState.error
-              : needsReconciliation
-                  ? SikaState.reconciling  // Reassuring state, not error
-                  : SikaState.idle;
-
-      final sikaMessage = SikaMessage(text: sikaText, isUser: false);
-      final finalMessages = List<SikaMessage>.from(state.messages)
-        ..add(sikaMessage);
-
-      state = state.copyWith(
-        state: SikaState.speaking,
-        messages: finalMessages,
-        pendingNextState: pendingState,
-        // P1.5: conserver l'action_id pour UNKNOWN_RESULT/REQUIRES_RECONCILIATION
-        pendingActionId: needsReconciliation ? actionId : null,
-        clearActiveAction: !needsReconciliation,
-        clearActionData: !needsReconciliation,
-      );
-
-      // P1.1: Rafraîchir le solde immédiatement après exécution réussie
-      if (isExecuted) {
-        debugPrint(
-            '[P1.1] Transaction EXECUTED — rafraîchissement automatique des portefeuilles.');
-        _ref.read(walletProvider.notifier).fetchWallets();
-        _ref.read(walletProvider.notifier).fetchMovements();
-      }
-
-      await _speak(sikaText, ttsLocale: currentLang.ttsLanguage);
-    } catch (e) {
-      debugPrint('[SECURITY EXECUTION ERROR] $e');
-      final errorMsg = isEnglish
-          ? 'Failed to execute transaction on PayMeChap: $e'
-          : 'Échec d\'exécution de la transaction sur PayMeChap : $e';
-
-      final sikaMessage = SikaMessage(text: errorMsg, isUser: false);
-      final finalMessages = List<SikaMessage>.from(state.messages)
-        ..add(sikaMessage);
-
-      String userFriendlyError = isEnglish
-          ? "Network error communicating with PayMeChap."
-          : "Erreur réseau lors de la communication avec PayMeChap.";
-
-      state = state.copyWith(
-        state: SikaState.error,
-        messages: finalMessages,
-        errorMessage: userFriendlyError,
-        pendingNextState: SikaState.error,
-        pendingActionId: null,
-      );
-
-      await _speak(errorMsg, ttsLocale: currentLang.ttsLanguage);
-    }
-  }
-
-  Future<void> executeActionReconciliation(String actionId) async {
-    final currentLang = _ref.read(languageProvider);
-    final isEnglish = currentLang.code == 'en';
-    try {
-      debugPrint(
-          '[RECONCILIATION] Triggering reconciliation for actionId: $actionId');
-      final res = await _apiService.sikaReconcileAction(actionId);
-      final String status = (res['status'] as String?) ?? 'UNKNOWN_RESULT';
-
-      final String speechText = (res['speech_text'] as String?) ??
-          (res['message'] as String?) ??
-          (status == 'EXECUTED'
-              ? (isEnglish
-                  ? 'Transaction confirmed and completed successfully on PayMeChap!'
-                  : 'Opération confirmée et exécutée avec succès sur PayMeChap !')
-              : status == 'FAILED'
-                  ? (isEnglish
-                      ? 'The transaction failed on PayMeChap. No funds were debited.'
-                      : 'La transaction a échoué sur PayMeChap. Aucun montant n\'a été débité.')
-                  : (isEnglish
-                      ? 'The transaction status is still pending verification with PayMeChap.'
-                      : 'Le statut de la transaction est toujours en attente de confirmation auprès de PayMeChap.'));
-
-      final sikaMessage = SikaMessage(text: speechText, isUser: false);
-      final finalMessages = List<SikaMessage>.from(state.messages)
-        ..add(sikaMessage);
-
-      final bool isExecuted = status == 'EXECUTED';
-      final bool isFailed = status == 'FAILED';
-      final bool stillPending = status == 'UNKNOWN_RESULT' ||
-          status == 'REQUIRES_RECONCILIATION' ||
-          status == 'RECONCILIATION_IN_PROGRESS';
-
-      state = state.copyWith(
-        state: SikaState.speaking,
-        messages: finalMessages,
-        pendingNextState: isExecuted
-            ? SikaState.completed
-            : isFailed
-                ? SikaState.idle
-                : SikaState.reconciling,
-        pendingActionId: stillPending ? actionId : null,
-      );
-
-      await _speak(speechText, ttsLocale: currentLang.ttsLanguage);
-    } catch (e) {
-      debugPrint('[RECONCILIATION ERROR] $e');
-      final errorNotice = isEnglish
-          ? 'Could not connect to verify status. Please try again shortly.'
-          : 'Impossible de joindre le serveur pour vérifier le statut. Veuillez réessayer dans un instant.';
-      final sikaMessage = SikaMessage(text: errorNotice, isUser: false);
-      state = state.copyWith(
-        messages: List<SikaMessage>.from(state.messages)..add(sikaMessage),
-      );
-    }
   }
 
   Future<void> stopSpeaking({bool resetState = true}) async {

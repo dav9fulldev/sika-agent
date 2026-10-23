@@ -50,7 +50,7 @@ class AgentOrbWidget extends StatelessWidget {
       case SikaState.securityValidation:
         return 'Authentication & PIN validation required...';
       case SikaState.executingAction:
-        return 'Executing transaction on PayMeChap...';
+        return 'Processing with PayPal (sandbox)...';
       case SikaState.processing:
         return 'Analyzing your request...';
       case SikaState.agentWorking:

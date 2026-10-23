@@ -15,8 +15,10 @@ from .user_preference import UserPreferenceModel
 from .agent_memory import AgentMemoryModel
 from .savings_goal import SavingsGoalModel
 from .payment_method import PaymentMethodModel
+from .paypal_checkout import PayPalCheckoutModel
 
 __all__ = [
+    "PayPalCheckoutModel",
     "UserModel",
     "ConnectedWalletModel",
     "SikaActionModel",

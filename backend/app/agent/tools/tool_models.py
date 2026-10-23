@@ -33,3 +33,5 @@ class ToolDefinition(BaseModel):
     risk_level: RiskLevel
     input_schema: Dict[str, Any]
     output_schema: Dict[str, Any]
+    # Outil de maintenance interne : jamais exposé au modèle IA
+    agent_exposed: bool = True
