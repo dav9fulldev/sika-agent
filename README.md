@@ -188,4 +188,4 @@ SIKA started at the Google "All Things Agentic" hackathon (August 2026) as a Mob
 
 ## License
 
-⚠️ To be added by the repository owner before submission (an OSI-approved license file is required by the hackathon rules).
+[MIT](LICENSE) © 2026 Brou David Yao
