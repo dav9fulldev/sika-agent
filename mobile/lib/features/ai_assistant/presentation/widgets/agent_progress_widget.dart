@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 
 /// AgentProgressWidget — Displays observable SIKA agent execution steps
 /// 
@@ -179,14 +181,16 @@ class _AgentProgressWidgetState extends State<AgentProgressWidget>
                 color: AppColors.brandPrimary.withValues(alpha: 0.9),
               ),
               const SizedBox(width: 6),
-              Text(
-                'Actions effectuées',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.brandPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                      letterSpacing: 0.3,
-                    ),
+              Consumer(
+                builder: (context, ref, _) => Text(
+                  ref.watch(languageProvider) == AppLanguage.french ? 'Étapes réalisées' : 'Steps completed',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.brandPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                        letterSpacing: 0.3,
+                      ),
+                ),
               ),
             ],
           ),
@@ -255,3 +259,4 @@ class _AgentProgressWidgetState extends State<AgentProgressWidget>
     );
   }
 }
+
