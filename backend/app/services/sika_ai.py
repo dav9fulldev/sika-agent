@@ -236,6 +236,9 @@ You can shop in two places:
   The tool returns exactly the products shown as cards (at most 3): mention only those, in the same order, with their best
   price and merchant, and say how many products and merchants you compared (`products_compared`, `merchants_compared`).
   Plain text only: no markdown, no bold, no lists with symbols.
+- PRICE ALERTS: if the user wants to be told when a web product gets cheaper or is back in stock, call
+  `watch_web_product_price(product_id, target_price)` with a product_id from `search_web_products` (search first if needed).
+  `list_price_watches` reports their alerts. Alerts never buy anything.
 
 HOW YOU WORK:
 1. Understand what the user wants to buy, their budget and the quantity.
@@ -504,6 +507,8 @@ LANGUAGE: {lang_instruction}
             "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
             "confirm_checkout_with_authorization": "Confirming with your authorization" if is_english else "Confirmation avec votre autorisation",
             "search_web_products": "Comparing offers from online merchants" if is_english else "Comparaison des offres des marchands en ligne",
+            "watch_web_product_price": "Setting up your price alert" if is_english else "Création de votre alerte de prix",
+            "list_price_watches": "Reading your price alerts" if is_english else "Lecture de vos alertes de prix",
             "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
         }
         allowed_tool_names = set(tool_registry.agent_tool_names(excluded_tools))

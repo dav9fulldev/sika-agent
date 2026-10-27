@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/api_service_provider.dart';
+import '../../providers/paypal_checkout_provider.dart';
 import '../../../../core/providers/language_provider.dart';
 import 'sika_pay_ui.dart';
 
@@ -140,6 +141,19 @@ class _ProductTile extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 10),
+            SizedBox(
+              height: 48,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: SikaPayColors.paypalBlue,
+                    side: const BorderSide(color: SikaPayColors.paypalBlue),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: Text(lang.tr('Surveiller le prix', 'Watch price'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                onPressed: () => _watchPrice(context, product, best, lang),
+              ),
+            ),
+            const SizedBox(height: 10),
             Text(
               lang.tr(
                   "Vous payez sur le site du marchand (avec PayPal s'il le propose). SIKA ne paie pas à votre place sur ces sites et ne peut pas vérifier cet achat.",
@@ -150,6 +164,50 @@ class _ProductTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Alerte quand une offre neuve passe sous le prix cible (notifiée par les webhooks Channel3).
+  static Future<void> _watchPrice(
+      BuildContext context, Map<String, dynamic> product, Map<String, dynamic>? best, LanguageNotifier lang) async {
+    final current = double.tryParse(best?['price']?.toString() ?? '');
+    final ctrl = TextEditingController(text: current != null ? (current * 0.9).toStringAsFixed(2) : '');
+    final target = await showDialog<String>(
+      context: context,
+      builder: (dlg) => AlertDialog(
+        title: Text(lang.tr('Prix cible', 'Target price')),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(lang.tr('SIKA vous prévient quand une offre neuve passe à ce prix ou moins. Aucun achat automatique.',
+              'SIKA tells you when a new offer drops to this price or less. Nothing is bought automatically.')),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(suffixText: 'USD'),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlg), child: Text(lang.tr('Annuler', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(dlg, ctrl.text.trim()), child: Text(lang.tr('Créer l\'alerte', 'Create alert'))),
+        ],
+      ),
+    );
+    if (target == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
+    try {
+      await container.read(apiServiceProvider).createPriceWatch(product['product_id'].toString(),
+          targetPrice: target.isEmpty ? null : target.replaceAll(',', '.'));
+      container.invalidate(priceWatchesProvider);
+      messenger.showSnackBar(SnackBar(
+        content: Text(lang.tr('Alerte créée : SIKA vous préviendra.', 'Alert created: SIKA will let you know.')),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(lang.tr("L'alerte n'a pas pu être créée.", 'The alert could not be created.')),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   /// Ouvre la page du marchand avec un lien à jour (les liens d'offre expirent) ; repli sur le lien reçu.

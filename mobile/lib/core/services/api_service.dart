@@ -403,6 +403,33 @@ class ApiService {
     return _decodePayPal(response);
   }
 
+  // Alertes de prix (produits du web, Channel3)
+  Future<Map<String, dynamic>> listPriceWatches() async {
+    final response = await http.get(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> createPriceWatch(String productId, {String? targetPrice}) async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}'),
+            headers: _headers, body: jsonEncode({'product_id': productId, 'target_price': targetPrice}))
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> markPriceWatchesSeen() async {
+    final response =
+        await http.post(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}/seen'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> deletePriceWatch(int watchId) async {
+    final response = await http
+        .delete(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}/$watchId'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   // Mode hybride : autorisation accordée par l'utilisateur à l'agent
   Future<Map<String, dynamic>> getAgentAuthorization() async {
     final response = await http
