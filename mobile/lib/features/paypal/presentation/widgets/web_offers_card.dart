@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/providers/language_provider.dart';
 import 'sika_pay_ui.dart';
 
@@ -123,7 +124,7 @@ class _ProductTile extends StatelessWidget {
                   if (isBest) lang.tr('meilleur prix', 'best price'),
                 ].join(' · ')),
                 trailing: Text('${o['price']} ${o['currency']}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                onTap: () => _open(o['url']?.toString()),
+                onTap: () => _open(context, product['product_id']?.toString(), o['merchant']?.toString(), o['url']?.toString()),
               );
             }),
             const SizedBox(height: 12),
@@ -133,7 +134,7 @@ class _ProductTile extends StatelessWidget {
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                       backgroundColor: SikaPayColors.paypalBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                  onPressed: () => _open(best['url']?.toString()),
+                  onPressed: () => _open(context, product['product_id']?.toString(), best['merchant']?.toString(), best['url']?.toString()),
                   child: Text(lang.tr('Ouvrir chez ${best['merchant']}', 'Open at ${best['merchant']}'),
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
@@ -151,7 +152,16 @@ class _ProductTile extends StatelessWidget {
     );
   }
 
-  static Future<void> _open(String? url) async {
+  /// Ouvre la page du marchand avec un lien à jour (les liens d'offre expirent) ; repli sur le lien reçu.
+  static Future<void> _open(BuildContext context, String? productId, String? merchant, String? fallbackUrl) async {
+    String? url = fallbackUrl;
+    if (productId != null && productId.isNotEmpty) {
+      try {
+        final fresh = await ProviderScope.containerOf(context, listen: false).read(apiServiceProvider).getWebProduct(productId);
+        final offers = (fresh['offers'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map));
+        url = offers.firstWhere((o) => o['merchant'] == merchant, orElse: () => const {})['url']?.toString() ?? url;
+      } catch (_) {}
+    }
     final uri = url == null ? null : Uri.tryParse(url);
     if (uri == null || uri.scheme != 'https') return; // liens HTTPS uniquement
     await launchUrl(uri, mode: LaunchMode.externalApplication);

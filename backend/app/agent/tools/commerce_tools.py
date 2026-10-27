@@ -147,11 +147,11 @@ def confirm_checkout_with_authorization(checkout_id: str, user_id: Optional[str]
                       data={"action_id": checkout["checkout_id"], "checkout": checkout})
 
 
-def search_web_products(query: str, max_price: Optional[float] = None) -> ToolResult:
+def search_web_products(query: str, max_price: Optional[float] = None, user_id: Optional[str] = None) -> ToolResult:
     """Recherche de vrais produits chez des marchands en ligne (Channel3) : comparaison seulement, aucun paiement."""
     from ...services.web_shopping_service import web_shopping_service, WebShoppingError
     try:
-        data = web_shopping_service.search(query, max_price, limit=5)
+        data = web_shopping_service.search(query, max_price, limit=10, user_ref=str(_uid(user_id)) if _uid(user_id) else None)
     except WebShoppingError as e:
         return ToolResult(success=False, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY,
                           data={"error_code": e.code}, error_message=e.message)

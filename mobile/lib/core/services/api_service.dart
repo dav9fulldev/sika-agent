@@ -395,6 +395,14 @@ class ApiService {
     throw PayPalApiException(code, message, response.statusCode, checkout: checkout);
   }
 
+  /// Offres à jour d'un produit trouvé sur le web (les liens d'achat expirent vite).
+  Future<Map<String, dynamic>> getWebProduct(String productId) async {
+    final response = await http
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalWebProducts}/${Uri.encodeComponent(productId)}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   // Mode hybride : autorisation accordée par l'utilisateur à l'agent
   Future<Map<String, dynamic>> getAgentAuthorization() async {
     final response = await http

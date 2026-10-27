@@ -109,14 +109,42 @@ class WebShoppingService:
     def is_configured(self) -> bool:
         return bool(settings.CHANNEL3_API_KEY)
 
-    def search(self, query: str, max_price: Any = None, limit: int = 5) -> Dict[str, Any]:
+    def _headers(self, user_ref: Optional[str]) -> Dict[str, str]:
+        headers = {"x-api-key": settings.CHANNEL3_API_KEY, "Content-Type": "application/json"}
+        if user_ref:
+            # Attribution des clics par utilisateur SIKA (identifiant opaque, aucune donnée personnelle)
+            headers["x-user-id"] = f"sika-{user_ref}"[:128]
+        return headers
+
+    def refresh_offers(self, product_id: str, user_ref: Optional[str] = None) -> Dict[str, Any]:
+        """Prix, stock et liens d'achat à jour (GET /v1/products/{id}, gratuit) : les liens d'offre expirent vite."""
+        if not self.is_configured():
+            raise WebShoppingError("WEB_SEARCH_NOT_CONFIGURED", "Web product search is not configured on the SIKA backend.")
+        pid = str(product_id or "")
+        if not pid or len(pid) > 64 or not pid.replace("-", "").replace("_", "").isalnum():
+            raise WebShoppingError("INVALID_PRODUCT", "Unknown product.")
+        try:
+            resp = self._session.get(f"{settings.CHANNEL3_API_BASE}/v1/products/{pid}", headers=self._headers(user_ref), timeout=20)
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"[WEB SHOPPING] Channel3 unreachable: {type(e).__name__}")
+            raise WebShoppingError("WEB_SEARCH_UNAVAILABLE", "The product service could not be reached. Try again.")
+        if resp.status_code == 404:
+            raise WebShoppingError("INVALID_PRODUCT", "This product is no longer listed.")
+        if resp.status_code != 200:
+            raise WebShoppingError("WEB_SEARCH_UNAVAILABLE", f"The product service returned an error ({resp.status_code}).")
+        product = normalize_product(resp.json())
+        if not product:
+            raise WebShoppingError("INVALID_PRODUCT", "This product has no available offer anymore.")
+        return product
+
+    def search(self, query: str, max_price: Any = None, limit: int = 5, user_ref: Optional[str] = None) -> Dict[str, Any]:
         if not self.is_configured():
             raise WebShoppingError("WEB_SEARCH_NOT_CONFIGURED", "Web product search is not configured on the SIKA backend.")
         query = (query or "").strip()[:200]
         if not query:
             raise WebShoppingError("EMPTY_QUERY", "Say what product you are looking for.")
         budget = _money(max_price) if max_price not in (None, "") else None
-        body: Dict[str, Any] = {"query": query, "limit": max(1, min(int(limit or 5), 10)),
+        body: Dict[str, Any] = {"query": query, "limit": max(1, min(int(limit or 10), 20)),
                                 "filters": {"availability": ["InStock", "LimitedAvailability"]}}
         if budget:
             body["filters"]["price"] = {"max_price": float(budget)}
@@ -124,7 +152,7 @@ class WebShoppingService:
             resp = self._session.post(
                 f"{settings.CHANNEL3_API_BASE}/v1/search",
                 json=body,
-                headers={"x-api-key": settings.CHANNEL3_API_KEY, "Content-Type": "application/json"},
+                headers=self._headers(user_ref),
                 timeout=20,
             )
         except requests.exceptions.RequestException as e:
@@ -140,12 +168,17 @@ class WebShoppingService:
         products = [p for p in (normalize_product(r, budget) for r in raw_products) if p]
         # Les produits avec une offre éligible d'abord, puis par meilleur prix
         products.sort(key=lambda p: (p["best_offer"] is None, Decimal(p["best_offer"]["price"]) if p["best_offer"] else Decimal(0)))
+        merchants = {o["merchant"] for p in products for o in p["offers"]}
+        # Le modèle et l'app voient exactement les mêmes produits (au plus 3), pour que le texte corresponde aux cartes
+        shown = products[:3]
         return {
             "source": SOURCE,
             "query": query,
             "max_price": str(budget) if budget else None,
-            "count": len(products),
-            "products": products,
+            "products_compared": len(products),
+            "merchants_compared": len(merchants),
+            "count": len(shown),
+            "products": shown,
             "payment_note": "These are real merchants. SIKA cannot pay on their sites: the user opens the merchant page and pays there "
                             "(with PayPal when the merchant offers it). Only SIKA partner stores can be paid inside the app.",
         }

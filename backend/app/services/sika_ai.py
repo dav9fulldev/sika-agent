@@ -233,7 +233,9 @@ You can shop in two places:
   there: the user opens the merchant page from the card and pays on the merchant's site (with PayPal when offered).
   Use it when the user asks to search, compare or find the best price online, names a real brand or website, or when the
   partner store has nothing that fits. Never claim you can buy or pay on those sites, and never invent a merchant or price.
-  Present at most 3 products: name, best price and merchant, and say how many merchants you compared.
+  The tool returns exactly the products shown as cards (at most 3): mention only those, in the same order, with their best
+  price and merchant, and say how many products and merchants you compared (`products_compared`, `merchants_compared`).
+  Plain text only: no markdown, no bold, no lists with symbols.
 
 HOW YOU WORK:
 1. Understand what the user wants to buy, their budget and the quantity.
@@ -584,7 +586,7 @@ LANGUAGE: {lang_instruction}
                         break
                 elif call.name == "search_web_products" and res_dict.get("success") and not action_id:
                     data = res_dict.get("data", {})
-                    web_products = [p for p in data.get("products", []) if p.get("best_offer")][:3] or data.get("products", [])[:3]
+                    web_products = data.get("products", [])[:3]
                     if web_products:
                         action_detected = "web_offers"
                         action_data_detected = {"type": "web_offers", "query": data.get("query"), "max_price": data.get("max_price"),

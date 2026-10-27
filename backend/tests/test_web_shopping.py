@@ -33,6 +33,12 @@ class FakeSession:
     def __init__(self, status=200, payload=None, raise_exc=None):
         self.status, self.payload, self.raise_exc, self.calls = status, payload, raise_exc, []
 
+    def get(self, url, headers, timeout):
+        self.calls.append((url, None, headers))
+        if url.endswith("/v1/products/p1"):
+            return SimpleNamespace(status_code=200, json=lambda: RAW[0])
+        return SimpleNamespace(status_code=404, json=lambda: {})
+
     def post(self, url, json, headers, timeout):
         self.calls.append((url, json, headers))
         if self.raise_exc:
@@ -67,6 +73,7 @@ def test_search_sends_budget_and_key_and_ranks_results(configured):
     assert url.endswith("/v1/search") and headers["x-api-key"] == "test-key"
     assert body["filters"]["price"] == {"max_price": 50.0}
     assert [p["product_id"] for p in data["products"]] == ["p2", "p1", "p3"]
+    assert data["products_compared"] == 3 and data["merchants_compared"] == 6
     assert "cannot pay" in data["payment_note"]
 
 
@@ -108,5 +115,20 @@ def test_agent_returns_web_offer_cards(configured):
     res = asyncio.run(ai.chat("Find wireless headphones under $50 online", user_id="1"))
     assert res["action"] == "web_offers" and res["requires_confirmation"] is False
     cards = res["action_data"]["products"]
-    assert [c["product_id"] for c in cards] == ["p2", "p1"]  # p3 n'a aucune offre dans le budget
-    assert all(c["best_offer"]["url"].startswith("https://") for c in cards)
+    assert [c["product_id"] for c in cards] == ["p2", "p1", "p3"]  # mêmes produits que ceux vus par le modèle
+    assert cards[2]["best_offer"] is None  # p3 : aucune offre dans le budget, la carte le dit
+    assert all(c["best_offer"]["url"].startswith("https://") for c in cards if c["best_offer"])
+
+
+def test_offers_are_refreshed_before_opening_and_user_is_attributed(configured):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.services.auth_service import oauth2_auth_service
+    client = TestClient(app)
+    auth = {"Authorization": "Bearer " + oauth2_auth_service.create_access_token({"user_id": 7, "email": "w@sika.test"})}
+    assert client.get("/api/v1/paypal/web-products/p1").status_code == 401
+    r = client.get("/api/v1/paypal/web-products/p1", headers=auth)
+    assert r.status_code == 200 and r.json()["offers"][0]["url"].startswith("https://")
+    assert configured.calls[-1][2]["x-user-id"] == "sika-7"
+    assert client.get("/api/v1/paypal/web-products/zzz", headers=auth).status_code == 404
+    assert client.get("/api/v1/paypal/web-products/..%2Fadmin", headers=auth).status_code in (404, 422)

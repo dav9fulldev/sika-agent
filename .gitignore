@@ -87,3 +87,7 @@ backend/app/data/
 /mobile/fix_const.py
 /mobile/fix_context.py
 /mobile/replace_colors.py
+
+# Outils d'agent locaux (skills)
+/.claude/
+/skills-lock.json
