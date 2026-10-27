@@ -1,9 +1,27 @@
+from types import SimpleNamespace
+
 import pytest
 from app.services.gcp_tts_service import gcp_tts_service
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
+
+
+class FakeTTSClient:
+    """Client Text-to-Speech simulé : les tests ne contactent jamais Google Cloud."""
+
+    def synthesize_speech(self, input, voice, audio_config):
+        return SimpleNamespace(audio_content=b"ID3" + b"\x00" * 512)
+
+    def list_voices(self, language_code):
+        gender = SimpleNamespace(name="FEMALE")
+        return SimpleNamespace(voices=[SimpleNamespace(name="fr-FR-Neural2-C", language_codes=["fr-FR"], ssml_gender=gender)])
+
+
+@pytest.fixture(autouse=True)
+def fake_tts(monkeypatch):
+    monkeypatch.setattr(gcp_tts_service, "_client", FakeTTSClient())
 
 def test_gcp_tts_service_synthesis():
     """Vérifie la génération de la synthèse vocale via GCP Text-to-Speech service."""

@@ -26,8 +26,10 @@ android {
         applicationId "com.sika.assistant"
         minSdk 24
         targetSdk 36
-        // Version issue de pubspec.yaml (version: x.y.z+build)
-        versionCode flutter.versionCode
+        // Version issue de pubspec.yaml (x.y.z, mise à jour par release-please).
+        // versionCode dérivé de x.y.z (2.1.0 -> 20100) pour rester croissant ; --build-number reste prioritaire.
+        def semver = flutter.versionName.tokenize('.').collect { it.replaceAll('[^0-9]', '') as int }
+        versionCode(flutter.versionCode > 1 ? flutter.versionCode : semver[0] * 10000 + semver[1] * 100 + semver[2])
         versionName flutter.versionName
     }
 

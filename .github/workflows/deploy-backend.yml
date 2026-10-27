@@ -23,24 +23,8 @@ env:
   WORKLOAD_IDENTITY_PROVIDER: 'projects/1064195418653/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: sika_user
-          POSTGRES_PASSWORD: sika_password
-          POSTGRES_DB: sika_test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -50,23 +34,28 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: 'backend/requirements.txt'
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Installation des dépendances
         run: |
           cd backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
+      # Un test en échec bloque le déploiement (base SQLite jetable, aucun appel réseau : voir tests/conftest.py)
       - name: Exécution des tests backend
-        continue-on-error: true
         run: |
           cd backend
-          PYTHONPATH=. pytest tests/
-        env:
-          # On définit l'environnement de test et on pointe sur le container PostgreSQL
-          ENV: testing
-          DATABASE_URL: postgresql+psycopg2://sika_user:sika_password@localhost:5432/sika_test_db
+          python -m pytest tests -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
 
       - name: Authentification via Google Cloud Workload Identity
         uses: google-github-actions/auth@v2

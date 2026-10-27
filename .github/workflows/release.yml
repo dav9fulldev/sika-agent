@@ -1,0 +1,22 @@
+name: Release
+
+# À chaque merge sur main, release-please ouvre (ou met à jour) une PR « chore: release x.y.z » :
+# CHANGELOG.md, version de l'API (backend/app/config.py) et de l'app (mobile/pubspec.yaml).
+# Merger cette PR crée le tag vX.Y.Z et la release GitHub. Rien n'est publié sans ce merge.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

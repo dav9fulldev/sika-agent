@@ -17,7 +17,7 @@ def test_api_reports_app_version():
 
 def test_mobile_and_changelog_match_api_version():
     pubspec = (ROOT / "mobile" / "pubspec.yaml").read_text()
-    mobile_version = re.search(r"^version:\s*([0-9.]+)\+\d+", pubspec, re.MULTILINE).group(1)
+    mobile_version = re.search(r"^version:\s*([0-9]+\.[0-9]+\.[0-9]+)", pubspec, re.MULTILINE).group(1)
     assert mobile_version == APP_VERSION
 
     changelog = (ROOT / "CHANGELOG.md").read_text()

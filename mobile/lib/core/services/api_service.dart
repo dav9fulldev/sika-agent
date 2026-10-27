@@ -58,7 +58,9 @@ class ApiService {
     try {
       final body = jsonDecode(response.body);
       if (body is Map && body.containsKey('detail')) {
-        return body['detail'].toString();
+        final detail = body['detail'];
+        if (detail is Map && detail['message'] != null) return detail['message'].toString();
+        return detail.toString();
       }
     } catch (_) {}
     return '$fallbackPrefix (${response.statusCode})';
@@ -81,6 +83,12 @@ class ApiService {
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
+    try {
+      final detail = jsonDecode(response.body)['detail'];
+      if (detail is Map && detail['error_code'] != null) {
+        throw AuthApiException(detail['error_code'].toString(), detail['message']?.toString() ?? '');
+      }
+    } on FormatException catch (_) {}
     throw Exception(_extractErrorMessage(response, 'Erreur de connexion'));
   }
 
@@ -532,6 +540,16 @@ class ApiService {
 }
 
 /// Erreur métier renvoyée par les endpoints SIKA Pay (code stable + message lisible).
+/// Erreur d'authentification avec code (ex. USE_PAYPAL_SIGN_IN), traduite par l'interface.
+class AuthApiException implements Exception {
+  final String code;
+  final String message;
+  AuthApiException(this.code, this.message);
+
+  @override
+  String toString() => message;
+}
+
 class PayPalApiException implements Exception {
   final String code;
   final String message;

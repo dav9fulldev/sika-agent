@@ -66,3 +66,24 @@ mobile/.flutter-plugins-dependencies
 # Runtime Data / User Storage
 backend/app/data/
 
+
+# Documents internes (restent en local, jamais publiés pour le jury)
+/CLAUDE.md
+/CONTEXT.md
+/HISTORY.md
+/data/
+/scripts/
+/docs/internal/
+/docs/AGENTIC_ARCHITECTURE_AUDIT.md
+/docs/PAYPAL_HACKATHON_AUDIT.md
+/docs/HACKATHON_PROGRESS.md
+/docs/DEMO_SCRIPT.md
+/docs/DEMO_CHECKLIST.md
+/docs/SIKA_IMPLEMENTATION_GUIDE.md
+/docs/SIKA_VOICE_COMMANDS.md
+/docs/SIKA_WAKEWORD.md
+/SIKA.iml
+/backend/test_vertex.py
+/mobile/fix_const.py
+/mobile/fix_context.py
+/mobile/replace_colors.py

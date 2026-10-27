@@ -37,7 +37,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('loading screen tells the user what is happening', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SikaLoadingScreen()));
+    await tester.pumpWidget(_app(const SikaLoadingScreen()));
     expect(find.text('Chargement de votre assistant IA…'), findsOneWidget);
   });
 
@@ -52,6 +52,15 @@ void main() {
     expect(find.text('Google'), findsOneWidget);
     expect(find.text('PayPal'), findsOneWidget);
     expect(find.textContaining('Continuer avec'), findsNothing);
+  });
+
+  testWidgets('PayPal account on the email form is told to use PayPal, in the app language', (tester) async {
+    await tester.pumpWidget(_app(const WelcomeScreen(), overrides: [
+      authProvider.overrideWith((ref) => AuthNotifier.withState(
+          AuthState(errorCode: 'USE_PAYPAL_SIGN_IN', errorMessage: 'This account uses PayPal sign-in.'))),
+    ]));
+    await tester.pump();
+    expect(find.textContaining('Ce compte utilise la connexion PayPal'), findsOneWidget);
   });
 
   testWidgets('biometric step is skipped when the device has no biometrics', (tester) async {

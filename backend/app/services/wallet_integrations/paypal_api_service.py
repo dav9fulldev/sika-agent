@@ -190,8 +190,8 @@ class PayPalAPIService:
                     "experience_context": {
                         "brand_name": settings.PAYPAL_BRAND_NAME[:127],
                         "shipping_preference": "NO_SHIPPING",
-                        # CONTINUE : le payeur revient dans SIKA pour la revue finale avant capture
-                        "user_action": "CONTINUE",
+                        # PAY_NOW : le bouton PayPal indique « Payer » ; SIKA capture dès que l'approbation est vérifiée
+                        "user_action": "PAY_NOW",
                         "return_url": settings.PAYPAL_RETURN_URL,
                         "cancel_url": settings.PAYPAL_CANCEL_URL,
                     }

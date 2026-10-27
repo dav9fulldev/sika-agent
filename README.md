@@ -26,12 +26,22 @@ SIKA Pay is an **agentic checkout assistant** built on PayPal Orders v2:
 2. **Gemini** understands the intent, searches the catalog with a tool and asks a question when the request is ambiguous.
 3. The agent **prepares** a checkout. The **backend** computes the price, checks your budget and refuses anything over it. The AI never chooses an amount.
 4. You review a confirmation screen that shows the item, the price, the budget check, and what was *verified* versus *provided by you*.
-5. On your explicit confirmation, which uses biometrics when the device supports them, the backend **creates the PayPal order**.
-6. You **approve on PayPal** (sandbox buyer account).
-7. Back in SIKA, the backend **verifies with PayPal that the order is APPROVED**. You then tap **"Pay now"**, and it **captures** the payment.
+5. You confirm (biometrics when the device supports them), **or** SIKA confirms for you if you granted it an authorization (see *Hybrid control* below). Either way, the backend **creates the PayPal order**.
+6. You **approve on PayPal** (sandbox buyer account). This is always your decision.
+7. The backend **verifies with PayPal that the order is APPROVED**, then **captures** the payment right away, as in the standard PayPal flow. It does this on your return to the app, through the PayPal webhook, or when the app checks the status.
 8. SIKA shows and explains the **real capture status returned by PayPal**: order ID, capture ID and captured amount.
 
 "Order created", "approved" and "captured" are always shown as **distinct states**.
+
+### Hybrid control
+
+By default you confirm every purchase yourself. In **Profile → SIKA authorization** you can let SIKA confirm purchases for you, within limits you choose:
+
+- a maximum per purchase,
+- a maximum per day,
+- a duration (24 hours, 7 days or 30 days).
+
+You can withdraw it at any time. The agent's confirmation tool is **not even shown to the model** without an active authorization, and the **server** enforces the limits, not the AI. PayPal approval by the payer is still required, and no tool can capture a payment.
 
 ---
 
@@ -43,11 +53,12 @@ SIKA Pay is an **agentic checkout assistant** built on PayPal Orders v2:
 | Find real products, never invented | `search_demo_catalog` tool (READ_ONLY) |
 | Ask when ambiguous | System policy + tests: several matches → it asks which one |
 | Prepare, never pay | `prepare_paypal_checkout` tool (CONFIRMATION_REQUIRED): no PayPal call, no charge |
+| Confirm only when you allowed it | `confirm_checkout_with_authorization` tool, shown to the model only under an active user authorization; per-purchase, daily and expiry limits checked server-side |
 | Explain over-budget refusals and offer alternatives | Backend returns `OVER_BUDGET` + alternatives; Gemini explains them |
 | Report the real outcome | `get_paypal_checkout_status` re-checks PayPal (read-only) |
 | Separate facts from assumptions | Every checkout carries `provenance.verified / user_provided / assumptions` |
 
-**What the AI cannot do, by design:** create a PayPal order, capture a payment, pass an amount, or act as another user. These operations are not tools. They exist only as authenticated user actions, and the server always injects `user_id`. A bounded ReAct loop (5 steps) and an allow-list reject any other tool call.
+**What the AI cannot do, by design:** capture a payment, pass an amount, act as another user, or confirm a purchase you did not authorize. Capture is not a tool: it only follows the payer's approval, verified with PayPal. The server always injects `user_id`. A bounded ReAct loop (5 steps) and an allow-list reject any other tool call.
 
 If Gemini is unavailable, a **deterministic fallback** still handles purchase requests. It is labelled `SIKA_LOCAL_FALLBACK`, never claims to be AI, and never simulates a PayPal result.
 
@@ -58,12 +69,21 @@ If Gemini is unavailable, a **deterministic fallback** still handles purchase re
 | Step | PayPal API | Safety |
 |---|---|---|
 | Auth | `POST /v1/oauth2/token` (client_credentials) | Token cached server-side, never logged |
-| Create order | `POST /v2/checkout/orders` (`intent=CAPTURE`, items + breakdown, `NO_SHIPPING`, `user_action=CONTINUE`) | Only after user confirmation bound to a SHA-256 `details_hash`; stable `PayPal-Request-Id` |
+| Log in with PayPal | `/connect` (OpenID Connect) → `POST /v1/oauth2/token` (authorization_code) → `GET /v1/identity/oauth2/userinfo` | Signed `state`, code exchanged server-side, account linked by payer ID, verified PayPal account = verified identity |
+| Create order | `POST /v2/checkout/orders` (`intent=CAPTURE`, items + breakdown, `NO_SHIPPING`, `user_action=PAY_NOW`) | Only after user confirmation bound to a SHA-256 `details_hash`; stable `PayPal-Request-Id` |
 | Verify approval | `GET /v2/checkout/orders/{id}` | Capture refused unless PayPal says `APPROVED` and the amount matches |
 | Capture | `POST /v2/checkout/orders/{id}/capture` | Stable `PayPal-Request-Id` → a retry can never double-charge |
 | Result | `purchase_units[].payments.captures[]` | `COMPLETED` only if captured amount and currency equal the confirmed ones |
+| Webhooks | `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED / PENDING / DENIED / DECLINED / REFUNDED / REVERSED` | Signature checked with `POST /v1/notifications/verify-webhook-signature`, each event processed once, state always re-read with `GET` order |
 
-Handled outcomes include `PAYER_ACTION_REQUIRED`, `ORDER_NOT_APPROVED`, `INSTRUMENT_DECLINED` (back to PayPal), `ORDER_ALREADY_CAPTURED`, `DECLINED`, `PENDING`, expired or unknown orders (404), payer cancellation, timeouts (`UNKNOWN_RESULT`, never a fake success) and amount mismatches.
+Errors follow PayPal's [payment-failure guide](https://developer.paypal.com/api/handle-payment-failures):
+
+- **Back to PayPal to choose another funding source:** `INSTRUMENT_DECLINED`, `REDIRECT_PAYER_FOR_ALTERNATE_FUNDING`, `PAYER_ACTION_REQUIRED`, `ORDER_NOT_APPROVED`.
+- **Declined with a specific message:** `PAYER_CANNOT_PAY`, `TRANSACTION_REFUSED`, `MAX_NUMBER_OF_PAYMENT_ATTEMPTS_EXCEEDED`, `CANNOT_PAY_SELF`, `CURRENCY_NOT_SUPPORTED` and similar.
+- **Expired:** an order PayPal no longer knows (404, `INVALID_RESOURCE_ID`).
+- **Never a second capture:** `ORDER_ALREADY_CAPTURED`.
+- **`UNKNOWN_RESULT`, never a fake success:** timeouts.
+- **Also handled:** pending captures, refunds and payer cancellation.
 
 ```
 AWAITING_USER_CONFIRMATION → CREATING_ORDER → AWAITING_PAYPAL_APPROVAL → APPROVED → CAPTURING → COMPLETED
@@ -85,8 +105,9 @@ flowchart LR
   AG -->|allow-listed tools| TR[Tool registry]
   TR --> CAT[Demo catalog]
   TR --> CS[PayPalCheckoutService<br/>state machine + audit]
-  APP -->|confirm / capture / cancel| CS
-  CS --> PP[PayPal REST API<br/>Orders v2 · SANDBOX]
+  APP -->|confirm / cancel / authorization| CS
+  CS --> PP[PayPal REST API<br/>Orders v2 · Identity · Webhooks<br/>SANDBOX]
+  PP -->|signed webhooks| API
   CS --> DB[(SQLite / PostgreSQL)]
 ```
 
@@ -100,7 +121,9 @@ flowchart LR
 Key files:
 
 - `backend/app/services/wallet_integrations/paypal_api_service.py`: PayPal REST client
-- `backend/app/services/paypal_checkout_service.py`: state machine, validation, idempotency, audit
+- `backend/app/services/paypal_checkout_service.py`: state machine, validation, idempotency, auto-capture, webhooks, audit
+- `backend/app/services/agent_mandate_service.py`: hybrid control (user authorization limits)
+- `backend/app/services/paypal_identity_service.py`: Log in with PayPal
 - `backend/app/routes/paypal_router.py`: `/api/v1/paypal/*`
 - `backend/app/agent/tools/commerce_tools.py`: agent tools with strict schemas
 - `backend/app/services/sika_ai.py`: Gemini agent loop and deterministic fallback
@@ -142,7 +165,9 @@ flutter run --dart-define=SIKA_API_URL=http://<your-LAN-IP>:8001   # physical ph
 # emulator: --dart-define=SIKA_API_URL=http://10.0.2.2:8001
 ```
 
-Create an account in the app, open **Assistant**, and ask: *"Help me buy an Excel course without going over 50 dollars."*
+Sign in (e-mail, Google or **PayPal**), open **Assistant**, and ask: *"Help me buy an Excel course without going over 50 dollars."* The app is in English by default; French is available in the settings.
+
+Optional, for asynchronous updates: register the webhook once with `cd backend && python scripts/paypal_register_webhook.py https://<public-backend-url>` (see the setup guide).
 
 ### 4. Real sandbox end-to-end check without the app
 
@@ -157,21 +182,26 @@ The script creates a real sandbox order and prints the approval link. Approve it
 ## Tests
 
 ```bash
-cd backend && source venv/bin/activate && pytest -q      # 131 tests, no network, ~15 s
-cd mobile && flutter analyze && flutter test               # 0 issues, 12 tests
+cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q   # 166 tests, no network to PayPal
+cd mobile && flutter analyze && flutter test                                     # 0 issues, 23 tests
 ```
 
-The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `test_paypal_agent.py`) cover server-side pricing, budget refusal, confirmation binding and tampering, cross-user isolation, idempotent creation and capture, no capture before approval, network failure → `UNKNOWN_RESULT`, declines, pending captures, amount mismatches, the sandbox-only configuration, the tool allow-list, rejection of model-supplied amounts and `user_id` spoofing, and the bounded agent loop. Unit tests use a test double of the PayPal API and never call the network. The real sandbox flow is exercised by `scripts/paypal_sandbox_e2e.py`. It **passed on 2026-10-24**: order created, buyer approval, `APPROVED` verified, capture `COMPLETED` 49.00 USD, and a second capture refused.
+CI (GitHub Actions) runs both suites on every pull request. A failing backend test blocks the Cloud Run deployment.
+
+The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `test_paypal_agent.py`) cover server-side pricing, budget refusal, confirmation binding and tampering, cross-user isolation, idempotent creation and capture, no capture before approval, network failure → `UNKNOWN_RESULT`, declines, pending captures, amount mismatches, the sandbox-only configuration, the tool allow-list, rejection of model-supplied amounts and `user_id` spoofing, the bounded agent loop, the hybrid authorization limits, webhook signature checks and deduplication, and the PayPal error mapping. Unit tests use a test double of the PayPal API and never call the network. The real sandbox flow is exercised by `scripts/paypal_sandbox_e2e.py`. It **passed on 2026-10-24**: order created, buyer approval, `APPROVED` verified, capture `COMPLETED` 49.00 USD, and a second capture refused. On 2026-10-27, Log in with PayPal and an in-app purchase also passed against the deployed backend: order `5VN16317FJ728053P`, capture `COMPLETED` 49.00 USD, checked independently with PayPal.
 
 ## API
 
 | Method | Endpoint | Auth |
 |---|---|---|
 | GET | `/api/v1/paypal/status` | – |
+| GET / POST | `/api/v1/sika/auth/paypal/start` · `/api/v1/sika/auth/paypal` (Log in with PayPal) | – |
 | POST | `/api/v1/sika/chat` | JWT |
 | POST | `/api/v1/paypal/checkouts` (prepare: sku, quantity, budget) | JWT |
 | GET | `/api/v1/paypal/checkouts` · `/{id}?sync=true` | JWT |
 | POST | `/api/v1/paypal/checkouts/{id}/confirm` · `/capture` · `/cancel` | JWT |
+| GET / PUT / DELETE | `/api/v1/paypal/agent-authorization` (hybrid control) | JWT |
+| POST | `/api/v1/paypal/webhook` (PayPal, signature-verified) | PayPal signature |
 | GET | `/api/v1/paypal/return` · `/cancel` (PayPal redirects, server-verified) | – |
 
 ## Known limitations
@@ -179,16 +209,28 @@ The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `tes
 - **Demo merchant.** The catalog (`SIKA Demo Store`) is fictional demo data with digital goods only. The PayPal calls are real sandbox calls.
 - **No PayPal balance.** Orders v2 does not expose a buyer balance, so SIKA shows the connection status instead of inventing one.
 - **Single currency (USD).** SIKA never converts currencies; a budget in another currency triggers a clarification.
-- Approval happens in the external browser. The app re-checks the status when you come back, through the app lifecycle or the "I've approved — check" button.
+- Approval happens in the external browser. Capture then happens server-side, when you return to the app or through the webhook.
+- Accounts created with PayPal or Google have no SIKA password: sign in again with the same button.
 - Running the AI requires a Gemini API key or Google Cloud ADC. Without it, the deterministic fallback is used and labelled as such.
 
 ## Project history
 
-SIKA started at the Google "All Things Agentic" hackathon (August 2026) as a Mobile Money assistant. For this hackathon, the payment layer was rebuilt around PayPal. See [docs/HACKATHON_PROGRESS.md](docs/HACKATHON_PROGRESS.md) for what existed before and what was built during the submission period.
+SIKA started at the Google "All Things Agentic" hackathon (August 2026) as a Mobile Money assistant for West African users. It had a voice and chat assistant, a Gemini agent and a FastAPI backend.
+
+**Built during the PayPal AI Hackathon submission period (from October 1, 2026):**
+
+- The whole payment layer was replaced by PayPal Orders v2 (sandbox), and the Mobile Money integration was removed.
+- An agentic commerce flow with server-side pricing and budget checks, plus hybrid control (user-granted authorization).
+- Auto-capture after PayPal approval, signed PayPal webhooks, and PayPal error handling.
+- Log in with PayPal, with verified identity.
+- A new mobile experience in English and French.
+- Security fixes and CI.
+
+See [CHANGELOG.md](CHANGELOG.md) for the details.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md), which includes a legacy credential exposure the owner must revoke.
+See [SECURITY.md](SECURITY.md).
 
 ## License
 
