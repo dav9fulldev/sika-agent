@@ -25,6 +25,7 @@ from ..services.auth_service import oauth2_auth_service
 from ..services.security_rate_limiter import security_rate_limiter
 from ..services.paypal_checkout_service import paypal_checkout_service, CheckoutError
 from ..services.agent_mandate_service import agent_mandate_service, MandateError
+from ..services.paypal_subscription_service import paypal_subscription_service, SubscriptionError
 from ..services.wallet_integrations.paypal_api_service import paypal_api_service, PayPalAPIError, PayPalNetworkError
 from ..database import engine
 from ..models.paypal_webhook_event import PayPalWebhookEventModel
@@ -167,6 +168,68 @@ def web_product_offers(product_id: str, authorization: Optional[str] = Header(No
     except WebShoppingError as e:
         status = 404 if e.code == "INVALID_PRODUCT" else 503
         raise HTTPException(status_code=status, detail={"success": False, "error_code": e.code, "message": e.message})
+
+
+# ----------------------------------------------------------------------
+# Abonnements PayPal (toujours confirmés par l'utilisateur, puis approuvés sur PayPal)
+# ----------------------------------------------------------------------
+
+_SUB_REF = re.compile(r"^sub_[a-f0-9]{24}$")
+
+
+def _sub_ref(value: str) -> str:
+    if not _SUB_REF.match(value or ""):
+        raise HTTPException(status_code=404, detail={"success": False, "error_code": "NOT_FOUND", "message": "Subscription not found."})
+    return value
+
+
+def _sub_call(fn, *args):
+    try:
+        return fn(*args)
+    except SubscriptionError as e:
+        raise HTTPException(status_code=e.http_status, detail=e.to_dict())
+
+
+@router.get("/subscriptions", summary="My PayPal subscriptions")
+def list_subscriptions(sync: bool = False, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return {"subscriptions": paypal_subscription_service.list(user_id, sync=sync)}
+
+
+@router.get("/subscriptions/{ref}", summary="Subscription status (re-checked with PayPal)")
+def get_subscription(ref: str, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return _sub_call(paypal_subscription_service.sync, user_id, _sub_ref(ref))
+
+
+@router.post("/subscriptions/{ref}/confirm", summary="Confirm and create the PayPal subscription")
+def confirm_subscription(ref: str, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    security_rate_limiter.check_confirm_rate_limit(str(user_id))
+    return _sub_call(paypal_subscription_service.confirm, user_id, _sub_ref(ref))
+
+
+@router.post("/subscriptions/{ref}/cancel", summary="Cancel a subscription")
+def cancel_subscription(ref: str, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return _sub_call(paypal_subscription_service.cancel, user_id, _sub_ref(ref))
+
+
+@router.get("/subscriptions-return", include_in_schema=False)
+def subscription_return(subscription_id: str = Query("", max_length=64)):
+    if not re.match(r"^I-[A-Z0-9]{6,60}$", subscription_id or ""):
+        return _page("Unknown subscription", "This PayPal return link is not valid.")
+    status = paypal_subscription_service.refresh_by_paypal_id(subscription_id)
+    if status in ("ACTIVE", "APPROVED"):
+        return _page("Subscription approved", "PayPal confirmed your subscription. Return to SIKA Pay to see it.")
+    if status is None:
+        return _page("Unknown subscription", "SIKA does not know this PayPal subscription.")
+    return _page("Back from PayPal", "Return to SIKA Pay: it will verify the subscription with PayPal.")
+
+
+@router.get("/subscriptions-cancel", include_in_schema=False)
+def subscription_cancel_page():
+    return _page("Subscription not started", "You left PayPal without approving. Nothing was charged.")
 
 
 # ----------------------------------------------------------------------

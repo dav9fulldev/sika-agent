@@ -27,6 +27,8 @@ class FakePayPalAPI:
         self.create_status = "PAYER_ACTION_REQUIRED"
         self._by_request_id: Dict[str, str] = {}
         self.webhook_signature_valid = True
+        self.subscriptions = {}
+        self.plan_overrides = {}
         self.webhooks = [{"id": "WH-TEST-0001", "url": "http://localhost:8001/api/v1/paypal/webhook"}]
 
     # API publique identique à PayPalAPIService
@@ -83,6 +85,52 @@ class FakePayPalAPI:
     def verify_webhook_signature(self, *, headers, event, webhook_id):
         self.calls.append(("verify_webhook", webhook_id))
         return self.webhook_signature_valid
+
+    # Abonnements (plans créés via MCP côté marchand ; parcours utilisateur en REST)
+    plan_overrides: Dict[str, Any] = {}
+    subscriptions: Dict[str, Dict[str, Any]] = {}
+
+    def list_plans(self, page=1):
+        from app.services.demo_subscriptions import SUBSCRIPTION_CATALOG, PLAN_TAG
+        self.calls.append(("list_plans", page))
+        return {"total_pages": 1, "plans": [{"id": f"P-{p['key'].upper().replace('-', '')}", "status": "ACTIVE",
+                                             "description": f"{PLAN_TAG}{p['key']} {p['description']}"} for p in SUBSCRIPTION_CATALOG]}
+
+    def get_plan(self, plan_id):
+        from app.services.demo_subscriptions import SUBSCRIPTION_CATALOG
+        self.calls.append(("get_plan", plan_id))
+        entry = next(p for p in SUBSCRIPTION_CATALOG if f"P-{p['key'].upper().replace('-', '')}" == plan_id)
+        price = self.plan_overrides.get(plan_id, entry["price"])
+        return {"id": plan_id, "status": "ACTIVE", "billing_cycles": [
+            {"tenure_type": "REGULAR", "pricing_scheme": {"fixed_price": {"currency_code": "USD", "value": price}}}]}
+
+    def create_subscription(self, *, plan_id, custom_id, request_id, brand_name, return_url, cancel_url):
+        self.calls.append(("create_subscription", request_id))
+        if request_id in self._by_request_id:
+            return self._sub_repr(self._by_request_id[request_id])
+        sid = f"I-SUB{next(_ids):07d}"
+        self.subscriptions[sid] = {"id": sid, "status": "APPROVAL_PENDING", "plan_id": plan_id}
+        self._by_request_id[request_id] = sid
+        return self._sub_repr(sid)
+
+    def get_subscription(self, sid):
+        self.calls.append(("get_subscription", sid))
+        return self._sub_repr(sid)
+
+    def cancel_subscription(self, sid, reason):
+        self.calls.append(("cancel_subscription", sid))
+        self.subscriptions[sid]["status"] = "CANCELLED"
+
+    def activate(self, sid):
+        self.subscriptions[sid]["status"] = "ACTIVE"
+
+    def _sub_repr(self, sid):
+        s = self.subscriptions[sid]
+        out = {"id": sid, "status": s["status"], "plan_id": s["plan_id"],
+               "billing_info": {"next_billing_time": "2026-11-27T10:00:00Z"} if s["status"] == "ACTIVE" else {}}
+        if s["status"] == "APPROVAL_PENDING":
+            out["links"] = [{"rel": "approve", "href": f"https://www.sandbox.paypal.com/webapps/billing/subscriptions?ba_token=BA-{sid}"}]
+        return out
 
     # Pilotage du test : simule un remboursement fait depuis le compte marchand
     def refund(self, order_id):

@@ -25,8 +25,14 @@ def main() -> int:
         return 2
     url = sys.argv[1].rstrip("/") + "/api/v1/paypal/webhook"
     existing = next((w for w in paypal_api_service.list_webhooks() if w.get("url") == url), None)
+    wanted = list(PayPalCheckoutService.WEBHOOK_EVENTS)
     if existing:
-        print(f"Webhook already registered: {existing['id']} -> {url}")
+        have = {t.get("name") for t in existing.get("event_types") or []}
+        if set(wanted) - have:
+            paypal_api_service.update_webhook_events(existing["id"], wanted)
+            print(f"Webhook {existing['id']} updated with {len(wanted)} event types (added: {', '.join(sorted(set(wanted) - have))})")
+        else:
+            print(f"Webhook already registered: {existing['id']} -> {url}")
         return 0
     try:
         created = paypal_api_service.create_webhook(url, list(PayPalCheckoutService.WEBHOOK_EVENTS))

@@ -69,6 +69,23 @@ WATCH_SCHEMA = {
     "required": ["product_id"],
 }
 
+SUB_SEARCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string", "description": "Kind of service, e.g. 'video streaming', 'music', 'cloud storage', 'fitness'."},
+        "max_monthly_price": {"type": "number", "description": "Monthly budget ceiling in USD stated by the user. Omit if none."},
+    },
+    "required": ["query"],
+}
+
+SUB_PREPARE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "plan_key": {"type": "string", "description": "Exact plan key returned by search_subscription_plans. Never invent one."},
+    },
+    "required": ["plan_key"],
+}
+
 AGENT_CONFIRM_SCHEMA = {
     "type": "object",
     "properties": {
@@ -191,6 +208,48 @@ def list_price_watches(user_id: Optional[str] = None) -> ToolResult:
                           data={}, error_message="An authenticated user is required.")
     return ToolResult(success=True, tool_name="list_price_watches", risk_level=RiskLevel.READ_ONLY,
                       data={"watches": price_watch_service.list(uid)})
+
+
+def search_subscription_plans(query: str, max_monthly_price: Optional[float] = None) -> ToolResult:
+    """Plans d'abonnement du SIKA Demo Store (prix mensuels du catalogue serveur, revérifiés avec PayPal à la préparation)."""
+    from ...services import demo_subscriptions
+    price = None
+    if max_monthly_price is not None:
+        try:
+            price = Decimal(str(max_monthly_price))
+        except (InvalidOperation, ValueError):
+            price = None
+    plans = demo_subscriptions.search_plans(query or "", price)
+    return ToolResult(success=True, tool_name="search_subscription_plans", risk_level=RiskLevel.READ_ONLY,
+                      data={"merchant": "SIKA Demo Store (sandbox)", "currency": "USD", "interval": "month",
+                            "plans": [{k: p[k] for k in ("key", "name", "category", "description", "price")} for p in plans]})
+
+
+def prepare_subscription(plan_key: str, user_id: Optional[str] = None) -> ToolResult:
+    """Prépare un abonnement PayPal SANS le créer : l'utilisateur confirme dans l'app puis approuve sur PayPal."""
+    from ...services.paypal_subscription_service import paypal_subscription_service, SubscriptionError
+    uid = _uid(user_id)
+    if uid is None:
+        return ToolResult(success=False, tool_name="prepare_subscription", risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                          data={}, error_message="An authenticated user is required.")
+    try:
+        sub = paypal_subscription_service.prepare(uid, plan_key)
+    except SubscriptionError as e:
+        return ToolResult(success=False, tool_name="prepare_subscription", risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                          data={"error_code": e.code}, error_message=e.message)
+    return ToolResult(success=True, tool_name="prepare_subscription", risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                      requires_confirmation=True, data={"action_id": sub["subscription_ref"], "subscription": sub})
+
+
+def list_my_subscriptions(user_id: Optional[str] = None) -> ToolResult:
+    """Abonnements PayPal de l'utilisateur, statuts revérifiés auprès de PayPal. Résiliation : dans l'app uniquement."""
+    from ...services.paypal_subscription_service import paypal_subscription_service
+    uid = _uid(user_id)
+    if uid is None:
+        return ToolResult(success=False, tool_name="list_my_subscriptions", risk_level=RiskLevel.READ_ONLY,
+                          data={}, error_message="An authenticated user is required.")
+    return ToolResult(success=True, tool_name="list_my_subscriptions", risk_level=RiskLevel.READ_ONLY,
+                      data={"subscriptions": paypal_subscription_service.list(uid, sync=True)})
 
 
 def get_paypal_checkout_status(checkout_id: str, user_id: Optional[str] = None) -> ToolResult:

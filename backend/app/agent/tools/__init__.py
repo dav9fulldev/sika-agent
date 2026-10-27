@@ -7,6 +7,7 @@ from .financial_tools import get_user_habits, update_user_habit, create_backup_s
 from .commerce_tools import (
     search_demo_catalog, prepare_paypal_checkout, get_paypal_checkout_status, list_recent_paypal_checkouts,
     confirm_checkout_with_authorization, search_web_products, watch_web_product_price, list_price_watches,
+    search_subscription_plans, prepare_subscription, list_my_subscriptions, SUB_SEARCH_SCHEMA, SUB_PREPARE_SCHEMA,
     SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA, AGENT_CONFIRM_SCHEMA, WEB_SEARCH_SCHEMA, WATCH_SCHEMA,
 )
 
@@ -58,6 +59,33 @@ def register_all_sika_tools(registry):
         func=list_price_watches,
         name="list_price_watches",
         description="List the user's price alerts on web products and which ones were triggered.",
+        risk_level=RiskLevel.READ_ONLY,
+        input_schema={"type": "object", "properties": {}},
+    )
+
+    register(
+        func=search_subscription_plans,
+        name="search_subscription_plans",
+        description="Search monthly subscription plans of the SIKA Demo Store (fictional services: video and music streaming, "
+                    "cloud storage, fitness). Returns plan keys and server-side monthly prices in USD.",
+        risk_level=RiskLevel.READ_ONLY,
+        input_schema=SUB_SEARCH_SCHEMA,
+    )
+
+    register(
+        func=prepare_subscription,
+        name="prepare_subscription",
+        description="Prepare a PayPal subscription to one plan WITHOUT creating it. The backend re-checks the price with PayPal. "
+                    "The user must confirm in the app, then approve on PayPal. Recurring payments are never confirmed by the agent.",
+        risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+        input_schema=SUB_PREPARE_SCHEMA,
+    )
+
+    register(
+        func=list_my_subscriptions,
+        name="list_my_subscriptions",
+        description="List the user's PayPal subscriptions with their status re-checked with PayPal (active, cancelled...). "
+                    "Cancelling is done by the user in the app, from the cards shown.",
         risk_level=RiskLevel.READ_ONLY,
         input_schema={"type": "object", "properties": {}},
     )
@@ -136,5 +164,8 @@ __all__ = [
     "search_web_products",
     "watch_web_product_price",
     "list_price_watches",
+    "search_subscription_plans",
+    "prepare_subscription",
+    "list_my_subscriptions",
     "AUTHORIZATION_ONLY_TOOLS",
 ]

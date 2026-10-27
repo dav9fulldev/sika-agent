@@ -39,6 +39,15 @@ SIKA Pay is an **agentic checkout assistant** built on PayPal Orders v2:
 - **The web (compare, then buy on the merchant's site):** SIKA searches real products at real online merchants through **[Channel3](https://trychannel3.com)**. It compares their offers (price, stock, new or used), checks your budget, and shows the best one. Opening the offer takes you to the merchant's page, where you pay there, with PayPal if the merchant offers it. SIKA never claims it paid on those sites: no API lets an agent check out at an arbitrary third-party merchant, and PayPal's agentic checkout for third-party merchants is not open in sandbox.
 - **Price alerts:** *"Tell me when these headphones drop below $50."* SIKA subscribes the product with Channel3. Channel3 sends signed webhooks when an offer's price or stock changes (Svix, Standard Webhooks signature checked, each event processed once). The alert shows in the app, and nothing is bought automatically.
 
+### Subscriptions (PayPal Subscriptions + the PayPal MCP server)
+
+*"Subscribe me to the cheapest video streaming plan under $10 a month."* SIKA compares the plans of the SIKA Demo Store, which are fictional services (video and music streaming, cloud storage, fitness). It prepares the chosen plan after re-checking its price with PayPal.
+
+- **You subscribe yourself.** The subscription is never confirmed by the agent: you confirm it in the app, then approve it on PayPal.
+- **The status comes from PayPal.** It is updated on your return from PayPal and through `BILLING.SUBSCRIPTION.*` webhooks.
+- **You can cancel at any time** from **My subscriptions** (Home → More, or Profile).
+- **How PayPal is used:** the merchant-side products and plans are created through **PayPal's official MCP server** (`scripts/paypal_seed_subscription_plans.py`). The user flow (create, check, cancel) uses the Subscriptions REST API directly, which is faster and more reliable for a person waiting in the app.
+
 ### Hybrid control
 
 By default you confirm every purchase yourself. In **Profile → SIKA authorization** you can let SIKA confirm purchases for you, within limits you choose:
@@ -190,8 +199,8 @@ The script creates a real sandbox order and prints the approval link. Approve it
 ## Tests
 
 ```bash
-cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q   # 179 tests, no network to PayPal
-cd mobile && flutter analyze && flutter test                                     # 0 issues, 23 tests
+cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q   # 186 tests, no network to PayPal
+cd mobile && flutter analyze && flutter test                                     # 0 issues, 26 tests
 ```
 
 CI (GitHub Actions) runs both suites on every pull request. A failing backend test blocks the Cloud Run deployment.
@@ -209,6 +218,7 @@ The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `tes
 | GET | `/api/v1/paypal/checkouts` · `/{id}?sync=true` | JWT |
 | POST | `/api/v1/paypal/checkouts/{id}/confirm` · `/capture` · `/cancel` | JWT |
 | GET / PUT / DELETE | `/api/v1/paypal/agent-authorization` (hybrid control) | JWT |
+| GET / POST | `/api/v1/paypal/subscriptions` · `/{ref}` · `/{ref}/confirm` · `/{ref}/cancel` | JWT |
 | POST | `/api/v1/paypal/webhook` (PayPal, signature-verified) | PayPal signature |
 | GET / POST / DELETE | `/api/v1/shopping/price-watches` (price alerts on web products) | JWT |
 | POST | `/api/v1/shopping/channel3/webhook` (Channel3, signature-verified) | Svix signature |
