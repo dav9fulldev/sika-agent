@@ -791,6 +791,12 @@ class PayPalCheckoutService:
         "PAYMENT.CAPTURE.DECLINED",
         "PAYMENT.CAPTURE.REFUNDED",
         "PAYMENT.CAPTURE.REVERSED",
+        "BILLING.SUBSCRIPTION.ACTIVATED",
+        "BILLING.SUBSCRIPTION.CANCELLED",
+        "BILLING.SUBSCRIPTION.SUSPENDED",
+        "BILLING.SUBSCRIPTION.EXPIRED",
+        "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+        "PAYMENT.SALE.COMPLETED",
     )
 
     def handle_webhook_event(self, event: Dict[str, Any]) -> str:
@@ -798,6 +804,13 @@ class PayPalCheckoutService:
         l'état appliqué vient toujours d'un GET /v2/checkout/orders côté serveur."""
         event_type = str(event.get("event_type") or "")
         resource = event.get("resource") or {}
+        if event_type.startswith("BILLING.SUBSCRIPTION.") or event_type == "PAYMENT.SALE.COMPLETED":
+            from .paypal_subscription_service import paypal_subscription_service
+            sub_id = resource.get("billing_agreement_id") if event_type == "PAYMENT.SALE.COMPLETED" else resource.get("id")
+            if not sub_id:
+                return "NO_SUBSCRIPTION_ID"
+            status = paypal_subscription_service.refresh_by_paypal_id(str(sub_id))
+            return f"SUBSCRIPTION_{status}" if status else "UNKNOWN_SUBSCRIPTION"
         if event_type == "CHECKOUT.ORDER.APPROVED":
             order_id = resource.get("id")
         else:

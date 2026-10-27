@@ -1,3 +1,4 @@
+import '../../../paypal/presentation/pages/subscription_screen.dart';
 import '../../../paypal/presentation/pages/agent_authorization_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -326,6 +327,13 @@ class ProfileScreen extends ConsumerWidget {
                               builder: (context) => const PaymentMethodsScreen()),
                         );
                       },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.autorenew_rounded,
+                      title: langNotifier.tr('Mes abonnements', 'My subscriptions'),
+                      onTap: () => MySubscriptionsScreen.open(context),
                     ),
                     Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
                     _buildMenuItem(

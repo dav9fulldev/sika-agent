@@ -239,6 +239,10 @@ You can shop in two places:
 - PRICE ALERTS: if the user wants to be told when a web product gets cheaper or is back in stock, call
   `watch_web_product_price(product_id, target_price)` with a product_id from `search_web_products` (search first if needed).
   `list_price_watches` reports their alerts. Alerts never buy anything.
+- SUBSCRIPTIONS: the SIKA Demo Store sells fictional monthly plans paid with PayPal subscriptions. Use
+  `search_subscription_plans` (compare prices, respect the monthly budget), then `prepare_subscription(plan_key)` for the
+  chosen plan. You never subscribe the user yourself: they confirm in the app and approve on PayPal. To show or cancel
+  their subscriptions, call `list_my_subscriptions`: cancelling is done by the user from the cards shown.
 
 HOW YOU WORK:
 1. Understand what the user wants to buy, their budget and the quantity.
@@ -322,6 +326,33 @@ LANGUAGE: {lang_instruction}
             return text or fallback
         except Exception as e:
             logger.warning(f"[SIKA PAY] Explanation generation failed, deterministic summary used: {e}")
+            return fallback
+
+    async def _explain_prepared_subscription(self, messages: list, system_instruction: str, sub: Dict[str, Any],
+                                             is_english: bool) -> str:
+        fallback = (f"I prepared a monthly PayPal subscription to {sub.get('name')} at {sub.get('price')} {sub.get('currency')} "
+                    "per month, price verified with PayPal. Nothing is set up yet: tap \"Review subscription\" on the card to "
+                    "confirm, then approve it on PayPal." if is_english else
+                    f"J'ai préparé un abonnement PayPal mensuel à {sub.get('name')} pour {sub.get('price')} {sub.get('currency')} "
+                    "par mois, prix vérifié auprès de PayPal. Rien n'est encore souscrit : touchez « Voir l'abonnement » sur la "
+                    "carte pour confirmer, puis approuvez sur PayPal.")
+        if not self.client:
+            return fallback
+        from google.genai import types
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=self.model, contents=messages,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction + (
+                        "\nThe subscription is now prepared (not created). In 2-3 short sentences: plan name, monthly price "
+                        "verified with PayPal, and that nothing is set up until the user taps \"Review subscription\" on the card, "
+                        "confirms, then approves on PayPal. Plain text, no markdown. Do not call any tool."),
+                    temperature=0.2,
+                ),
+            )
+            return (response.text or "").strip() or fallback
+        except Exception as e:
+            logger.warning(f"[SIKA PAY] Subscription explanation failed, deterministic text used: {e}")
             return fallback
 
     def _chat_sika_pay_fallback(self, user_message: str, firstname: str, is_english: bool,
@@ -509,6 +540,9 @@ LANGUAGE: {lang_instruction}
             "search_web_products": "Comparing offers from online merchants" if is_english else "Comparaison des offres des marchands en ligne",
             "watch_web_product_price": "Setting up your price alert" if is_english else "Création de votre alerte de prix",
             "list_price_watches": "Reading your price alerts" if is_english else "Lecture de vos alertes de prix",
+            "search_subscription_plans": "Comparing subscription plans" if is_english else "Comparaison des abonnements",
+            "prepare_subscription": "Checking the plan with PayPal" if is_english else "Vérification du plan auprès de PayPal",
+            "list_my_subscriptions": "Checking your subscriptions with PayPal" if is_english else "Vérification de vos abonnements auprès de PayPal",
             "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
         }
         allowed_tool_names = set(tool_registry.agent_tool_names(excluded_tools))
@@ -589,6 +623,17 @@ LANGUAGE: {lang_instruction}
                             messages, system_instruction, action_data_detected["checkout"], is_english
                         )
                         break
+                elif call.name == "prepare_subscription" and res_dict.get("success"):
+                    data = res_dict.get("data", {})
+                    action_id = data.get("action_id")
+                    action_detected = call.name
+                    action_data_detected = {"type": "paypal_subscription", "action_id": action_id,
+                                            "subscription": data.get("subscription")}
+                elif call.name == "list_my_subscriptions" and res_dict.get("success") and not action_id:
+                    subs = res_dict.get("data", {}).get("subscriptions") or []
+                    if subs:
+                        action_detected = "subscriptions"
+                        action_data_detected = {"type": "subscriptions_list", "subscriptions": subs[:5]}
                 elif call.name == "search_web_products" and res_dict.get("success") and not action_id:
                     data = res_dict.get("data", {})
                     web_products = data.get("products", [])[:3]
@@ -604,6 +649,11 @@ LANGUAGE: {lang_instruction}
                                             "confirmed_by": "AGENT"}
                     agent_confirmed = True
 
+            if action_detected == "prepare_subscription":
+                # Abonnement préparé : la main revient à l'utilisateur (confirmation dans l'app)
+                final_response_text = await self._explain_prepared_subscription(
+                    messages, system_instruction, action_data_detected["subscription"], is_english)
+                break
             if action_id and (not authorized or agent_confirmed):
                 if agent_confirmed and not final_response_text:
                     final_response_text = await self._explain_prepared_checkout(
@@ -618,7 +668,8 @@ LANGUAGE: {lang_instruction}
                 else "Je n'ai pas pu terminer l'analyse."
             )
 
-        prepared = bool(action_detected == "prepare_paypal_checkout" and action_id) and not agent_confirmed
+        prepared = (bool(action_detected == "prepare_paypal_checkout" and action_id) and not agent_confirmed) \
+            or bool(action_detected == "prepare_subscription" and action_id)
         return {
             "response": final_response_text,
             "action": action_detected,

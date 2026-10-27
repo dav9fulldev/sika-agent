@@ -456,7 +456,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
           '[SIKA API] Action detected: $action | Action ID: $actionId | Requires Security: $requiresSecurity | shouldSpeak: $shouldSpeak');
 
       SikaState pendingNextState = SikaState.idle;
-      final bool isPayPalCheckout = actionData?['type'] == 'paypal_checkout';
+      // Achats et abonnements : la carte porte sa propre confirmation (écran dédié, biométrie)
+      final bool isPayPalCheckout = const ['paypal_checkout', 'paypal_subscription', 'subscriptions_list', 'web_offers']
+          .contains(actionData?['type']);
 
       if (isPayPalCheckout) {
         // SIKA Pay : la carte de checkout porte sa propre confirmation. La conversation reste

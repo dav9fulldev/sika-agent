@@ -186,3 +186,9 @@ final agentAuthorizationProvider = FutureProvider.autoDispose<Map<String, dynami
 final priceWatchesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   return ref.watch(apiServiceProvider).listPriceWatches();
 });
+
+/// Abonnements PayPal de l'utilisateur (statuts revérifiés auprès de PayPal).
+final subscriptionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final res = await ref.watch(apiServiceProvider).listSubscriptions(sync: true);
+  return (res['subscriptions'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+});

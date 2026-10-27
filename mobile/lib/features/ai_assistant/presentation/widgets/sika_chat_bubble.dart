@@ -1,3 +1,4 @@
+import '../../../paypal/presentation/pages/subscription_screen.dart';
 import '../../../paypal/presentation/widgets/web_offers_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -122,6 +123,16 @@ class SikaChatBubble extends ConsumerWidget {
     // SIKA Pay : checkout PayPal préparé par l'agent (statuts réels suivis par le backend)
     if (data['type'] == 'paypal_checkout' && data['checkout'] is Map) {
       return PayPalCheckoutCard(initialCheckout: Map<String, dynamic>.from(data['checkout'] as Map));
+    }
+    // Abonnement PayPal préparé par l'agent (confirmation par l'utilisateur)
+    if (data['type'] == 'paypal_subscription' && data['subscription'] is Map) {
+      return SubscriptionCard(subscription: Map<String, dynamic>.from(data['subscription'] as Map));
+    }
+    if (data['type'] == 'subscriptions_list' && data['subscriptions'] is List) {
+      return Column(
+          children: (data['subscriptions'] as List)
+              .map((s) => SubscriptionCard(subscription: Map<String, dynamic>.from(s as Map)))
+              .toList());
     }
     // Recherche web : offres de vrais marchands (comparaison, paiement sur leur site)
     if (data['type'] == 'web_offers' && data['products'] is List) {

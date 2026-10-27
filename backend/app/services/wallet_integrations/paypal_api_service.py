@@ -209,11 +209,50 @@ class PayPalAPIService:
         return self._request("POST", f"/v2/checkout/orders/{order_id}/capture", json_body={}, request_id=request_id)
 
     # ------------------------------------------------------------------
+    # Abonnements (Subscriptions v1) — parcours utilisateur ; la création des plans passe par le serveur MCP PayPal
+    # ------------------------------------------------------------------
+
+    def list_plans(self, page: int = 1) -> Dict[str, Any]:
+        return self._request("GET", f"/v1/billing/plans?page_size=20&page={int(page)}&total_required=true")
+
+    def get_plan(self, plan_id: str) -> Dict[str, Any]:
+        _validate_billing_id(plan_id, "P-")
+        return self._request("GET", f"/v1/billing/plans/{plan_id}")
+
+    def create_subscription(self, *, plan_id: str, custom_id: str, request_id: str, brand_name: str,
+                            return_url: str, cancel_url: str) -> Dict[str, Any]:
+        _validate_billing_id(plan_id, "P-")
+        body = {
+            "plan_id": plan_id,
+            "custom_id": custom_id,
+            "application_context": {
+                "brand_name": brand_name[:127],
+                "shipping_preference": "NO_SHIPPING",
+                "user_action": "SUBSCRIBE_NOW",
+                "return_url": return_url,
+                "cancel_url": cancel_url,
+            },
+        }
+        return self._request("POST", "/v1/billing/subscriptions", json_body=body, request_id=request_id)
+
+    def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
+        _validate_billing_id(subscription_id, "I-")
+        return self._request("GET", f"/v1/billing/subscriptions/{subscription_id}")
+
+    def cancel_subscription(self, subscription_id: str, reason: str) -> None:
+        _validate_billing_id(subscription_id, "I-")
+        self._request("POST", f"/v1/billing/subscriptions/{subscription_id}/cancel", json_body={"reason": reason[:128]})
+
+    # ------------------------------------------------------------------
     # Webhooks (Notifications v1)
     # ------------------------------------------------------------------
 
     def list_webhooks(self) -> List[Dict[str, Any]]:
         return self._request("GET", "/v1/notifications/webhooks").get("webhooks") or []
+
+    def update_webhook_events(self, webhook_id: str, event_types: List[str]) -> Dict[str, Any]:
+        patch = [{"op": "replace", "path": "/event_types", "value": [{"name": n} for n in event_types]}]
+        return self._request("PATCH", f"/v1/notifications/webhooks/{webhook_id}", json_body=patch)
 
     def create_webhook(self, url: str, event_types: List[str]) -> Dict[str, Any]:
         body = {"url": url, "event_types": [{"name": n} for n in event_types]}
@@ -298,6 +337,14 @@ class PayPalAPIService:
 def _validate_order_id(order_id: str):
     if not order_id or not ORDER_ID_PATTERN.match(str(order_id)):
         raise ValueError("Identifiant de commande PayPal invalide.")
+
+
+BILLING_ID_PATTERN = re.compile(r"^[A-Z0-9-]{6,64}$")
+
+
+def _validate_billing_id(value: str, prefix: str):
+    if not value or not str(value).startswith(prefix) or not BILLING_ID_PATTERN.match(str(value)):
+        raise ValueError("Identifiant d'abonnement PayPal invalide.")
 
 
 def _safe_json(resp) -> Dict[str, Any]:

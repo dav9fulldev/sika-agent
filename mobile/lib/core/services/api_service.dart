@@ -403,6 +403,34 @@ class ApiService {
     return _decodePayPal(response);
   }
 
+  // Abonnements PayPal (toujours confirmés par l'utilisateur)
+  Future<Map<String, dynamic>> listSubscriptions({bool sync = false}) async {
+    final response = await http
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalSubscriptions}${sync ? '?sync=true' : ''}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> getSubscription(String ref) async {
+    final response =
+        await http.get(Uri.parse('$safeBaseUrl${ApiConstants.paypalSubscriptions}/$ref'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> confirmSubscription(String ref) async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.paypalSubscriptions}/$ref/confirm'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> cancelSubscription(String ref) async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.paypalSubscriptions}/$ref/cancel'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   // Alertes de prix (produits du web, Channel3)
   Future<Map<String, dynamic>> listPriceWatches() async {
     final response = await http.get(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}'), headers: _headers).timeout(AppConfig.agentTimeout);
