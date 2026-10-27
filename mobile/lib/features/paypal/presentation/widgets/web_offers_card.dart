@@ -150,7 +150,10 @@ class _ProductTile extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
                 icon: const Icon(Icons.notifications_active_outlined),
                 label: Text(lang.tr('Surveiller le prix', 'Watch price'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                onPressed: () => _watchPrice(context, product, best, lang),
+                onPressed: () {
+                  Navigator.pop(sheet); // la confirmation s'affiche ensuite au-dessus du chat, pas derrière la feuille
+                  _watchPrice(context, product, best, lang);
+                },
               ),
             ),
             const SizedBox(height: 10),

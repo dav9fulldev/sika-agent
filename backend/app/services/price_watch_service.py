@@ -212,10 +212,11 @@ class PriceWatchService:
     # Webhooks Channel3 (signature déjà vérifiée par la route)
     # ------------------------------------------------------------------
 
-    def handle_event(self, event: Dict[str, Any]) -> str:
-        event_id = str(event.get("id") or "")[:80]
+    def handle_event(self, event: Dict[str, Any], message_id: Optional[str] = None) -> str:
+        # L'ancien format « price.changed » (Price Tracking, obsolète) n'a pas d'id : on dédoublonne sur svix-id
+        event_id = str(event.get("id") or message_id or "")[:80]
         event_type = str(event.get("type") or "")[:40]
-        if not event_id or not event_type.startswith("offer."):
+        if not event_id or not (event_type.startswith("offer.") or event_type == "price.changed"):
             return "IGNORED"
         with Session(engine) as db:
             db.add(ShoppingWebhookEventModel(event_id=event_id, event_type=event_type))
@@ -230,7 +231,12 @@ class PriceWatchService:
         merchant = str(subject.get("domain") or "")[:120] or None
         price = availability = None
         condition = "new"
-        if event_type == "offer.price.changed":
+        if event_type == "price.changed":
+            # Format à plat : canonical_product_id, domain, old_price, new_price, currency, buy_url
+            product_id = str(event.get("canonical_product_id") or "")
+            merchant = str(event.get("domain") or "")[:120] or None
+            price = event.get("new_price")
+        elif event_type == "offer.price.changed":
             price = (data.get("current") or {}).get("price")
         elif event_type == "offer.availability.changed":
             availability = data.get("current")
