@@ -37,7 +37,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('loading screen tells the user what is happening', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SikaLoadingScreen()));
+    await tester.pumpWidget(_app(const SikaLoadingScreen()));
     expect(find.text('Chargement de votre assistant IA…'), findsOneWidget);
   });
 

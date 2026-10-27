@@ -70,7 +70,7 @@ If Gemini is unavailable, a **deterministic fallback** still handles purchase re
 |---|---|---|
 | Auth | `POST /v1/oauth2/token` (client_credentials) | Token cached server-side, never logged |
 | Log in with PayPal | `/connect` (OpenID Connect) → `POST /v1/oauth2/token` (authorization_code) → `GET /v1/identity/oauth2/userinfo` | Signed `state`, code exchanged server-side, account linked by payer ID, verified PayPal account = verified identity |
-| Create order | `POST /v2/checkout/orders` (`intent=CAPTURE`, items + breakdown, `NO_SHIPPING`, `user_action=CONTINUE`) | Only after user confirmation bound to a SHA-256 `details_hash`; stable `PayPal-Request-Id` |
+| Create order | `POST /v2/checkout/orders` (`intent=CAPTURE`, items + breakdown, `NO_SHIPPING`, `user_action=PAY_NOW`) | Only after user confirmation bound to a SHA-256 `details_hash`; stable `PayPal-Request-Id` |
 | Verify approval | `GET /v2/checkout/orders/{id}` | Capture refused unless PayPal says `APPROVED` and the amount matches |
 | Capture | `POST /v2/checkout/orders/{id}/capture` | Stable `PayPal-Request-Id` → a retry can never double-charge |
 | Result | `purchase_units[].payments.captures[]` | `COMPLETED` only if captured amount and currency equal the confirmed ones |

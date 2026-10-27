@@ -72,7 +72,7 @@ def test_create_order_sends_official_body_and_idempotency_header():
     assert body["purchase_units"][0]["amount"] == {"currency_code": "USD", "value": "49.00",
                                                    "breakdown": {"item_total": {"currency_code": "USD", "value": "49.00"}}}
     ctx = body["payment_source"]["paypal"]["experience_context"]
-    assert ctx["shipping_preference"] == "NO_SHIPPING" and ctx["user_action"] == "CONTINUE"
+    assert ctx["shipping_preference"] == "NO_SHIPPING" and ctx["user_action"] == "PAY_NOW"
     assert ctx["return_url"].endswith("/api/v1/paypal/return") and ctx["cancel_url"].endswith("/api/v1/paypal/cancel")
 
 
