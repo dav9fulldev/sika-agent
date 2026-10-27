@@ -7,8 +7,11 @@ Séparation stricte des responsabilités :
 - get_paypal_checkout_status   READ_ONLY              revérifie le statut réel auprès de PayPal
 - list_recent_paypal_checkouts READ_ONLY              historique de l'utilisateur
 
-La création de commande PayPal et la capture ne sont PAS des tools : elles ne peuvent être
-déclenchées que par l'utilisateur via les endpoints /api/v1/paypal/checkouts/{id}/confirm|capture.
+- confirm_checkout_with_authorization CONFIRMATION_REQUIRED confirme un checkout préparé, UNIQUEMENT si
+  l'utilisateur a accordé une autorisation active (mode hybride) ; limites vérifiées par le serveur.
+  Ce tool n'est présenté au modèle que lorsque cette autorisation existe.
+
+La capture n'est PAS un tool : elle suit l'approbation du payeur sur PayPal, vérifiée côté serveur.
 Le modèle ne fournit jamais de montant : uniquement un SKU, une quantité et le budget exprimé
 par l'utilisateur. `user_id` est toujours injecté par le serveur.
 """
@@ -44,6 +47,14 @@ STATUS_SCHEMA = {
     "type": "object",
     "properties": {
         "checkout_id": {"type": "string", "description": "checkout_id returned by prepare_paypal_checkout (starts with chk_)."},
+    },
+    "required": ["checkout_id"],
+}
+
+AGENT_CONFIRM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "checkout_id": {"type": "string", "description": "checkout_id just returned by prepare_paypal_checkout (starts with chk_)."},
     },
     "required": ["checkout_id"],
 }
@@ -109,6 +120,22 @@ def prepare_paypal_checkout(sku: str, quantity: int = 1, budget_limit: Optional[
         requires_confirmation=True,
         data={"action_id": checkout["checkout_id"], "checkout": checkout},
     )
+
+
+def confirm_checkout_with_authorization(checkout_id: str, user_id: Optional[str] = None) -> ToolResult:
+    """Confirme un checkout préparé au nom de l'utilisateur, dans les limites de l'autorisation qu'il a accordée."""
+    uid = _uid(user_id)
+    name = "confirm_checkout_with_authorization"
+    if uid is None:
+        return ToolResult(success=False, tool_name=name, risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                          data={}, error_message="An authenticated user is required.")
+    try:
+        checkout = paypal_checkout_service.confirm_by_agent(uid, str(checkout_id))
+    except CheckoutError as e:
+        return ToolResult(success=False, tool_name=name, risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                          data={"error_code": e.code}, error_message=e.message)
+    return ToolResult(success=True, tool_name=name, risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+                      data={"action_id": checkout["checkout_id"], "checkout": checkout})
 
 
 def get_paypal_checkout_status(checkout_id: str, user_id: Optional[str] = None) -> ToolResult:

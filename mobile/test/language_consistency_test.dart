@@ -13,8 +13,12 @@ void main() {
   group('SIKA Language Consistency Unit & Widget Tests', () {
     test('LanguageNotifier translates correctly and updates state', () {
       final notifier = LanguageNotifier();
-      expect(notifier.state, AppLanguage.french);
-      expect(notifier.isEnglish, false);
+      // English by default (hackathon submission language); French is one tap away
+      expect(notifier.state, AppLanguage.english);
+      expect(notifier.isEnglish, true);
+      expect(notifier.tr('Bonjour', 'Hello'), 'Hello');
+
+      notifier.setLanguage(AppLanguage.french);
       expect(notifier.tr('Bonjour', 'Hello'), 'Bonjour');
 
       notifier.setLanguage(AppLanguage.english);

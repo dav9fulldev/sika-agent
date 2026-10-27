@@ -86,6 +86,20 @@ https://<cloud-run-url>/api/v1/sika/auth/paypal/return
 
 PayPal accepts only web return URLs. It rejects a custom scheme such as `sikapay://` with *"invalid client_id or redirect_uri"*. The return page above sends `code` and `state` back to the app via `sikapay://paypal/login`, and the app sends them to `POST /api/v1/sika/auth/paypal`, where the server exchanges the code. The code is never exchanged on the return page. Changes in the PayPal dashboard can take a few minutes to apply.
 
+## 3d. Webhooks
+
+Register the webhook once with the API (no dashboard form needed):
+
+```bash
+cd backend && python scripts/paypal_register_webhook.py https://<cloud-run-url>
+```
+
+It subscribes `<url>/api/v1/paypal/webhook` to `CHECKOUT.ORDER.APPROVED` and `PAYMENT.CAPTURE.COMPLETED|PENDING|DENIED|DECLINED|REFUNDED|REVERSED`. The backend finds the webhook ID by its URL; you can also set `PAYPAL_WEBHOOK_ID`. Every event's signature is checked with `POST /v1/notifications/verify-webhook-signature` before anything else. The state applied always comes from a fresh `GET /v2/checkout/orders/{id}`.
+
+## 3e. Hybrid control (agent authorization)
+
+By default the user confirms each purchase in the app. In **Profile → SIKA authorization** (or **Home → More**), the user can let SIKA confirm purchases for them, with a maximum per purchase, a maximum per day and a duration. The backend checks these limits on every confirmation, and the user can withdraw the authorization at any time. In both modes the payer approves the order on PayPal, and SIKA captures it only after PayPal confirms that approval.
+
 ## 4. Safety guarantees
 
 - The backend refuses to start if `PAYPAL_ENV` is not `sandbox` or if `PAYPAL_API_BASE` is not a sandbox host.

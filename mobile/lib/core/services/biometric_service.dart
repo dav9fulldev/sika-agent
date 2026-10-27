@@ -9,11 +9,12 @@ final biometricServiceProvider = Provider<BiometricService>((ref) {
 class BiometricService {
   final LocalAuthentication _auth = LocalAuthentication();
 
+  /// Vrai seulement si une empreinte ou un visage est réellement enregistré :
+  /// un capteur sans donnée enregistrée fait échouer chaque authentification.
   Future<bool> isBiometricsAvailable() async {
     try {
-      final bool canAuthenticateWithBiometrics = await _auth.canCheckBiometrics;
-      final bool canAuthenticate = canAuthenticateWithBiometrics || await _auth.isDeviceSupported();
-      return canAuthenticate;
+      if (!await _auth.canCheckBiometrics) return false;
+      return (await _auth.getAvailableBiometrics()).isNotEmpty;
     } on PlatformException catch (_) {
       return false;
     }

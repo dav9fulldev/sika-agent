@@ -10,6 +10,7 @@ import '../../../profile/presentation/pages/kyc_verification_screen.dart';
 import '../../providers/paypal_checkout_provider.dart';
 import '../../../../core/widgets/sika_pay_brand.dart';
 import '../widgets/sika_pay_ui.dart';
+import 'agent_authorization_screen.dart';
 import 'paypal_checkout_screen.dart';
 
 /// Accueil SIKA Pay : accès direct à l'agent de paiement et au compte PayPal sandbox.
@@ -217,6 +218,8 @@ class SikaPayHomeScreen extends ConsumerWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             item(Icons.fact_check_rounded, lang.tr('Statut de mon dernier paiement', 'Status of my last payment'),
                 () => _ask(ref, lang.tr('Où en est mon dernier paiement ?', 'What is the status of my last payment?'))),
+            item(Icons.auto_awesome_rounded, lang.tr('Autoriser SIKA à confirmer mes achats', 'Let SIKA confirm my purchases'),
+                () => AgentAuthorizationScreen.open(context)),
             item(Icons.person_outline_rounded, lang.tr('Mon profil', 'My profile'), onOpenProfile),
             if (kycStatus == 'none')
               item(Icons.badge_outlined, lang.tr('Vérifier mon identité', 'Verify my identity'),

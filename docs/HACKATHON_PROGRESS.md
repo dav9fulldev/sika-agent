@@ -46,11 +46,13 @@ At the owner's request, the previous Mobile Money provider integration was remov
 
 | Check | Before (commit `e0fcaea`) | After |
 |---|---|---|
-| Backend tests | 2 failing; 1 file hung for more than 150 s | **131 passed** (incl. version consistency and Secret Manager config), repeated runs, 10–18 s, no network |
+| Backend tests | 2 failing; 1 file hung for more than 150 s | **144 passed** (incl. version consistency, Secret Manager config and Log in with PayPal), no network |
 | PayPal-specific tests | none | 66 (checkout state machine: 38, HTTP client and config: 10, agent: 18) |
 | `flutter analyze` | – | 0 issues |
-| `flutter test` | – | 12 passed |
+| `flutter test` | – | 20 passed |
 | Live Gemini check (Vertex AI) | – | prepares within budget, refuses over budget with alternatives, asks when ambiguous |
 | Real PayPal sandbox run | – | ✅ **passed on 2026-10-24** (`scripts/paypal_sandbox_e2e.py`): OAuth2 → order `9PJ70960RC924761S` created (`PAYER_ACTION_REQUIRED`) → approved by the sandbox buyer → verified `APPROVED` → capture `25J37924GR192080C` `COMPLETED` 49.00 USD → second capture refused (`already_completed`). Re-checked independently with `GET /v2/checkout/orders` |
 | Open-source license | none | MIT (`LICENSE`) |
-| Deployed backend (Cloud Run) | v1 | v2.0.0 live; PayPal `configured: false` until the sandbox secrets are added to Secret Manager |
+| Deployed backend (Cloud Run) | v1 | Revision `sika-backend-00119-q8l` live; sandbox secrets in Secret Manager; `/api/v1/paypal/status` → `configured: true` (2026-10-27) |
+| Real Log in with PayPal (sandbox) | – | ✅ **passed on 2026-10-27** on a Pixel 10 emulator against Cloud Run: `/auth/paypal/start` 200 → PayPal consent (name, email, country, verification status, payer ID) → return page 200 → `POST /auth/paypal` 200 → SIKA session opened, home shows "Bonjour John" and "Identité : Vérifiée par PayPal" |
+| Real in-app payment (sandbox, mobile → Cloud Run) | – | ✅ **passed on 2026-10-27**: agent proposed "Excel for Small Business" 49.00 USD within a 50 USD budget → summary → order `5VN16317FJ728053P` created → approved by the sandbox buyer → capture `36C64892CH755443D` `COMPLETED` 49.00 USD. Re-checked independently with `GET /v2/checkout/orders` |

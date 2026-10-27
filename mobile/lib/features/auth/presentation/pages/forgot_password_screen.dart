@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (kDebugMode && otp.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Code reçu (mode dev) : $otp'),
+            content: Text(langNotifier.tr('Code reçu (mode dev) : $otp', 'Code received (dev mode): $otp')),
             backgroundColor: AppColors.primary,
             duration: const Duration(seconds: 5),
           ),

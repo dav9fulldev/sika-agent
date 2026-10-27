@@ -207,7 +207,21 @@ class SikaAIService:
     # SIKA Pay — Agent de commerce PayPal (sandbox)
     # ==================================================================
 
-    def _sika_pay_instruction(self, firstname: str, lang_instruction: str) -> str:
+    @staticmethod
+    def _confirmation_rule(mandate: Optional[Dict[str, Any]]) -> str:
+        if not mandate or not mandate.get("active"):
+            return ("The user must review the confirmation card in the app, confirm, then approve on PayPal; the payment is "
+                    "captured after the PayPal approval. You cannot confirm, approve or capture a payment yourself.")
+        return (f"The user AUTHORIZED you to confirm purchases on their behalf: up to {mandate['max_per_purchase']} "
+                f"{mandate['currency']} per purchase and {mandate['daily_limit']} {mandate['currency']} per day "
+                f"({mandate['remaining_today']} left today), until {mandate['expires_at']}. When the user clearly asks you to BUY "
+                "(not just to find, compare or check a price), call `confirm_checkout_with_authorization(checkout_id)` right after "
+                "a successful `prepare_paypal_checkout`. The backend enforces the limits: if it refuses, explain why and tell the "
+                "user to confirm in the app. The user still approves the order on PayPal; you never approve or capture yourself. "
+                "Say clearly when you confirmed on their behalf.")
+
+    def _sika_pay_instruction(self, firstname: str, lang_instruction: str, mandate: Optional[Dict[str, Any]] = None) -> str:
+        confirmation_rule = self._confirmation_rule(mandate)
         return f"""
 You are SIKA Pay, a personal AI payment agent. You help {firstname} make informed, controlled purchases
 with PayPal (SANDBOX test environment — no real money moves).
@@ -225,8 +239,7 @@ HOW YOU WORK:
    - You never pass an amount: the backend computes the price and checks the budget.
    - If it fails (for example OVER_BUDGET), explain why and propose the alternatives it returned. Do not retry with another product
      unless the user asks.
-6. Preparing a checkout does NOT create a PayPal order and charges nothing. The user must review the confirmation card in the app,
-   confirm, approve on PayPal, then complete the payment. You cannot create, approve or capture a PayPal payment yourself.
+6. Preparing a checkout does NOT create a PayPal order and charges nothing. {confirmation_rule}
 7. To answer "did my payment go through?" call `get_paypal_checkout_status` or `list_recent_paypal_checkouts` and report ONLY the
    statuses they return. "Order created", "approved" and "captured/completed" are different states: never merge them.
 8. Separate clearly: what is verified (catalog price, backend total, PayPal statuses), what the user said (budget, quantity),
@@ -242,21 +255,30 @@ LANGUAGE: {lang_instruction}
         item = (checkout.get("item") or {}).get("name", "")
         total = f"{checkout.get('total_amount')} {checkout.get('currency')}"
         budget = checkout.get("budget") or {}
+        agent_confirmed = checkout.get("status") == "AWAITING_PAYPAL_APPROVAL"
         if is_english:
             budget_txt = (
                 f" It fits your budget of {budget.get('limit')} {budget.get('currency')} "
                 f"({budget.get('remaining_after_purchase')} left)." if budget.get("limit") else ""
             )
+            if agent_confirmed:
+                return (f"I confirmed {checkout.get('quantity')} × {item} ({total}) on your behalf, within the authorization you "
+                        f"gave me.{budget_txt} The PayPal sandbox order is created: nothing is charged until you approve it on "
+                        "PayPal with the button on the card.")
             return (f"I prepared a PayPal sandbox checkout for {checkout.get('quantity')} × {item}: {total}, price taken from the "
                     f"demo store catalog.{budget_txt} Nothing has been charged and no PayPal order exists yet. "
-                    "Review the card and tap Confirm to continue on PayPal.")
+                    "Tap \"Review summary\" on the card to confirm.")
         budget_txt = (
             f" C'est dans votre budget de {budget.get('limit')} {budget.get('currency')} "
             f"(reste {budget.get('remaining_after_purchase')})." if budget.get("limit") else ""
         )
+        if agent_confirmed:
+            return (f"J'ai confirmé pour vous {checkout.get('quantity')} × {item} ({total}), dans les limites de l'autorisation "
+                    f"que vous m'avez donnée.{budget_txt} La commande PayPal sandbox est créée : rien n'est débité tant que vous "
+                    "ne l'approuvez pas sur PayPal avec le bouton de la carte.")
         return (f"J'ai préparé un paiement PayPal sandbox pour {checkout.get('quantity')} × {item} : {total}, prix issu du "
                 f"catalogue de démonstration.{budget_txt} Rien n'a été débité et aucune commande PayPal n'existe encore. "
-                "Vérifiez la carte puis touchez Confirmer pour continuer sur PayPal.")
+                "Touchez « Voir le récapitulatif » sur la carte pour confirmer.")
 
     async def _explain_prepared_checkout(self, messages: list, system_instruction: str, checkout: Dict[str, Any],
                                          is_english: bool) -> str:
@@ -271,10 +293,15 @@ LANGUAGE: {lang_instruction}
                 contents=messages,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction + (
+                        "\nYou confirmed this purchase on the user's behalf under their authorization and the PayPal sandbox "
+                        "order now exists. Explain it in 2-4 short sentences: item, total and currency, the budget check, and "
+                        "that you confirmed it within their authorization. Say that nothing is charged until they approve "
+                        "the order on PayPal (button \"Approve on PayPal\" on the card). Do not call any tool."
+                        if checkout.get("status") == "AWAITING_PAYPAL_APPROVAL" else
                         "\nThe checkout is now prepared. Explain it in 2-4 short sentences: item, total and currency, "
                         "the budget check result. Mention which facts are verified and which come from the user. "
                         "Say clearly that nothing has been charged and no PayPal order exists yet, and that the user "
-                        "must review the card and tap Confirm. Do not call any tool."
+                        "must open the summary on the card (button \"Review summary\") and confirm there. Do not call any tool."
                     ),
                     temperature=0.2,
                 ),
@@ -428,9 +455,21 @@ LANGUAGE: {lang_instruction}
         from ..agent.tool_registry import tool_registry
         from google.genai import types
 
-        safe_tools = tool_registry.get_gemini_tools()
+        from ..agent.tools import AUTHORIZATION_ONLY_TOOLS
+        from .agent_mandate_service import agent_mandate_service
+
+        mandate = None
+        if user_id and str(user_id).isdigit():
+            try:
+                mandate = agent_mandate_service.get(int(user_id))
+            except Exception as e:  # base indisponible : on reste en mode « l'utilisateur confirme »
+                logger.warning(f"[SIKA AGENT] Authorization lookup failed: {type(e).__name__}")
+        authorized = bool(mandate and mandate.get("active"))
+        excluded_tools = None if authorized else set(AUTHORIZATION_ONLY_TOOLS)
+
+        safe_tools = tool_registry.get_gemini_tools(excluded_tools)
         lang_instruction = "Answer ONLY in English." if is_english else "Réponds UNIQUEMENT en français."
-        system_instruction = self._sika_pay_instruction(firstname, lang_instruction)
+        system_instruction = self._sika_pay_instruction(firstname, lang_instruction, mandate)
 
         messages = []
         for msg in conversation_history or []:
@@ -454,9 +493,11 @@ LANGUAGE: {lang_instruction}
             "prepare_paypal_checkout": "Checking budget & preparing PayPal checkout" if is_english else "Vérification du budget et préparation PayPal",
             "get_paypal_checkout_status": "Verifying the status with PayPal" if is_english else "Vérification du statut auprès de PayPal",
             "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
+            "confirm_checkout_with_authorization": "Confirming with your authorization" if is_english else "Confirmation avec votre autorisation",
             "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
         }
-        allowed_tool_names = set(tool_registry.agent_tool_names())
+        allowed_tool_names = set(tool_registry.agent_tool_names(excluded_tools))
+        agent_confirmed = False
         gen_config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=safe_tools,
@@ -522,18 +563,30 @@ LANGUAGE: {lang_instruction}
                     )
                 )
 
-                # Un checkout préparé rend la main à l'utilisateur : confirmation humaine obligatoire
                 if call.name == "prepare_paypal_checkout" and res_dict.get("success"):
                     data = res_dict.get("data", {})
                     action_id = data.get("action_id")
                     action_detected = call.name
                     action_data_detected = {"type": "paypal_checkout", "action_id": action_id, "checkout": data.get("checkout")}
+                    if not authorized:
+                        # Sans autorisation, un checkout préparé rend la main à l'utilisateur
+                        final_response_text = await self._explain_prepared_checkout(
+                            messages, system_instruction, action_data_detected["checkout"], is_english
+                        )
+                        break
+                elif call.name == "confirm_checkout_with_authorization" and res_dict.get("success"):
+                    data = res_dict.get("data", {})
+                    action_id = data.get("action_id")
+                    action_detected = "prepare_paypal_checkout"
+                    action_data_detected = {"type": "paypal_checkout", "action_id": action_id, "checkout": data.get("checkout"),
+                                            "confirmed_by": "AGENT"}
+                    agent_confirmed = True
+
+            if action_id and (not authorized or agent_confirmed):
+                if agent_confirmed and not final_response_text:
                     final_response_text = await self._explain_prepared_checkout(
                         messages, system_instruction, action_data_detected["checkout"], is_english
                     )
-                    break
-
-            if action_id:
                 break
 
         if not final_response_text:
@@ -543,7 +596,7 @@ LANGUAGE: {lang_instruction}
                 else "Je n'ai pas pu terminer l'analyse."
             )
 
-        prepared = bool(action_detected == "prepare_paypal_checkout" and action_id)
+        prepared = bool(action_detected == "prepare_paypal_checkout" and action_id) and not agent_confirmed
         return {
             "response": final_response_text,
             "action": action_detected,

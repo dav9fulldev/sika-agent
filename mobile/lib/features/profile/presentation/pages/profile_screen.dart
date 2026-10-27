@@ -1,3 +1,4 @@
+import '../../../paypal/presentation/pages/agent_authorization_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -325,6 +326,13 @@ class ProfileScreen extends ConsumerWidget {
                               builder: (context) => const PaymentMethodsScreen()),
                         );
                       },
+                    ),
+                    Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
+                    _buildMenuItem(
+                      context,
+                      icon: Icons.auto_awesome_outlined,
+                      title: langNotifier.tr('Autorisation de SIKA', 'SIKA authorization'),
+                      onTap: () => AgentAuthorizationScreen.open(context),
                     ),
                     Divider(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), height: 1),
                     _buildMenuItem(

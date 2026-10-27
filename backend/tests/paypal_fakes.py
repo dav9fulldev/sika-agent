@@ -26,6 +26,8 @@ class FakePayPalAPI:
         self.order_amount_override = None
         self.create_status = "PAYER_ACTION_REQUIRED"
         self._by_request_id: Dict[str, str] = {}
+        self.webhook_signature_valid = True
+        self.webhooks = [{"id": "WH-TEST-0001", "url": "http://localhost:8001/api/v1/paypal/webhook"}]
 
     # API publique identique à PayPalAPIService
     def is_configured(self):
@@ -73,6 +75,18 @@ class FakePayPalAPI:
         })
         order["status"] = "COMPLETED"
         return self._repr(order_id)
+
+    def list_webhooks(self):
+        self.calls.append(("list_webhooks", None))
+        return list(self.webhooks)
+
+    def verify_webhook_signature(self, *, headers, event, webhook_id):
+        self.calls.append(("verify_webhook", webhook_id))
+        return self.webhook_signature_valid
+
+    # Pilotage du test : simule un remboursement fait depuis le compte marchand
+    def refund(self, order_id):
+        self.orders[order_id]["captures"][0]["status"] = "REFUNDED"
 
     # Pilotage du test : simule l'approbation du payeur sur le site PayPal
     def approve(self, order_id):

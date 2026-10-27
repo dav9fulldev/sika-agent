@@ -117,13 +117,16 @@ class SikaToolRegistry:
                 error_message=f"Erreur interne lors de l'exécution du tool: {e}"
             )
 
-    def agent_tool_names(self) -> List[str]:
+    def agent_tool_names(self, exclude: Optional[set] = None) -> List[str]:
         """Noms des tools que le modèle IA a le droit d'appeler.
 
-        Jamais EXECUTION ; jamais les outils de maintenance internes.
+        Jamais EXECUTION ; jamais les outils de maintenance internes ; jamais ceux exclus pour cette requête
+        (par exemple la confirmation par l'agent quand l'utilisateur ne l'a pas autorisée).
         """
         names = []
         for name, def_item in self._definitions.items():
+            if exclude and name in exclude:
+                continue
             if def_item.risk_level not in [RiskLevel.READ_ONLY, RiskLevel.CONFIRMATION_REQUIRED]:
                 continue
             if not def_item.agent_exposed:
@@ -131,7 +134,7 @@ class SikaToolRegistry:
             names.append(name)
         return names
 
-    def get_gemini_tools(self) -> list:
+    def get_gemini_tools(self, exclude: Optional[set] = None) -> list:
         """Returns the tools safe for Gemini (READ_ONLY and CONFIRMATION_REQUIRED).
 
         Les tools disposant d'un input_schema explicite sont exposés sous forme de
@@ -140,7 +143,7 @@ class SikaToolRegistry:
         """
         safe_tools = []
         declarations = []
-        for name in self.agent_tool_names():
+        for name in self.agent_tool_names(exclude):
             def_item = self._definitions[name]
             if def_item.input_schema:
                 declarations.append({

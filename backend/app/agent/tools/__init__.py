@@ -6,11 +6,15 @@ from .tool_models import RiskLevel, ToolResult, ToolDefinition
 from .financial_tools import get_user_habits, update_user_habit, create_backup_snapshot
 from .commerce_tools import (
     search_demo_catalog, prepare_paypal_checkout, get_paypal_checkout_status, list_recent_paypal_checkouts,
-    SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA,
+    confirm_checkout_with_authorization,
+    SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA, AGENT_CONFIRM_SCHEMA,
 )
 
 # Outils de maintenance : appelables par le backend, jamais par le modèle IA.
 INTERNAL_ONLY_TOOLS = {"update_user_habit", "create_backup_snapshot"}
+
+# Présenté au modèle uniquement si l'utilisateur a accordé une autorisation active (voir sika_ai.chat)
+AUTHORIZATION_ONLY_TOOLS = {"confirm_checkout_with_authorization"}
 
 def register_all_sika_tools(registry):
     """Enregistre l'ensemble des tools financiers SIKA dans le registre donné."""
@@ -38,6 +42,17 @@ def register_all_sika_tools(registry):
         description="Prepare a PayPal sandbox checkout for one catalog SKU WITHOUT creating the PayPal order or charging anything. The backend computes the price and checks the user's budget. The user must then confirm in the app.",
         risk_level=RiskLevel.CONFIRMATION_REQUIRED,
         input_schema=PREPARE_SCHEMA,
+    )
+
+    register(
+        func=confirm_checkout_with_authorization,
+        name="confirm_checkout_with_authorization",
+        description="Confirm, on the user's behalf, a checkout you just prepared. Only available because the user authorized SIKA "
+                    "to confirm purchases within limits they chose; the backend enforces those limits and refuses otherwise. "
+                    "Call it only when the user clearly asked you to buy or complete the purchase (not just to look or compare). "
+                    "It creates the PayPal sandbox order; the user still approves it on PayPal.",
+        risk_level=RiskLevel.CONFIRMATION_REQUIRED,
+        input_schema=AGENT_CONFIRM_SCHEMA,
     )
 
     register(
@@ -91,4 +106,6 @@ __all__ = [
     "prepare_paypal_checkout",
     "get_paypal_checkout_status",
     "list_recent_paypal_checkouts",
+    "confirm_checkout_with_authorization",
+    "AUTHORIZATION_ONLY_TOOLS",
 ]
