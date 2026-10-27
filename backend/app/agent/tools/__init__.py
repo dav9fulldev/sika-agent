@@ -6,8 +6,8 @@ from .tool_models import RiskLevel, ToolResult, ToolDefinition
 from .financial_tools import get_user_habits, update_user_habit, create_backup_snapshot
 from .commerce_tools import (
     search_demo_catalog, prepare_paypal_checkout, get_paypal_checkout_status, list_recent_paypal_checkouts,
-    confirm_checkout_with_authorization,
-    SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA, AGENT_CONFIRM_SCHEMA,
+    confirm_checkout_with_authorization, search_web_products,
+    SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA, AGENT_CONFIRM_SCHEMA, WEB_SEARCH_SCHEMA,
 )
 
 # Outils de maintenance : appelables par le backend, jamais par le modèle IA.
@@ -34,6 +34,15 @@ def register_all_sika_tools(registry):
         description="Search the SIKA Demo Store catalog (fictional demo products priced in USD). Use it before preparing any purchase. Returns SKUs and server-side prices.",
         risk_level=RiskLevel.READ_ONLY,
         input_schema=SEARCH_SCHEMA,
+    )
+
+    register(
+        func=search_web_products,
+        name="search_web_products",
+        description="Search REAL products at real online merchants (Channel3 catalog) and compare their offers (merchant site, "
+                    "price, stock). Read-only: SIKA cannot pay on these sites; the user opens the merchant page to buy there.",
+        risk_level=RiskLevel.READ_ONLY,
+        input_schema=WEB_SEARCH_SCHEMA,
     )
 
     register(
@@ -107,5 +116,6 @@ __all__ = [
     "get_paypal_checkout_status",
     "list_recent_paypal_checkouts",
     "confirm_checkout_with_authorization",
+    "search_web_products",
     "AUTHORIZATION_ONLY_TOOLS",
 ]

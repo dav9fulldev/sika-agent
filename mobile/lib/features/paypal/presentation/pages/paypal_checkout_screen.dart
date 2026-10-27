@@ -153,7 +153,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
           child: Column(children: [
             InfoRow(label: lang.tr("Prix de l'article", 'Item price'), value: '${v.unitAmount} ${v.currency}'),
             InfoRow(label: lang.tr('Quantité', 'Quantity'), value: '${v.quantity}'),
-            InfoRow(label: lang.tr('Frais connus', 'Known fees'), value: lang.tr('Aucun (produit numérique)', 'None (digital product)')),
+            InfoRow(label: lang.tr('Frais de livraison', 'Shipping'), value: lang.tr('Gratuit (produit numérique)', 'Free (digital product)')),
             const Divider(height: 18),
             InfoRow(label: 'Total', value: '${v.total} ${v.currency}', strong: true),
             if (budget['limit'] != null)

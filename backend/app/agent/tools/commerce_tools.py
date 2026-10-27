@@ -51,6 +51,15 @@ STATUS_SCHEMA = {
     "required": ["checkout_id"],
 }
 
+WEB_SEARCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "query": {"type": "string", "description": "Product the user wants, e.g. 'noise cancelling bluetooth headphones'."},
+        "max_price": {"type": "number", "description": "Budget ceiling stated by the user, in USD. Omit if none."},
+    },
+    "required": ["query"],
+}
+
 AGENT_CONFIRM_SCHEMA = {
     "type": "object",
     "properties": {
@@ -136,6 +145,17 @@ def confirm_checkout_with_authorization(checkout_id: str, user_id: Optional[str]
                           data={"error_code": e.code}, error_message=e.message)
     return ToolResult(success=True, tool_name=name, risk_level=RiskLevel.CONFIRMATION_REQUIRED,
                       data={"action_id": checkout["checkout_id"], "checkout": checkout})
+
+
+def search_web_products(query: str, max_price: Optional[float] = None) -> ToolResult:
+    """Recherche de vrais produits chez des marchands en ligne (Channel3) : comparaison seulement, aucun paiement."""
+    from ...services.web_shopping_service import web_shopping_service, WebShoppingError
+    try:
+        data = web_shopping_service.search(query, max_price, limit=5)
+    except WebShoppingError as e:
+        return ToolResult(success=False, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY,
+                          data={"error_code": e.code}, error_message=e.message)
+    return ToolResult(success=True, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY, data=data)
 
 
 def get_paypal_checkout_status(checkout_id: str, user_id: Optional[str] = None) -> ToolResult:
