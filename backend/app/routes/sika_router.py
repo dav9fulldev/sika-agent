@@ -6,7 +6,7 @@ from ..models.user import UserModel
 from typing import Dict, Any, Optional
 from ..schemas.sika_dto import (
     SikaQueryDTO, SikaResponseDTO,
-    AuthLoginRequest, AuthRegisterRequest, AuthGoogleRequest,
+    AuthLoginRequest, AuthRegisterRequest, AuthGoogleRequest, AuthPayPalRequest,
     AuthForgotPasswordRequest, AuthResetPasswordRequest,
     TTSRequest, AgentProcessRequest
 )
@@ -78,6 +78,46 @@ def auth_google(data: AuthGoogleRequest):
         raise HTTPException(status_code=400, detail="Adresse email ou id_token Google requis.")
     return oauth2_auth_service.google_login(email=data.email, name=name, id_token=data.id_token)
 
+@router.get("/auth/paypal/start", summary="Start Log in with PayPal",
+            description="Renvoie l'URL d'autorisation PayPal (sandbox) et un state signé valable 10 minutes.")
+def auth_paypal_start():
+    from ..services.paypal_identity_service import paypal_identity_service
+    return paypal_identity_service.start()
+
+
+@router.post("/auth/paypal", summary="Complete Log in with PayPal",
+             description="Échange le code PayPal côté serveur, lit le profil PayPal vérifié et ouvre la session SIKA.")
+def auth_paypal(data: AuthPayPalRequest):
+    from ..services.paypal_identity_service import paypal_identity_service
+    return paypal_identity_service.complete(data.code, data.state)
+
+
+@router.get("/auth/paypal/return", summary="Log in with PayPal return page", include_in_schema=False)
+def auth_paypal_return(request: Request):
+    """URL de retour web déclarée chez PayPal : renvoie code/state (ou l'erreur) à l'application mobile.
+
+    Le code n'est pas échangé ici : l'app le transmet à POST /auth/paypal avec le state signé.
+    """
+    import html
+    from urllib.parse import urlencode
+    from fastapi.responses import HTMLResponse
+    from ..config import settings
+
+    params = {k: request.query_params[k] for k in ("code", "state", "error") if k in request.query_params}
+    if not params:
+        params = {"error": "missing_code"}
+    target = html.escape(f"{settings.PAYPAL_LOGIN_APP_REDIRECT}?{urlencode(params)}", quote=True)
+    page = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url={target}">
+<title>SIKA Pay</title></head>
+<body style="font-family:sans-serif;text-align:center;padding:48px 20px;color:#0D1B3E">
+<p>Retour vers SIKA Pay…</p>
+<p><a href="{target}" style="display:inline-block;padding:14px 22px;border-radius:14px;background:#1463FF;color:#fff;text-decoration:none">Ouvrir SIKA Pay</a></p>
+</body></html>"""
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/auth/me", summary="Get current user", description="Route protégée vérifiant le jeton OAuth2 Bearer.")
 def auth_me(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     """Route protégée vérifiant le jeton OAuth2 Bearer."""
@@ -93,9 +133,12 @@ def auth_me(authorization: Optional[str] = Header(None), db: Session = Depends(g
     if user_id:
         user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if user:
+            from ..services.user_profile import profile_status
             payload["full_name"] = user.full_name
             payload["phone"] = user.phone
-            payload["is_kyc_verified"] = user.is_kyc_verified
+            payload["country"] = user.country
+            payload["is_kyc_verified"] = user.kyc_status == "paypal"
+            payload["profile"] = profile_status(user)
 
     return {
         "status": "AUTHENTICATED",

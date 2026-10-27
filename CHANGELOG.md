@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Security: password reset no longer returns the OTP in the API response outside development (it allowed account takeover), and uses the same reply whether the e-mail exists or not.
+- Identity documents sent from the app are recorded as `submitted` (pending), not as verified. The app no longer shows "Identité vérifiée par IA".
+- Production: PayPal sandbox credentials are now resolved from Google Secret Manager (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`). Before, the deployed backend could never be configured for PayPal.
+- Production: the deploy workflow sets `PUBLIC_BASE_URL` so that PayPal `return_url` and `cancel_url` point to the Cloud Run service instead of `localhost`.
+
+### Added
+- Log in with PayPal (sandbox OpenID Connect): `GET /api/v1/sika/auth/paypal/start`, web return page `/api/v1/sika/auth/paypal/return`, `POST /api/v1/sika/auth/paypal`. The account is linked by PayPal payer ID, an existing e-mail is linked only if PayPal confirmed it, and a verified PayPal account marks the identity as verified.
+- Profile status (`missing_fields`, `kyc_status`) in login, register and `/auth/me` responses; the app asks only for missing fields.
+- Mobile: new entry flow. Splash, then a welcome screen (e-mail login with Google and PayPal below), then an optional biometrics offer, then profile completion only when needed, then home. Permissions are requested only when a feature needs them.
+- Mobile: identity card and "Plus" sheet on home, payment method and "Confirmer et payer" on the summary, "Voir la commande" on the result, "Dans votre budget" / "Prix vérifié" on the chat product card.
+- MIT `LICENSE`.
+- `SECURITY.md`, documenting the legacy partner credential exposure and the required revocation.
+- Docs: optional PayPal settings and the Cloud Run Secret Manager setup.
+
+### Verified
+- Real PayPal sandbox end-to-end run passed (2026-10-24): order creation, buyer approval, `APPROVED` verification, capture `COMPLETED` 49.00 USD, idempotent re-capture.
+
 ## [2.0.0] — 2026-10-23 — SIKA Pay
 
 SIKA becomes **SIKA Pay**: an AI payment agent built on the **PayPal REST API (Orders v2, sandbox)** for the PayPal AI Hackathon 2026.
@@ -57,6 +77,7 @@ This is a **major** release: the previous Mobile Money payment layer was removed
 ### Added
 - First public release of SIKA (Google "All Things Agentic" Hackathon): Flutter voice and chat agent, FastAPI backend, Gemini via Vertex AI, risk-tiered tool registry, human-in-the-loop confirmation with biometrics, and a Mobile Money integration.
 
+[Unreleased]: https://github.com/dav9fulldev/sika-agent/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/dav9fulldev/sika-agent/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/dav9fulldev/sika-agent/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/dav9fulldev/sika-agent/releases/tag/v1.0.0

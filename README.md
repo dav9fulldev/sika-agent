@@ -157,11 +157,11 @@ The script creates a real sandbox order and prints the approval link. Approve it
 ## Tests
 
 ```bash
-cd backend && source venv/bin/activate && pytest -q      # 130 tests, no network, ~15 s
+cd backend && source venv/bin/activate && pytest -q      # 131 tests, no network, ~15 s
 cd mobile && flutter analyze && flutter test               # 0 issues, 12 tests
 ```
 
-The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `test_paypal_agent.py`) cover server-side pricing, budget refusal, confirmation binding and tampering, cross-user isolation, idempotent creation and capture, no capture before approval, network failure → `UNKNOWN_RESULT`, declines, pending captures, amount mismatches, the sandbox-only configuration, the tool allow-list, rejection of model-supplied amounts and `user_id` spoofing, and the bounded agent loop. Unit tests use a test double of the PayPal API and never call the network. The real sandbox flow is exercised by `scripts/paypal_sandbox_e2e.py`.
+The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `test_paypal_agent.py`) cover server-side pricing, budget refusal, confirmation binding and tampering, cross-user isolation, idempotent creation and capture, no capture before approval, network failure → `UNKNOWN_RESULT`, declines, pending captures, amount mismatches, the sandbox-only configuration, the tool allow-list, rejection of model-supplied amounts and `user_id` spoofing, and the bounded agent loop. Unit tests use a test double of the PayPal API and never call the network. The real sandbox flow is exercised by `scripts/paypal_sandbox_e2e.py`. It **passed on 2026-10-24**: order created, buyer approval, `APPROVED` verified, capture `COMPLETED` 49.00 USD, and a second capture refused.
 
 ## API
 
@@ -185,6 +185,10 @@ The PayPal suites (`test_paypal_checkout.py`, `test_paypal_api_service.py`, `tes
 ## Project history
 
 SIKA started at the Google "All Things Agentic" hackathon (August 2026) as a Mobile Money assistant. For this hackathon, the payment layer was rebuilt around PayPal. See [docs/HACKATHON_PROGRESS.md](docs/HACKATHON_PROGRESS.md) for what existed before and what was built during the submission period.
+
+## Security
+
+See [SECURITY.md](SECURITY.md), which includes a legacy credential exposure the owner must revoke.
 
 ## License
 

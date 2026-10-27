@@ -99,8 +99,13 @@ class Settings:
         self.PAYPAL_API_BASE: str = overrides.get(
             "PAYPAL_API_BASE", os.getenv("PAYPAL_API_BASE", "https://api-m.sandbox.paypal.com")
         ).rstrip("/")
-        self.PAYPAL_CLIENT_ID: Optional[str] = overrides.get("PAYPAL_CLIENT_ID", os.getenv("PAYPAL_CLIENT_ID") or None)
-        self.PAYPAL_CLIENT_SECRET: Optional[str] = overrides.get("PAYPAL_CLIENT_SECRET", os.getenv("PAYPAL_CLIENT_SECRET") or None)
+        # En production : GCP Secret Manager (secrets PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET) > variables d'environnement
+        self.PAYPAL_CLIENT_ID: Optional[str] = resolved_secrets.get(
+            "PAYPAL_CLIENT_ID", overrides.get("PAYPAL_CLIENT_ID", os.getenv("PAYPAL_CLIENT_ID") or None)
+        )
+        self.PAYPAL_CLIENT_SECRET: Optional[str] = resolved_secrets.get(
+            "PAYPAL_CLIENT_SECRET", overrides.get("PAYPAL_CLIENT_SECRET", os.getenv("PAYPAL_CLIENT_SECRET") or None)
+        )
         # URL publique du backend, utilisée pour les redirections return/cancel de PayPal
         self.PUBLIC_BASE_URL: str = overrides.get("PUBLIC_BASE_URL", os.getenv("PUBLIC_BASE_URL", "http://localhost:8001")).rstrip("/")
         self.PAYPAL_RETURN_URL: str = overrides.get(
@@ -120,6 +125,23 @@ class Settings:
         self.PAYPAL_CONFIRMATION_TTL_SECONDS: int = int(
             overrides.get("PAYPAL_CONFIRMATION_TTL_SECONDS", os.getenv("PAYPAL_CONFIRMATION_TTL_SECONDS", "900"))
         )
+        # Log in with PayPal (OpenID Connect) — sandbox
+        self.PAYPAL_WEB_BASE: str = overrides.get(
+            "PAYPAL_WEB_BASE", os.getenv("PAYPAL_WEB_BASE", "https://www.sandbox.paypal.com")
+        ).rstrip("/")
+        # Doit être identique à l'URL de retour déclarée dans l'app PayPal (Log in with PayPal).
+        # PayPal n'accepte qu'une URL web : cette page renvoie ensuite le code à l'app (sikapay://paypal/login).
+        self.PAYPAL_LOGIN_REDIRECT_URI: str = overrides.get(
+            "PAYPAL_LOGIN_REDIRECT_URI",
+            os.getenv("PAYPAL_LOGIN_REDIRECT_URI", f"{self.PUBLIC_BASE_URL}/api/v1/sika/auth/paypal/return"),
+        )
+        self.PAYPAL_LOGIN_APP_REDIRECT: str = overrides.get(
+            "PAYPAL_LOGIN_APP_REDIRECT", os.getenv("PAYPAL_LOGIN_APP_REDIRECT", "sikapay://paypal/login")
+        )
+        self.PAYPAL_LOGIN_SCOPES: str = overrides.get(
+            "PAYPAL_LOGIN_SCOPES",
+            os.getenv("PAYPAL_LOGIN_SCOPES", "openid profile email address https://uri.paypal.com/services/paypalattributes"),
+        )
         self.PAYPAL_HTTP_TIMEOUT_SECONDS: float = float(
             overrides.get("PAYPAL_HTTP_TIMEOUT_SECONDS", os.getenv("PAYPAL_HTTP_TIMEOUT_SECONDS", "30"))
         )
@@ -133,6 +155,8 @@ class Settings:
             raise ValueError("[SECURITY FATAL] PAYPAL_ENV doit valoir 'sandbox'. Les paiements réels ne sont pas supportés.")
         if "sandbox.paypal.com" not in self.PAYPAL_API_BASE:
             raise ValueError("[SECURITY FATAL] PAYPAL_API_BASE doit pointer vers l'API sandbox PayPal (api-m.sandbox.paypal.com).")
+        if "sandbox.paypal.com" not in self.PAYPAL_WEB_BASE:
+            raise ValueError("[SECURITY FATAL] PAYPAL_WEB_BASE doit pointer vers le site sandbox PayPal (www.sandbox.paypal.com).")
 
     @property
     def paypal_configured(self) -> bool:
@@ -144,7 +168,8 @@ class Settings:
         if not self.USE_GCP_SECRET_MANAGER:
             return secrets
 
-        target_secrets = ["JWT_SECRET_KEY", "DATABASE_URL", "REDIS_URL", "GOOGLE_CLIENT_ID"]
+        target_secrets = ["JWT_SECRET_KEY", "DATABASE_URL", "REDIS_URL", "GOOGLE_CLIENT_ID",
+                          "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]
         try:
             # pyrefly: ignore [missing-import]
             from google.cloud import secretmanager

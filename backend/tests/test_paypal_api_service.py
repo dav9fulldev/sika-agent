@@ -139,3 +139,13 @@ def test_configuration_is_sandbox_only():
     with pytest.raises(ValueError):
         Settings(PAYPAL_API_BASE="https://api-m.paypal.com")
     assert Settings().PAYPAL_API_BASE == "https://api-m.sandbox.paypal.com"
+
+
+def test_production_reads_paypal_credentials_from_secret_manager(monkeypatch):
+    """En production, PAYPAL_CLIENT_ID/SECRET doivent pouvoir venir de GCP Secret Manager."""
+    resolved = {"PAYPAL_CLIENT_ID": f"sm-{secrets.token_hex(4)}", "PAYPAL_CLIENT_SECRET": f"sm-{secrets.token_hex(4)}"}
+    monkeypatch.setattr(Settings, "_resolve_secrets", lambda self, overrides: dict(resolved))
+    cfg = Settings()
+    assert cfg.PAYPAL_CLIENT_ID == resolved["PAYPAL_CLIENT_ID"]
+    assert cfg.PAYPAL_CLIENT_SECRET == resolved["PAYPAL_CLIENT_SECRET"]
+    assert cfg.paypal_configured is True

@@ -49,6 +49,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.17.1
   google_fonts: ^8.2.1
   flutter_animate: ^4.5.2
+  app_links: ^7.2.2
 
 dev_dependencies:
   flutter_test:
@@ -63,12 +64,13 @@ flutter:
 
 # Configuration de l'écran de démarrage natif (Nettoyé pour être invisible)
 flutter_native_splash:
-  color: "#020614" # Harmonisé avec le fond exact de votre SplashScreen Dart (0xff020614)
-  color_dark: "#020614"
+  color: "#FFFFFF" # Identique au fond du SplashScreen Flutter (SIKA Pay)
+  color_dark: "#FFFFFF"
   fullscreen: true
   # Ligne "image" supprimée volontairement ici pour éviter le logo statique initial
 
   android_12:
-    color: "#020614"
-    icon_background_color: "#020614"
-    # Ligne "image" supprimée volontairement ici aussi
+    # Android 12+ affiche toujours une icône centrale : on impose le logo SIKA Pay
+    image: assets/images/sika_splash_android12.png
+    color: "#FFFFFF" # Identique au fond du SplashScreen Flutter (SIKA Pay)
+    icon_background_color: "#FFFFFF"

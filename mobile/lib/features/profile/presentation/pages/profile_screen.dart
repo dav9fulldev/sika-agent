@@ -7,7 +7,6 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/sika_glass_card.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
 import '../../../ai_assistant/presentation/pages/settings_screen.dart';
-import '../../../auth/presentation/pages/login_screen.dart';
 import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
 import 'personal_information_screen.dart';
 import 'payment_methods_screen.dart';
@@ -67,11 +66,8 @@ class ProfileScreen extends ConsumerWidget {
               onPressed: () {
                 Navigator.pop(ctx);
                 ref.read(authProvider.notifier).logout();
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
+                // Le routeur de main.dart affiche l'écran suivant selon l'état d'authentification
+      Navigator.of(context).popUntil((route) => route.isFirst);
               },
               text: langNotifier.tr('Déconnexion', 'Log Out'),
             ),

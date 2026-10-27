@@ -271,23 +271,31 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
   Future<void> _submitKyc() async {
     setState(() => _isProcessing = true);
-
-    await Future.delayed(const Duration(seconds: 2));
-
-    ref.read(authProvider.notifier).updateKycStatus(true);
-
-    if (mounted) {
-      final langNotifier = ref.read(languageProvider.notifier);
+    final langNotifier = ref.read(languageProvider.notifier);
+    try {
+      await ref.read(authProvider.notifier).submitKyc();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(langNotifier.tr(
-              'Identité vérifiée par IA avec succès !',
-              'Identity verified by AI successfully!')),
-          backgroundColor: AppColors.success,
+              'Documents envoyés. Votre vérification est en attente.',
+              'Documents sent. Your verification is pending.')),
           behavior: SnackBarBehavior.floating,
         ),
       );
       Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(langNotifier.tr(
+              "L'envoi a échoué. Vérifiez votre connexion et réessayez.",
+              'Sending failed. Check your connection and try again.')),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

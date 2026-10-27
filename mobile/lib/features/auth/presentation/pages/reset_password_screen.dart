@@ -10,7 +10,6 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/sika_surface.dart';
 import '../../../../core/widgets/sika_glass_text_field.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
-import 'login_screen.dart';
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String email;
@@ -53,11 +52,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       );
 
       // Retour à la page de connexion
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+      // Le routeur de main.dart affiche l'écran suivant selon l'état d'authentification
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

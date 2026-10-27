@@ -12,6 +12,8 @@ class ApiConstants {
   static const String authLogin = '/api/v1/sika/auth/login';
   static const String authRegister = '/api/v1/sika/auth/register';
   static const String authGoogle = '/api/v1/sika/auth/google';
+  static const String authPayPalStart = '/api/v1/sika/auth/paypal/start';
+  static const String authPayPal = '/api/v1/sika/auth/paypal';
   static const String authMe = '/api/v1/sika/auth/me';
   static const String authLogout = '/api/v1/sika/auth/logout';
   static const String authForgotPassword = '/api/v1/sika/auth/forgot-password';

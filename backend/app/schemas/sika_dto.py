@@ -79,6 +79,10 @@ class AuthGoogleRequest(BaseModel):
     name: Optional[str] = None
     id_token: Optional[str] = None
 
+class AuthPayPalRequest(BaseModel):
+    code: str
+    state: str
+
 class AuthForgotPasswordRequest(BaseModel):
     email: str
 

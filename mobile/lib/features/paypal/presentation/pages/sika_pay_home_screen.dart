@@ -6,7 +6,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../ai_assistant/providers/sika_provider.dart';
+import '../../../profile/presentation/pages/kyc_verification_screen.dart';
 import '../../providers/paypal_checkout_provider.dart';
+import '../../../../core/widgets/sika_pay_brand.dart';
 import '../widgets/sika_pay_ui.dart';
 import 'paypal_checkout_screen.dart';
 
@@ -15,7 +17,8 @@ import 'paypal_checkout_screen.dart';
 class SikaPayHomeScreen extends ConsumerWidget {
   final VoidCallback onOpenChat;
   final VoidCallback onOpenHistory;
-  const SikaPayHomeScreen({super.key, required this.onOpenChat, required this.onOpenHistory});
+  final VoidCallback onOpenProfile;
+  const SikaPayHomeScreen({super.key, required this.onOpenChat, required this.onOpenHistory, required this.onOpenProfile});
 
   void _ask(WidgetRef ref, String prompt) {
     onOpenChat();
@@ -26,7 +29,9 @@ class SikaPayHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lang = ref.read(languageProvider.notifier);
     ref.watch(languageProvider);
-    final name = (ref.watch(authProvider).user?.name ?? '').trim().split(' ').first;
+    final user = ref.watch(authProvider).user;
+    final name = (user?.name ?? '').trim().split(' ').first;
+    final kycStatus = user?.kycStatus ?? 'none';
     final status = ref.watch(paypalStatusProvider);
     final history = ref.watch(paypalHistoryProvider);
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -45,12 +50,33 @@ class SikaPayHomeScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
             children: [
               Row(children: [
-                Image.asset('assets/images/sika_logo.png', width: 30, height: 30),
+                const SikaPayLogo(size: 30),
                 const SizedBox(width: 8),
-                const Text('SIKA ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                const Text('Pay', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: SikaPayColors.paypalBlue)),
-                const Spacer(),
+                const SikaPayWordmark(fontSize: 21),
+                const SizedBox(width: 8),
                 const SandboxBadge(compact: true),
+                const Spacer(),
+                IconButton(
+                  tooltip: lang.tr('Statut de mes paiements', 'My payment status'),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  onPressed: onOpenHistory,
+                ),
+                InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onOpenProfile,
+                  child: Semantics(
+                    button: true,
+                    label: lang.tr('Mon profil', 'My profile'),
+                    child: CircleAvatar(
+                      radius: 17,
+                      backgroundColor: SikaBrand.action,
+                      child: Text(
+                        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
               ]),
               const SizedBox(height: 22),
               Text('${lang.tr('Bonjour', 'Hello')}${name.isNotEmpty ? ' $name' : ''} 👋',
@@ -99,8 +125,8 @@ class SikaPayHomeScreen extends ConsumerWidget {
                 _quick(context, Icons.shopping_bag_rounded, lang.tr('Achat assisté', 'Assisted buy'), AppColors.success,
                     () => _ask(ref, assistedPrompt)),
                 _quick(context, Icons.receipt_long_rounded, lang.tr('Historique', 'History'), AppColors.brandPrimary, onOpenHistory),
-                _quick(context, Icons.fact_check_rounded, lang.tr('Statut', 'Status'), AppColors.warning,
-                    () => _ask(ref, lang.tr('Où en est mon dernier paiement ?', 'What is the status of my last payment?'))),
+                _quick(context, Icons.more_horiz_rounded, lang.tr('Plus', 'More'), AppColors.warning,
+                    () => _showMore(context, ref, lang, kycStatus)),
               ]),
               const SizedBox(height: 26),
 
@@ -135,6 +161,8 @@ class SikaPayHomeScreen extends ConsumerWidget {
                   ),
                 ]),
               ),
+              const SizedBox(height: 10),
+              _IdentityCard(kycStatus: kycStatus, lang: lang),
               const SizedBox(height: 24),
 
               // Derniers paiements
@@ -172,6 +200,34 @@ class SikaPayHomeScreen extends ConsumerWidget {
     );
   }
 
+  void _showMore(BuildContext context, WidgetRef ref, LanguageNotifier lang, String kycStatus) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) {
+        Widget item(IconData icon, String label, VoidCallback onTap) => ListTile(
+              leading: Icon(icon, color: SikaBrand.action),
+              title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(sheet);
+                onTap();
+              },
+            );
+        return SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            item(Icons.fact_check_rounded, lang.tr('Statut de mon dernier paiement', 'Status of my last payment'),
+                () => _ask(ref, lang.tr('Où en est mon dernier paiement ?', 'What is the status of my last payment?'))),
+            item(Icons.person_outline_rounded, lang.tr('Mon profil', 'My profile'), onOpenProfile),
+            if (kycStatus == 'none')
+              item(Icons.badge_outlined, lang.tr('Vérifier mon identité', 'Verify my identity'),
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycVerificationScreen()))),
+            const SizedBox(height: 8),
+          ]),
+        );
+      },
+    );
+  }
+
   Widget _quick(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -201,4 +257,48 @@ class StatusChipRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(top: 4), child: StatusChip(status: status, lang: lang)));
+}
+
+/// Statut d'identité tel que le serveur le connaît : vérifié par PayPal, en attente, ou à faire.
+class _IdentityCard extends StatelessWidget {
+  final String kycStatus;
+  final LanguageNotifier lang;
+  const _IdentityCard({required this.kycStatus, required this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    final verified = kycStatus == 'paypal';
+    final pending = kycStatus == 'submitted';
+    final color = verified ? AppColors.success : (pending ? AppColors.warning : SikaBrand.action);
+    return SikaPayCard(
+      child: Row(children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+          child: Icon(verified ? Icons.verified_rounded : (pending ? Icons.hourglass_top_rounded : Icons.badge_outlined), color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(lang.tr('Identité', 'Identity'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 3),
+            Text(
+              verified
+                  ? lang.tr('Vérifiée par PayPal', 'Verified by PayPal')
+                  : pending
+                      ? lang.tr('Documents envoyés, vérification en attente', 'Documents sent, verification pending')
+                      : lang.tr('Non vérifiée', 'Not verified'),
+              style: TextStyle(fontSize: 12.5, color: color),
+            ),
+          ]),
+        ),
+        if (!verified && !pending)
+          TextButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const KycVerificationScreen())),
+            child: Text(lang.tr('Vérifier', 'Verify')),
+          ),
+      ]),
+    );
+  }
 }

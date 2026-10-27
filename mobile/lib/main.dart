@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/services/sika_native_service.dart';
 import 'core/constants/app_theme.dart';
+import 'core/providers/app_setup_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'features/splash/splash_screen.dart';
-import 'features/onboarding/onboarding_screen.dart';
-import 'features/auth/presentation/pages/login_screen.dart';
+import 'features/splash/loading_screen.dart';
+import 'features/auth/presentation/pages/welcome_screen.dart';
+import 'features/entry/biometric_lock_screen.dart';
+import 'features/entry/biometric_setup_screen.dart';
+import 'features/entry/complete_profile_screen.dart';
 import 'features/ai_assistant/presentation/pages/sika_main_navigation_page.dart';
 import 'features/ai_assistant/providers/sika_provider.dart';
 
@@ -36,22 +40,17 @@ class _SikaAppState extends ConsumerState<SikaApp> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _demarrerServiceVocalSecurise();
+      _demarrerServiceVocalSiAutorise();
     });
   }
 
-  Future<void> _demarrerServiceVocalSecurise() async {
+  /// Démarre le service vocal natif uniquement si les permissions ont déjà été accordées.
+  /// Les permissions sont demandées au moment où une fonction en a besoin, jamais au démarrage.
+  Future<void> _demarrerServiceVocalSiAutorise() async {
     try {
-      final microStatus = await Permission.microphone.request();
-      final notificationStatus = await Permission.notification.request();
-
-      if (microStatus.isGranted && notificationStatus.isGranted) {
+      if (await Permission.microphone.isGranted && await Permission.notification.isGranted) {
         await SikaNativeService.startSikaService();
-        debugPrint(
-            '[SikaMain] ✅ Service Sika natif démarré avec succès au premier plan');
-      } else {
-        debugPrint(
-            '[SikaMain] ⚠️ Permissions refusées. Impossible de lancer le service d\'écoute.');
+        debugPrint('[SikaMain] ✅ Service Sika natif démarré au premier plan');
       }
     } catch (e) {
       debugPrint('[SikaMain] ⚠️ Erreur lors du démarrage du service Sika: $e');
@@ -61,62 +60,55 @@ class _SikaAppState extends ConsumerState<SikaApp> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
-    return Consumer(
-      builder: (context, ref, child) {
-        final authState = ref.watch(authProvider);
-        final authNotifier = ref.read(authProvider.notifier);
+    final authState = ref.watch(authProvider);
+    final setup = ref.watch(appSetupProvider);
 
-        // P1.2 — Effacement des données sensibles lors de la déconnexion.
-        // Lorsque isAuthenticated passe de true à false, on vide
-        // immédiatement le wallet et l'historique de conversation SIKA
-        // pour empêcher toute fuite de données entre sessions utilisateur.
-        ref.listen<AuthState>(authProvider, (previous, next) {
-          if ((previous?.isAuthenticated ?? false) && !next.isAuthenticated) {
-            debugPrint(
-                '[AUTH] Déconnexion détectée — vidage de la conversation SIKA.');
-            ref.read(sikaProvider.notifier).clearConversation();
-          }
-        });
+    // Déconnexion : effacement de la conversation et verrouillage de la session suivante
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if ((previous?.isAuthenticated ?? false) && !next.isAuthenticated) {
+        debugPrint('[AUTH] Déconnexion détectée — vidage de la conversation SIKA.');
+        ref.read(sikaProvider.notifier).clearConversation();
+        ref.read(appSetupProvider.notifier).lock();
+      }
+    });
 
-        Widget currentScreen;
+    final Widget currentScreen;
+    if (!_splashFinished) {
+      // 1. Démarrage
+      currentScreen = SplashScreen(
+        key: const ValueKey('splash'),
+        onFinish: () => setState(() => _splashFinished = true),
+      );
+    } else if (authState.isRestoring || !setup.loaded) {
+      // 2. Chargement : restauration de la session enregistrée
+      currentScreen = const SikaLoadingScreen(key: ValueKey('loading'));
+    } else if (!authState.isAuthenticated) {
+      // 3. Bienvenue : Google, PayPal ou e-mail
+      currentScreen = const WelcomeScreen(key: ValueKey('welcome'));
+    } else if (!setup.biometricDecided) {
+      // 4. Sécurisation, proposée une fois (passée sans capteur)
+      currentScreen = const BiometricSetupScreen(key: ValueKey('biometric_setup'));
+    } else if (authState.restoredSession && setup.biometricEnabled && !setup.unlocked) {
+      // 5. Empreinte pour une session restaurée au lancement
+      currentScreen = const BiometricLockScreen(key: ValueKey('biometric'));
+    } else if (authState.user?.missingFields.isNotEmpty ?? false) {
+      // 6. Profil : uniquement les champs que le mode de connexion n'a pas fournis
+      currentScreen = const CompleteProfileScreen(key: ValueKey('profile'));
+    } else {
+      // 7. Accueil
+      currentScreen = const SikaMainNavigationPage(key: ValueKey('main_hub'));
+    }
 
-        if (!_splashFinished) {
-          // 1. SPLASH SCREEN (Affiché au tout premier démarrage)
-          currentScreen = SplashScreen(
-            key: const ValueKey('splash'),
-            onFinish: () {
-              setState(() => _splashFinished = true);
-            },
-          );
-        } else if (!authState.hasSeenOnboarding) {
-          // 2. ONBOARDING (Seulement sur un nouvel appareil / 1ère installation)
-          currentScreen = OnboardingScreen(
-            key: const ValueKey('onboarding'),
-            onFinish: () {
-              authNotifier.completeOnboarding();
-            },
-          );
-        } else if (!authState.isAuthenticated) {
-          // 3. ECRAN DE CONNEXION / INSCRIPTION (Après l'onboarding ou après déconnexion)
-          currentScreen = const LoginScreen(key: ValueKey('login'));
-        } else {
-          // 4. HUB AGENT SIKA (Utilisateur authentifié)
-          currentScreen =
-              const SikaMainNavigationPage(key: ValueKey('main_hub'));
-        }
-
-        return MaterialApp(
-          title: 'SIKA Assistant',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: themeMode,
-          debugShowCheckedModeBanner: false,
-          home: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 500),
-            child: currentScreen,
-          ),
-        );
-      },
+    return MaterialApp(
+      title: 'SIKA Pay',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      debugShowCheckedModeBanner: false,
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: currentScreen,
+      ),
     );
   }
 }

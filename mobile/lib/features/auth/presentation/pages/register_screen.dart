@@ -10,7 +10,6 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/widgets/sika_surface.dart';
 import '../../../../core/widgets/sika_glass_text_field.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
-import '../../../ai_assistant/presentation/pages/sika_main_navigation_page.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -41,22 +40,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _passwordController.text,
     );
     if (success && mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
-        (route) => false,
-      );
+      // Le routeur de main.dart affiche l'écran suivant selon l'état d'authentification
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
   void _onGoogleRegisterPressed(AuthNotifier authNotifier) async {
     final success = await authNotifier.loginWithGoogle();
     if (success && mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const SikaMainNavigationPage()),
-        (route) => false,
-      );
+      // Le routeur de main.dart affiche l'écran suivant selon l'état d'authentification
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

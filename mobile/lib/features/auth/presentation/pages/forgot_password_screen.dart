@@ -36,7 +36,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     final otp = await authNotifier.forgotPassword(email);
 
     if (otp != null && mounted) {
-      if (kDebugMode) {
+      if (kDebugMode && otp.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Code reçu (mode dev) : $otp'),

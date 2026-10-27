@@ -24,6 +24,7 @@ from google.auth.transport import requests as google_requests
 from ..database import SessionLocal
 from ..models import UserModel
 from ..config import settings
+from .user_profile import profile_status
 from .security_rate_limiter import security_rate_limiter
 
 logger = logging.getLogger("SikaAuthService")
@@ -168,7 +169,8 @@ class OAuth2AuthService:
                 "access_token": token,
                 "token_type": "bearer",
                 "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-                "user": user_data
+                "user": {**user_data, "country": user.country},
+                "profile": profile_status(user),
             }
         finally:
             db.close()
@@ -206,7 +208,8 @@ class OAuth2AuthService:
                 "access_token": token,
                 "token_type": "bearer",
                 "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-                "user": user_data
+                "user": {**user_data, "country": new_user.country},
+                "profile": profile_status(new_user),
             }
         finally:
             db.close()
@@ -263,31 +266,37 @@ class OAuth2AuthService:
                 "access_token": token,
                 "token_type": "bearer",
                 "expires_in": self.TOKEN_EXPIRE_HOURS * 3600,
-                "user": user_data
+                "user": {**user_data, "country": user.country},
+                "profile": profile_status(user),
             }
         finally:
             db.close()
 
     def generate_password_reset_otp(self, email: str) -> Dict[str, Any]:
-        """Génère un OTP pour la réinitialisation de mot de passe."""
+        """Génère un OTP de réinitialisation.
+
+        Sécurité : la réponse est identique que le compte existe ou non (pas d'énumération), et le code
+        n'est JAMAIS renvoyé par l'API en production. Aucun service d'envoi d'e-mail n'étant branché,
+        le code est exposé sous `dev_otp` uniquement en développement pour permettre les tests.
+        """
+        import secrets
         clean_email = email.strip().lower()
+        response: Dict[str, Any] = {
+            "success": True,
+            "message": "Si cette adresse est inscrite, un code de réinitialisation lui a été envoyé.",
+        }
         db = SessionLocal()
         try:
             user = db.query(UserModel).filter(UserModel.email == clean_email).first()
             if not user:
-                # Éviter le user enumeration en renvoyant toujours un message de succès
-                return {"success": True, "message": "Si cette adresse existe, un code de réinitialisation a été généré.", "otp": "000000"}
+                return response
 
-            import random
-            otp = f"{random.randint(100000, 999999)}"
+            otp = f"{secrets.randbelow(900000) + 100000}"
             security_rate_limiter.store_otp(clean_email, otp, expire_seconds=900)
-            logger.info(f"[AUTH FORGOT PASSWORD] OTP généré pour {clean_email}")
-            
-            return {
-                "success": True, 
-                "message": "Code de réinitialisation généré avec succès.",
-                "otp": otp
-            }
+            logger.info("[AUTH FORGOT PASSWORD] OTP de réinitialisation généré.")
+            if settings.ENV == "development":
+                response["dev_otp"] = otp
+            return response
         finally:
             db.close()
 

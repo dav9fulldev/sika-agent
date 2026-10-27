@@ -209,6 +209,48 @@ class PayPalAPIService:
         return self._request("POST", f"/v2/checkout/orders/{order_id}/capture", json_body={}, request_id=request_id)
 
     # ------------------------------------------------------------------
+    # Log in with PayPal (OpenID Connect)
+    # ------------------------------------------------------------------
+
+    def exchange_authorization_code(self, code: str) -> Dict[str, Any]:
+        """Échange le code d'autorisation de l'utilisateur contre son jeton (POST /v1/oauth2/token)."""
+        if not self.is_configured():
+            raise PayPalConfigurationError("PAYPAL_CLIENT_ID et PAYPAL_CLIENT_SECRET (sandbox) doivent être définis.")
+        try:
+            resp = self._session.post(
+                f"{self.base_url}/v1/oauth2/token",
+                auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_CLIENT_SECRET),
+                data={"grant_type": "authorization_code", "code": code},
+                headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+                timeout=self._timeout(),
+            )
+        except requests.exceptions.RequestException as e:
+            raise PayPalNetworkError(f"OAuth2 PayPal injoignable: {type(e).__name__}") from e
+        body = _safe_json(resp)
+        if resp.status_code != 200 or not body.get("access_token"):
+            logger.warning(f"[PayPal Login] Échange du code refusé (HTTP {resp.status_code}, error={body.get('error')})")
+            raise PayPalAPIError(resp.status_code, name=str(body.get("error") or "INVALID_GRANT"),
+                                 message=str(body.get("error_description") or "Code d'autorisation PayPal invalide ou expiré."))
+        return body
+
+    def get_userinfo(self, user_access_token: str) -> Dict[str, Any]:
+        """Profil du payeur connecté (GET /v1/identity/oauth2/userinfo?schema=paypalv1.1)."""
+        try:
+            resp = self._session.request(
+                "GET",
+                f"{self.base_url}/v1/identity/oauth2/userinfo?schema=paypalv1.1",
+                headers={"Authorization": f"Bearer {user_access_token}", "Accept": "application/json"},
+                timeout=self._timeout(),
+            )
+        except requests.exceptions.RequestException as e:
+            raise PayPalNetworkError(f"userinfo PayPal injoignable: {type(e).__name__}") from e
+        body = _safe_json(resp)
+        if resp.status_code != 200:
+            raise PayPalAPIError(resp.status_code, name=str(body.get("name") or body.get("error") or "USERINFO_FAILED"),
+                                 message=str(body.get("message") or body.get("error_description") or ""))
+        return body
+
+    # ------------------------------------------------------------------
     # Helpers de lecture des réponses
     # ------------------------------------------------------------------
 

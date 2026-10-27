@@ -20,6 +20,21 @@ PUBLIC_BASE_URL=http://<backend address reachable from the phone>:8001
 
 `PUBLIC_BASE_URL` builds the PayPal `return_url` and `cancel_url` (`/api/v1/paypal/return` and `/cancel`). The phone's browser must be able to reach it: use the computer's LAN IP on the same Wi-Fi, or a public HTTPS URL if you deploy the backend.
 
+### Optional settings (defaults shown)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PAYPAL_RETURN_URL` | `${PUBLIC_BASE_URL}/api/v1/paypal/return` | Where PayPal redirects after approval |
+| `PAYPAL_CANCEL_URL` | `${PUBLIC_BASE_URL}/api/v1/paypal/cancel` | Where PayPal redirects if the payer cancels |
+| `PAYPAL_BRAND_NAME` | `SIKA Demo Store` | Merchant name shown on the PayPal page |
+| `PAYPAL_ALLOWED_CURRENCIES` | `USD` | Comma-separated currencies accepted by SIKA Pay |
+| `PAYPAL_MAX_ORDER_AMOUNT` | `500` | Upper limit for one checkout |
+| `PAYPAL_CONFIRMATION_TTL_SECONDS` | `900` | Validity of a prepared checkout before confirmation |
+| `PAYPAL_HTTP_TIMEOUT_SECONDS` | `30` | Read timeout for PayPal API calls |
+| `PAYPAL_LOGIN_REDIRECT_URI` | `${PUBLIC_BASE_URL}/api/v1/sika/auth/paypal/return` | Log in with PayPal return URL (must match the PayPal app exactly) |
+| `PAYPAL_LOGIN_APP_REDIRECT` | `sikapay://paypal/login` | Deep link the return page opens in the mobile app |
+| `PAYPAL_LOGIN_SCOPES` | `openid profile email address https://uri.paypal.com/services/paypalattributes` | Profile data requested at sign-in |
+
 ## 2. Get a sandbox buyer account (used on the phone to approve)
 
 1. Go to **Testing Tools → Sandbox Accounts**.
@@ -43,6 +58,33 @@ python scripts/paypal_sandbox_e2e.py
 # → open the link, log in with the sandbox BUYER, approve
 # 4-5. status verified APPROVED  6. capture COMPLETED + amount verified, second capture refused
 ```
+
+## 3b. Deployed backend (Cloud Run)
+
+The production backend (`ENV=production`, `USE_GCP_SECRET_MANAGER=true`) reads the PayPal sandbox credentials from **Google Secret Manager**. `PUBLIC_BASE_URL` is set by the deploy workflow (`.github/workflows/deploy-backend.yml`).
+
+```bash
+PROJECT=sika-all-things-agentic
+printf '%s' '<sandbox client id>' | gcloud secrets create PAYPAL_CLIENT_ID --project $PROJECT --data-file=-
+printf '%s' '<sandbox secret>'    | gcloud secrets create PAYPAL_CLIENT_SECRET --project $PROJECT --data-file=-
+# grant read access to the Cloud Run service account (SERVICE_ACCOUNT in the deploy workflow)
+for s in PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET; do
+  gcloud secrets add-iam-policy-binding $s --project $PROJECT \
+    --member="serviceAccount:sika-backend-sa@sika-all-things-agentic.iam.gserviceaccount.com" --role="roles/secretmanager.secretAccessor"
+done
+```
+
+Redeploy (merge to `main`, or rerun the workflow), then check `GET https://<cloud-run-url>/api/v1/paypal/status`: it should return `"configured": true`. Type the values yourself in your own terminal; never paste them into chats, issues or logs.
+
+## 3c. Log in with PayPal (optional sign-in)
+
+In the same sandbox REST app: **Features → Log in with PayPal**, tick full name, email, address (country), account verification status and payer ID. Set the **Return URL** to:
+
+```
+https://<cloud-run-url>/api/v1/sika/auth/paypal/return
+```
+
+PayPal accepts only web return URLs. It rejects a custom scheme such as `sikapay://` with *"invalid client_id or redirect_uri"*. The return page above sends `code` and `state` back to the app via `sikapay://paypal/login`, and the app sends them to `POST /api/v1/sika/auth/paypal`, where the server exchanges the code. The code is never exchanged on the return page. Changes in the PayPal dashboard can take a few minutes to apply.
 
 ## 4. Safety guarantees
 
