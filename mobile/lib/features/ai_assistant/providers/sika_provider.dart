@@ -127,6 +127,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _speechEnabled = false;
+  bool _sttRetried = false;
   int _activeSpeechRequestId = 0;
 
   SikaNotifier(this._apiService, this._ref)
@@ -168,24 +169,31 @@ class SikaNotifier extends StateNotifier<SikaData> {
                 ? "I didn't hear anything. Tap the microphone and speak."
                 : "Je n'ai rien entendu. Touchez le micro et parlez.",
           );
+        } else if ((val.errorMsg == 'error_server_disconnected' || val.errorMsg == 'error_busy' ||
+                val.errorMsg == 'error_client') &&
+            !_sttRetried) {
+          // Service de reconnaissance Android momentanément coupé : une nouvelle tentative silencieuse
+          _sttRetried = true;
+          Future.delayed(const Duration(milliseconds: 400), () => startListening(keepRetryFlag: true));
         } else {
           final isEn = _ref.read(languageProvider).code == 'en';
-          String friendlyError = isEn
-              ? "Speech recognition error (${val.errorMsg})"
-              : "Erreur de reconnaissance vocale (${val.errorMsg})";
-          if (val.errorMsg.contains('permission')) {
+          final msg = val.errorMsg;
+          String friendlyError;
+          if (msg.contains('permission')) {
             friendlyError = isEn
-                ? "Please allow microphone access in settings."
-                : "Veuillez autoriser l'accès au microphone.";
-          } else if (val.errorMsg == 'error_network' || val.errorMsg.contains('network')) {
+                ? 'Microphone access is off. Allow it in your phone settings to talk to SIKA.'
+                : "L'accès au micro est désactivé. Autorisez-le dans les réglages du téléphone pour parler à SIKA.";
+          } else if (msg.contains('network')) {
             friendlyError = isEn
-                ? "SIKA cannot connect to the network."
-                : "SIKA n'arrive pas à se connecter au réseau.";
+                ? 'Voice recognition needs an internet connection. Check your connection and try again.'
+                : 'La reconnaissance vocale a besoin d\'internet. Vérifiez votre connexion et réessayez.';
+          } else {
+            friendlyError = isEn
+                ? "Voice recognition isn't available right now. Try again, or type your request."
+                : "La reconnaissance vocale n'est pas disponible pour le moment. Réessayez ou écrivez votre demande.";
           }
-          state = state.copyWith(
-            state: SikaState.error,
-            errorMessage: friendlyError,
-          );
+          debugPrint('[SIKA STT] Unrecoverable speech error: $msg');
+          state = state.copyWith(state: SikaState.error, errorMessage: friendlyError, soundLevel: 0);
         }
       },
       onStatus: (status) {
@@ -231,7 +239,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   /// Déclenche l'écoute avec la locale STT active (en_US ou fr_FR)
-  Future<void> startListening({String? sttLocale}) async {
+  Future<void> startListening({String? sttLocale, bool keepRetryFlag = false}) async {
+    if (!keepRetryFlag) _sttRetried = false;
     debugPrint(
         '[SIKA VOICE] startListening called. Current state: ${state.state}');
     // INTERRUPTION DE LA VOIX (Comme Gemini Live) : Si Sika parlait, on l'arrête immédiatement
@@ -838,6 +847,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
     return _ref.read(languageProvider).code == 'en';
   }
 }
+
+/// Début de phrase déposé dans le champ du chat par un raccourci de l'accueil (l'utilisateur complète et envoie).
+final chatDraftProvider = StateProvider<String?>((ref) => null);
 
 final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
   // Utilise l'instance partagée dont le token JWT est synchronisé

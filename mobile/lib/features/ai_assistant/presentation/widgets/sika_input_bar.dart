@@ -7,6 +7,7 @@ import '../../../../core/providers/language_provider.dart';
 
 class SikaInputBar extends ConsumerWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final bool isListening;
   final bool isSpeaking;
   final VoidCallback onMicTap;
@@ -16,6 +17,7 @@ class SikaInputBar extends ConsumerWidget {
   const SikaInputBar({
     super.key,
     required this.controller,
+    this.focusNode,
     required this.isListening,
     required this.isSpeaking,
     required this.onMicTap,
@@ -97,6 +99,7 @@ class SikaInputBar extends ConsumerWidget {
                     child: Center(
                       child: TextField(
                         controller: controller,
+                        focusNode: focusNode,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 15,

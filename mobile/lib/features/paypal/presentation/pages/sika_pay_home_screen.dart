@@ -23,6 +23,12 @@ class SikaPayHomeScreen extends ConsumerWidget {
   final VoidCallback onOpenProfile;
   const SikaPayHomeScreen({super.key, required this.onOpenChat, required this.onOpenHistory, required this.onOpenProfile});
 
+  /// Ouvre le chat avec une phrase commencée : l'utilisateur la complète (aucune demande envoyée d'office).
+  void _draft(WidgetRef ref, String start) {
+    onOpenChat();
+    ref.read(chatDraftProvider.notifier).state = start;
+  }
+
   void _ask(WidgetRef ref, String prompt) {
     onOpenChat();
     ref.read(sikaProvider.notifier).sendTextMessage(prompt);
@@ -39,8 +45,6 @@ class SikaPayHomeScreen extends ConsumerWidget {
     final status = ref.watch(paypalStatusProvider);
     final history = ref.watch(paypalHistoryProvider);
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final assistedPrompt = lang.tr('Aide-moi à acheter un cours Excel sans dépasser 50 dollars.',
-        'Help me buy an Excel course without going over 50 dollars.');
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -99,7 +103,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
               // Carte héro PayPal
               InkWell(
                 borderRadius: BorderRadius.circular(22),
-                onTap: () => _ask(ref, assistedPrompt),
+                onTap: onOpenChat,
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -110,10 +114,11 @@ class SikaPayHomeScreen extends ConsumerWidget {
                   child: Row(children: [
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const PayPalWordmark(size: 18, color: Colors.white),
-                        const SizedBox(height: 10),
-                        Text(lang.tr('Dites ce que vous voulez acheter et votre budget. SIKA vérifie, prépare, et vous décidez.',
-                                'Say what you want to buy and your budget. SIKA checks, prepares, and you decide.'),
+                        Text(lang.tr('Demandez à SIKA', 'Ask SIKA'),
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        Text(lang.tr('Acheter, comparer les prix, vous abonner ou suivre un paiement. SIKA vérifie et prépare, vous décidez.',
+                                'Buy, compare prices, subscribe or track a payment. SIKA checks and prepares, you decide.'),
                             style: const TextStyle(color: Colors.white, fontSize: 13.5, height: 1.4)),
                       ]),
                     ),
@@ -132,10 +137,9 @@ class SikaPayHomeScreen extends ConsumerWidget {
               // Actions rapides
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 _quick(context, Icons.shopping_bag_rounded, lang.tr('Acheter', 'Buy'), AppColors.success,
-                    () => _ask(ref, assistedPrompt)),
+                    () => _draft(ref, lang.tr('Je veux acheter ', 'I want to buy '))),
                 _quick(context, Icons.compare_arrows_rounded, lang.tr('Comparer', 'Compare'), SikaPayColors.paypalBlue,
-                    () => _ask(ref, lang.tr('Compare les prix en ligne pour un casque sans fil sous 80 dollars.',
-                        'Compare prices online for wireless headphones under 80 dollars.'))),
+                    () => _draft(ref, lang.tr('Compare les prix en ligne pour ', 'Compare prices online for '))),
                 _quick(context, Icons.autorenew_rounded, lang.tr('Abonnements', 'Subscriptions'), AppColors.brandPrimary,
                     () => MySubscriptionsScreen.open(context)),
                 _quick(context, Icons.more_horiz_rounded, lang.tr('Plus', 'More'), AppColors.warning,
@@ -143,40 +147,8 @@ class SikaPayHomeScreen extends ConsumerWidget {
               ]),
               const SizedBox(height: 26),
 
-              // Compte PayPal sandbox (état réel de la configuration serveur, sans solde inventé)
-              Text(lang.tr('Vos comptes', 'Your accounts'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 10),
-              SikaPayCard(
-                child: Row(children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(color: SikaPayColors.paypalBlue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.account_balance_wallet_rounded, color: SikaPayColors.paypalNavy),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('PayPal', style: TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 3),
-                      status.when(
-                        loading: () => Text(lang.tr('Vérification…', 'Checking…'), style: const TextStyle(fontSize: 12.5)),
-                        error: (_, __) => Text(lang.tr('Serveur SIKA injoignable', 'SIKA server unreachable'),
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.error)),
-                        data: (s) => Text(
-                          s['configured'] == true
-                              ? lang.tr('Connecté', 'Connected')
-                              : lang.tr('Connexion PayPal indisponible', 'PayPal connection unavailable'),
-                          style: TextStyle(fontSize: 12.5, color: s['configured'] == true ? AppColors.success : AppColors.warning),
-                        ),
-                      ),
-                    ]),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 10),
-              _IdentityCard(kycStatus: kycStatus, lang: lang),
-              const SizedBox(height: 24),
+              // Comptes : affichés seulement s'il y a quelque chose à faire (PayPal indisponible, identité à vérifier)
+              ..._accountsNeedingAction(context, lang, status, kycStatus),
 
               // Derniers paiements
               Row(children: [
@@ -242,6 +214,35 @@ class SikaPayHomeScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  List<Widget> _accountsNeedingAction(
+      BuildContext context, LanguageNotifier lang, AsyncValue<Map<String, dynamic>> status, String kycStatus) {
+    final paypalDown = status.hasError || (status.hasValue && status.value?['configured'] != true);
+    final identityTodo = kycStatus != 'paypal';
+    if (!paypalDown && !identityTodo) return const [];
+    return [
+      Text(lang.tr('À faire', 'To do'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 10),
+      if (paypalDown)
+        SikaPayCard(
+          child: Row(children: [
+            const Icon(Icons.cloud_off_rounded, color: AppColors.warning),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                status.hasError
+                    ? lang.tr('Serveur SIKA injoignable. Vérifiez votre connexion.', 'SIKA server unreachable. Check your connection.')
+                    : lang.tr('Paiements PayPal momentanément indisponibles.', 'PayPal payments are temporarily unavailable.'),
+                style: const TextStyle(fontSize: 13.5),
+              ),
+            ),
+          ]),
+        ),
+      if (paypalDown && identityTodo) const SizedBox(height: 10),
+      if (identityTodo) _IdentityCard(kycStatus: kycStatus, lang: lang),
+      const SizedBox(height: 24),
+    ];
   }
 
   Widget _quick(BuildContext context, IconData icon, String label, Color color, VoidCallback onTap) {

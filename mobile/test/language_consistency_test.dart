@@ -51,16 +51,16 @@ void main() {
 
       expect(find.text('Hello'), findsOneWidget);
       expect(find.textContaining('I am SIKA Pay'), findsOneWidget);
-      expect(find.text('Buy an Excel course under \$50'), findsOneWidget);
-      expect(find.text('Cloud storage, \$40 budget'), findsOneWidget);
+      expect(find.text('Buy an online course under \$50'), findsOneWidget);
+      expect(find.text('Compare prices for wireless headphones'), findsOneWidget);
       expect(find.text('Did my last payment go through?'), findsOneWidget);
       expect(find.text('Active assistant'), findsOneWidget);
       expect(find.text('Ask SIKA...'), findsOneWidget);
 
       // Verify no French defaults are shown
       expect(find.text('Bonjour'), findsNothing);
-      expect(find.text('Acheter un cours Excel à moins de 50 \$'), findsNothing);
-      expect(find.text('Du stockage cloud, budget 40 \$'), findsNothing);
+      expect(find.text('Acheter un cours en ligne sous 50 \$'), findsNothing);
+      expect(find.text('Comparer les prix d\'un casque sans fil'), findsNothing);
       expect(find.text('Assistant actif'), findsNothing);
       expect(find.text('Demander à SIKA...'), findsNothing);
     });
@@ -85,16 +85,16 @@ void main() {
 
       expect(find.text('Bonjour'), findsOneWidget);
       expect(find.textContaining('Je suis SIKA Pay'), findsOneWidget);
-      expect(find.text('Acheter un cours Excel à moins de 50 \$'), findsOneWidget);
-      expect(find.text('Du stockage cloud, budget 40 \$'), findsOneWidget);
+      expect(find.text('Acheter un cours en ligne sous 50 \$'), findsOneWidget);
+      expect(find.text('Comparer les prix d\'un casque sans fil'), findsOneWidget);
       expect(find.text('Où en est mon dernier paiement ?'), findsOneWidget);
       expect(find.text('Assistant actif'), findsOneWidget);
       expect(find.text('Demander à SIKA...'), findsOneWidget);
 
       // Verify no English defaults are shown
       expect(find.text('Hello'), findsNothing);
-      expect(find.text('Buy an Excel course under \$50'), findsNothing);
-      expect(find.text('Cloud storage, \$40 budget'), findsNothing);
+      expect(find.text('Buy an online course under \$50'), findsNothing);
+      expect(find.text('Compare prices for wireless headphones'), findsNothing);
       expect(find.text('Active assistant'), findsNothing);
       expect(find.text('Ask SIKA...'), findsNothing);
     });
