@@ -133,7 +133,7 @@ class Settings:
         # PayPal n'accepte qu'une URL web : cette page renvoie ensuite le code à l'app (sikapay://paypal/login).
         self.PAYPAL_LOGIN_REDIRECT_URI: str = overrides.get(
             "PAYPAL_LOGIN_REDIRECT_URI",
-            os.getenv("PAYPAL_LOGIN_REDIRECT_URI", f"{self.PUBLIC_BASE_URL}/api/v1/sika/auth/paypal/return"),
+            os.getenv("PAYPAL_LOGIN_REDIRECT_URI") or f"{self.PUBLIC_BASE_URL}/api/v1/sika/auth/paypal/return",
         )
         self.PAYPAL_LOGIN_APP_REDIRECT: str = overrides.get(
             "PAYPAL_LOGIN_APP_REDIRECT", os.getenv("PAYPAL_LOGIN_APP_REDIRECT", "sikapay://paypal/login")

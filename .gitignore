@@ -83,3 +83,7 @@ backend/app/data/
 /docs/SIKA_VOICE_COMMANDS.md
 /docs/SIKA_WAKEWORD.md
 /SIKA.iml
+/backend/test_vertex.py
+/mobile/fix_const.py
+/mobile/fix_context.py
+/mobile/replace_colors.py
