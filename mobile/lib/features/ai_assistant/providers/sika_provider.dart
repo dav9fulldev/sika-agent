@@ -291,7 +291,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
         },
         listenOptions: SpeechListenOptions(
           listenFor: const Duration(seconds: 45),
-          pauseFor: const Duration(milliseconds: 1600),
+          // Le silence est compté dès l'ouverture du micro : 1,6 s coupait l'écoute avant que
+          // l'utilisateur ait commencé à parler. 4 s laissent le temps de commencer, la fin de
+          // phrase reste détectée par Android, et « Envoyer » permet de conclure plus tôt.
+          pauseFor: const Duration(seconds: 4),
           localeId: activeSttLocale,
           cancelOnError: false,
           partialResults: true,
