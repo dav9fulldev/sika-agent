@@ -181,3 +181,8 @@ final paypalStatusProvider = FutureProvider.autoDispose<Map<String, dynamic>>((r
 final agentAuthorizationProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   return ref.watch(apiServiceProvider).getAgentAuthorization();
 });
+
+/// Alertes de prix sur des produits du web (statuts du serveur, déclenchées par les webhooks Channel3).
+final priceWatchesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(apiServiceProvider).listPriceWatches();
+});

@@ -18,6 +18,7 @@ from .payment_method import PaymentMethodModel
 from .paypal_checkout import PayPalCheckoutModel
 from .agent_mandate import AgentMandateModel
 from .paypal_webhook_event import PayPalWebhookEventModel
+from .price_watch import PriceWatchModel, ShoppingWebhookEventModel
 
 __all__ = [
     "PayPalCheckoutModel",

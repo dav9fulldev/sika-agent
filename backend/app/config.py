@@ -110,6 +110,10 @@ class Settings:
         self.CHANNEL3_API_KEY: Optional[str] = resolved_secrets.get(
             "CHANNEL3_API_KEY", overrides.get("CHANNEL3_API_KEY", os.getenv("CHANNEL3_API_KEY") or None)
         )
+        # Secret de signature (whsec_…) de l'endpoint webhook déclaré dans le tableau de bord Channel3 (Svix)
+        self.CHANNEL3_WEBHOOK_SECRET: Optional[str] = resolved_secrets.get(
+            "CHANNEL3_WEBHOOK_SECRET", overrides.get("CHANNEL3_WEBHOOK_SECRET", os.getenv("CHANNEL3_WEBHOOK_SECRET") or None)
+        )
         self.CHANNEL3_API_BASE: str = overrides.get(
             "CHANNEL3_API_BASE", os.getenv("CHANNEL3_API_BASE", "https://api.trychannel3.com")
         ).rstrip("/")
@@ -178,7 +182,8 @@ class Settings:
             return secrets
 
         target_secrets = ["JWT_SECRET_KEY", "DATABASE_URL", "REDIS_URL", "GOOGLE_CLIENT_ID",
-                          "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "CHANNEL3_API_KEY"]
+                          "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "CHANNEL3_API_KEY",
+                          "CHANNEL3_WEBHOOK_SECRET"]
         try:
             # pyrefly: ignore [missing-import]
             from google.cloud import secretmanager

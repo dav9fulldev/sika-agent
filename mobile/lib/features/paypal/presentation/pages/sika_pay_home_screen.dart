@@ -11,6 +11,7 @@ import '../../providers/paypal_checkout_provider.dart';
 import '../../../../core/widgets/sika_pay_brand.dart';
 import '../widgets/sika_pay_ui.dart';
 import 'agent_authorization_screen.dart';
+import 'price_alerts_screen.dart';
 import 'paypal_checkout_screen.dart';
 
 /// Accueil SIKA Pay : accès direct à l'agent de paiement et au compte PayPal sandbox.
@@ -33,6 +34,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final name = (user?.name ?? '').trim().split(' ').first;
     final kycStatus = user?.kycStatus ?? 'none';
+    final unseenAlerts = (ref.watch(priceWatchesProvider).valueOrNull?['unseen'] as num?)?.toInt() ?? 0;
     final status = ref.watch(paypalStatusProvider);
     final history = ref.watch(paypalHistoryProvider);
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -46,6 +48,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
           onRefresh: () async {
             ref.invalidate(paypalStatusProvider);
             ref.invalidate(paypalHistoryProvider);
+            ref.invalidate(priceWatchesProvider);
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -58,9 +61,16 @@ class SikaPayHomeScreen extends ConsumerWidget {
                 const SandboxBadge(compact: true),
                 const Spacer(),
                 IconButton(
-                  tooltip: lang.tr('Statut de mes paiements', 'My payment status'),
-                  icon: const Icon(Icons.notifications_none_rounded),
-                  onPressed: onOpenHistory,
+                  tooltip: lang.tr('Alertes de prix', 'Price alerts'),
+                  icon: Badge(
+                    isLabelVisible: unseenAlerts > 0,
+                    label: Text('$unseenAlerts'),
+                    child: const Icon(Icons.notifications_none_rounded),
+                  ),
+                  onPressed: () async {
+                    await PriceAlertsScreen.open(context);
+                    ref.invalidate(priceWatchesProvider);
+                  },
                 ),
                 InkWell(
                   customBorder: const CircleBorder(),

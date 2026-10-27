@@ -60,6 +60,15 @@ WEB_SEARCH_SCHEMA = {
     "required": ["query"],
 }
 
+WATCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "product_id": {"type": "string", "description": "product_id of a product returned by search_web_products."},
+        "target_price": {"type": "number", "description": "Alert when a new offer is at or below this price (USD). Omit to be alerted when it is back in stock."},
+    },
+    "required": ["product_id"],
+}
+
 AGENT_CONFIRM_SCHEMA = {
     "type": "object",
     "properties": {
@@ -156,6 +165,32 @@ def search_web_products(query: str, max_price: Optional[float] = None, user_id: 
         return ToolResult(success=False, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY,
                           data={"error_code": e.code}, error_message=e.message)
     return ToolResult(success=True, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY, data=data)
+
+
+def watch_web_product_price(product_id: str, target_price: Optional[float] = None, user_id: Optional[str] = None) -> ToolResult:
+    """Crée une alerte de prix (ou de retour en stock) sur un produit du web. Aucun achat automatique."""
+    from ...services.price_watch_service import price_watch_service, PriceWatchError
+    uid = _uid(user_id)
+    if uid is None:
+        return ToolResult(success=False, tool_name="watch_web_product_price", risk_level=RiskLevel.READ_ONLY,
+                          data={}, error_message="An authenticated user is required.")
+    try:
+        watch = price_watch_service.create(uid, product_id, target_price)
+    except PriceWatchError as e:
+        return ToolResult(success=False, tool_name="watch_web_product_price", risk_level=RiskLevel.READ_ONLY,
+                          data={"error_code": e.code}, error_message=e.message)
+    return ToolResult(success=True, tool_name="watch_web_product_price", risk_level=RiskLevel.READ_ONLY, data={"watch": watch})
+
+
+def list_price_watches(user_id: Optional[str] = None) -> ToolResult:
+    """Alertes de prix de l'utilisateur et celles déjà déclenchées."""
+    from ...services.price_watch_service import price_watch_service
+    uid = _uid(user_id)
+    if uid is None:
+        return ToolResult(success=False, tool_name="list_price_watches", risk_level=RiskLevel.READ_ONLY,
+                          data={}, error_message="An authenticated user is required.")
+    return ToolResult(success=True, tool_name="list_price_watches", risk_level=RiskLevel.READ_ONLY,
+                      data={"watches": price_watch_service.list(uid)})
 
 
 def get_paypal_checkout_status(checkout_id: str, user_id: Optional[str] = None) -> ToolResult:
