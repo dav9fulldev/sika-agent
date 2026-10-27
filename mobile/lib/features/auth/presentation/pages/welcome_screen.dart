@@ -270,7 +270,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ],
           const SizedBox(height: 16),
           Text(
-            lang.tr('PayPal : environnement de test (sandbox), aucun argent réel.', 'PayPal: test environment (sandbox), no real money.'),
+            lang.tr('Mode test : aucun argent réel ne circule.', 'Test mode: no real money moves.'),
             textAlign: TextAlign.center,
             style: const TextStyle(color: SikaBrand.muted, fontSize: 12),
           ),

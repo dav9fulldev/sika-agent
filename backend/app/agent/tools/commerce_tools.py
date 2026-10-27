@@ -221,7 +221,7 @@ def search_subscription_plans(query: str, max_monthly_price: Optional[float] = N
             price = None
     plans = demo_subscriptions.search_plans(query or "", price)
     return ToolResult(success=True, tool_name="search_subscription_plans", risk_level=RiskLevel.READ_ONLY,
-                      data={"merchant": "SIKA Demo Store (sandbox)", "currency": "USD", "interval": "month",
+                      data={"merchant": "SIKA Demo Store", "currency": "USD", "interval": "month",
                             "plans": [{k: p[k] for k in ("key", "name", "category", "description", "price")} for p in plans]})
 
 

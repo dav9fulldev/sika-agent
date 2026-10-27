@@ -1,247 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/providers/language_provider.dart';
-import '../../../../core/providers/auth_provider.dart';
-import '../../../../core/providers/payment_provider.dart';
-import '../../../../core/widgets/sika_glass_card.dart';
-import '../../../../core/widgets/sika_premium_button.dart';
-import '../../../../core/widgets/sika_empty_state.dart';
-import '../widgets/add_payment_method_modal.dart';
 
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/language_provider.dart';
+import '../../../paypal/presentation/widgets/sika_pay_ui.dart';
+
+/// Moyen de paiement : PayPal uniquement. SIKA ne stocke aucune carte ; chaque paiement est approuvé sur PayPal.
 class PaymentMethodsScreen extends ConsumerWidget {
   const PaymentMethodsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final langNotifier = ref.watch(languageProvider.notifier);
+    ref.watch(languageProvider);
+    final lang = ref.read(languageProvider.notifier);
     final user = ref.watch(authProvider).user;
-    final isPremium = user?.isPremium ?? false;
-    final paymentState = ref.watch(paymentProvider);
+    final linked = user?.paypalLinked ?? false;
+    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+
+    Widget point(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 18, color: AppColors.brandPrimary),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 13.5, height: 1.4))),
+          ]),
+        );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
+        centerTitle: true,
+        title: Text(lang.tr('Moyen de paiement', 'Payment method'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Premium Status Banner
-            SikaGlassCard(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: AppColors.amber.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
-                    ),
-                    child: const Icon(Icons.star_rounded,
-                        color: AppColors.amber,
-                        size: 32),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isPremium
-                              ? langNotifier.tr(
-                                  'Sika Premium Actif', 'Sika Premium Active')
-                              : langNotifier.tr('Passez à Sika Premium',
-                                  'Upgrade to Sika Premium'),
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          isPremium
-                              ? langNotifier.tr(
-                                  'Vous profitez de toutes les fonctionnalités avancées.',
-                                  'You are enjoying all advanced features.')
-                              : langNotifier.tr(
-                                  'Débloquez l\'IA illimitée et plus encore.',
-                                  'Unlock unlimited AI and more.'),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.70),
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: [
+        SikaPayCard(
+          child: Row(children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: SikaPayColors.paypalBlue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.account_balance_wallet_rounded, color: SikaPayColors.paypalNavy),
             ),
-            const SizedBox(height: AppSpacing.xxl),
-
-            Text(
-              langNotifier.tr(
-                  'Vos cartes et comptes', 'Your cards and accounts'),
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            if (paymentState.methods.isEmpty)
-              SikaEmptyState(
-                icon: Icons.credit_card_off_rounded,
-                title: langNotifier.tr('Aucune méthode de paiement', 'No payment method'),
-                message: langNotifier.tr(
-                  'Ajoutez une carte ou un compte Mobile Money pour commencer.',
-                  'Add a card or Mobile Money account to get started.',
-                ),
-              )
-            else
-              ...paymentState.methods.map((method) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _buildPaymentMethodTile(
-                        context, method, ref, langNotifier),
-                  )),
-
-            const SizedBox(height: 24),
-
-            // Add Payment Method Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: SikaPremiumButton(
-                onPressed: () {
-                  AddPaymentMethodModal.show(context);
-                },
-                text: langNotifier.tr('Ajouter un moyen de paiement', 'Add payment method'),
-                prefixWidget: const Icon(Icons.add_circle_outline_rounded, color: AppColors.cyan),
-                isSecondary: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodTile(BuildContext context, PaymentMethod method,
-      WidgetRef ref, LanguageNotifier langNotifier) {
-    return SikaGlassCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
-              borderRadius: AppSpacing.borderRadiusSm,
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
-            ),
-            child: Icon(
-              method.type == 'card'
-                  ? Icons.credit_card_rounded
-                  : Icons.phone_android_rounded,
-              color: Theme.of(context).colorScheme.onSurface,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      method.title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    if (method.isDefault) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.emerald.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Défaut',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.emerald,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                    ]
-                  ],
-                ),
-                const SizedBox(height: 4),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('PayPal', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 3),
                 Text(
-                  method.subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMuted,
-                      ),
+                  linked
+                      ? lang.tr('Compte PayPal relié à SIKA Pay', 'PayPal account linked to SIKA Pay')
+                      : lang.tr('Choisi à chaque paiement, sur PayPal', 'Chosen at each payment, on PayPal'),
+                  style: TextStyle(fontSize: 12.5, color: muted),
                 ),
-              ],
+              ]),
             ),
-          ),
-          PopupMenuButton<String>(
-            icon:
-                const Icon(Icons.more_vert_rounded, color: AppColors.textMuted),
-            color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : Colors.white,
-            onSelected: (value) {
-              if (value == 'default') {
-                ref.read(paymentProvider.notifier).setDefault(method.id);
-              } else if (value == 'delete') {
-                ref
-                    .read(paymentProvider.notifier)
-                    .removePaymentMethod(method.id);
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'default',
-                child: Text(
-                  langNotifier.tr('Définir par défaut', 'Set as default'),
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'delete',
-                child: Text(
-                  langNotifier.tr('Supprimer', 'Delete'),
-                  style: const TextStyle(color: AppColors.rose),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+            const Icon(Icons.check_circle_rounded, color: AppColors.success),
+          ]),
+        ),
+        const SizedBox(height: 18),
+        SikaPayCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(lang.tr('Comment SIKA paie', 'How SIKA pays'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+            const SizedBox(height: 6),
+            point(Icons.credit_card_off_outlined,
+                lang.tr("SIKA ne stocke jamais vos cartes ni vos identifiants PayPal.", 'SIKA never stores your cards or PayPal credentials.')),
+            point(Icons.how_to_reg_outlined,
+                lang.tr('Vous approuvez chaque paiement et chaque abonnement sur PayPal.', 'You approve every payment and subscription on PayPal.')),
+            point(Icons.account_balance_outlined,
+                lang.tr('Votre solde, vos cartes et vos comptes bancaires restent gérés par PayPal.',
+                    'Your balance, cards and bank accounts stay managed by PayPal.')),
+          ]),
+        ),
+      ]),
     );
   }
 }

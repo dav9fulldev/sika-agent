@@ -55,7 +55,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
     final bio = ref.read(biometricServiceProvider);
     if (await bio.isBiometricsAvailable()) {
       final ok = await bio.authenticate(
-        localizedReason: lang.tr('Confirmez pour créer la commande PayPal sandbox.', 'Confirm to create the PayPal sandbox order.'),
+        localizedReason: lang.tr('Confirmez pour créer la commande PayPal.', 'Confirm to create the PayPal order.'),
       );
       if (!ok) {
         // aucune commande créée sans authentification réussie
@@ -84,8 +84,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
         elevation: 0,
         title: Text(_title(v?.status, lang), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         centerTitle: true,
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: Center(child: SandboxBadge(compact: true)))],
-      ),
+              ),
       body: v == null
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -99,7 +98,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
                   _actions(v, lang),
                   const SizedBox(height: 20),
                   Center(
-                    child: Text(lang.tr('Mode Sandbox • Test uniquement — aucun argent réel', 'Sandbox mode • Test only — no real money'),
+                    child: Text(lang.tr('Mode test : aucun argent réel', 'Test mode: no real money'),
                         style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45))),
                   ),
                 ],
@@ -210,8 +209,8 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
         body = v.data['confirmed_by'] == 'AGENT'
             ? lang.tr('SIKA a confirmé cet achat avec votre autorisation. Approuvez-le sur PayPal : le paiement se termine ensuite tout seul.',
                 'SIKA confirmed this purchase with your authorization. Approve it on PayPal: the payment then completes on its own.')
-            : lang.tr('Approuvez la commande sur PayPal avec votre compte acheteur sandbox. Le paiement se termine ensuite tout seul.',
-                'Approve the order on PayPal with your sandbox buyer account. The payment then completes on its own.');
+            : lang.tr('Approuvez la commande sur PayPal. Le paiement se termine ensuite tout seul.',
+                'Approve the order on PayPal. The payment then completes on its own.');
     }
     final st = statusStyle(v.status);
     return Padding(
@@ -250,8 +249,6 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
           ),
           child: Row(children: [
             const PayPalWordmark(size: 15),
-            const SizedBox(width: 8),
-            const SandboxBadge(compact: true),
             const Spacer(),
             Semantics(
               label: lang.tr('Sélectionné', 'Selected'),
@@ -285,10 +282,10 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
           StatusChip(status: v.status, lang: lang),
         ]),
         const SizedBox(height: 6),
-        Text(lang.tr('Paiement sécurisé via PayPal (Sandbox)', 'Secure payment via PayPal (Sandbox)'),
+        Text(lang.tr('Paiement sécurisé via PayPal', 'Secure payment via PayPal'),
             style: const TextStyle(fontSize: 12.5, color: SikaPayColors.paypalBlue, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        InfoRow(label: lang.tr('Bénéficiaire', 'Payee'), value: '${v.merchant['name']} (sandbox)'),
+        InfoRow(label: lang.tr('Bénéficiaire', 'Payee'), value: '${v.merchant['name']}'),
         InfoRow(label: lang.tr('Devise', 'Currency'), value: v.currency),
         InfoRow(label: lang.tr('Méthode', 'Method'), value: 'PayPal'),
         if (p['order_id'] != null) InfoRow(label: lang.tr('ID de commande PayPal', 'PayPal order ID'), value: p['order_id'].toString()),
@@ -352,8 +349,8 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
       Center(
         child: Text(
           isRefunded(p)
-              ? lang.tr('PayPal a capturé puis remboursé ce paiement (sandbox).', 'PayPal captured then refunded this payment (sandbox).')
-              : lang.tr('PayPal a confirmé la capture du paiement en sandbox.', 'PayPal confirmed the payment capture in the sandbox.'),
+              ? lang.tr('PayPal a encaissé puis remboursé ce paiement.', 'PayPal captured then refunded this payment.')
+              : lang.tr('PayPal a confirmé le paiement.', 'PayPal confirmed the payment.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
         ),
@@ -361,7 +358,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
       const SizedBox(height: 20),
       SikaPayCard(
         child: Column(children: [
-          const Row(children: [PayPalWordmark(size: 16), Spacer(), SandboxBadge(compact: true)]),
+          const Row(children: [PayPalWordmark(size: 16)]),
           const SizedBox(height: 8),
           InfoRow(label: lang.tr('Article', 'Item'), value: v.item['name']?.toString() ?? ''),
           InfoRow(label: lang.tr('Montant capturé', 'Captured amount'), value: '${p['captured_amount']} ${p['captured_currency']}'),

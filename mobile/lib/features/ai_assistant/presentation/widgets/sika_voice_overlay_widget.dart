@@ -161,7 +161,7 @@ class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
                         ],
                       ),
                       child: const Center(
-                        child: Text('✦', style: TextStyle(fontSize: 22, color: Colors.white)),
+                        child: Icon(Icons.auto_awesome_rounded, size: 22, color: Colors.white),
                       ),
                     ).animate().fade().slideY(begin: -0.2, end: 0),
                     

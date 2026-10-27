@@ -46,8 +46,6 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               const PayPalWordmark(size: 14),
-              const SizedBox(width: 8),
-              const SandboxBadge(compact: true),
               const Spacer(),
               StatusChip(status: v.status, lang: lang),
             ]),

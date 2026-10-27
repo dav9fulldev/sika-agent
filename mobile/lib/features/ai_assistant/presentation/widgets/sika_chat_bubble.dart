@@ -81,7 +81,7 @@ class SikaChatBubble extends ConsumerWidget {
               ],
             ),
             child: const Center(
-              child: Text('✦', style: TextStyle(fontSize: 14, color: Colors.white)),
+              child: Icon(Icons.auto_awesome_rounded, size: 14, color: Colors.white),
             ),
           ),
           const SizedBox(width: 16),

@@ -29,7 +29,6 @@ class SikaPayHistoryScreen extends ConsumerWidget {
               Row(children: [
                 Text(lang.tr('Transactions', 'Transactions'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
                 const Spacer(),
-                const SandboxBadge(compact: true),
               ]),
               const SizedBox(height: 4),
               Text(lang.tr('Paiements PayPal préparés par SIKA', 'PayPal payments prepared by SIKA'),

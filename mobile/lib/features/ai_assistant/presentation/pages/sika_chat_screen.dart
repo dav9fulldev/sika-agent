@@ -190,7 +190,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
                 ],
               ),
               child: const Center(
-                child: Text('✦', style: TextStyle(fontSize: 16, color: Colors.white)),
+                child: Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
               ),
             ),
             const SizedBox(width: 12),
@@ -277,7 +277,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
                   color: Colors.white,
                 ),
                 child: const Center(
-                  child: Text('✦', style: TextStyle(fontSize: 22, color: Colors.white)),
+                  child: Icon(Icons.auto_awesome_rounded, size: 22, color: Colors.white),
                 ),
               ),
             ),
@@ -285,7 +285,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           const SizedBox(height: 24),
           
           Text(
-            langNotifier.tr('Bonjour 👋', 'Hello 👋'),
+            langNotifier.tr('Bonjour', 'Hello'),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
@@ -295,8 +295,8 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           
           Text(
             langNotifier.tr(
-              'Je suis SIKA Pay. Dites-moi ce que vous voulez acheter et votre budget :\nje vérifie, je prépare le paiement PayPal (sandbox) et vous décidez.',
-              'I am SIKA Pay. Tell me what you want to buy and your budget:\nI check, prepare the PayPal (sandbox) payment, and you decide.',
+              'Je suis SIKA Pay. Dites-moi ce que vous voulez acheter et votre budget :\nje vérifie, je prépare le paiement PayPal et vous décidez.',
+              'I am SIKA Pay. Tell me what you want to buy and your budget:\nI check, prepare the PayPal payment, and you decide.',
             ),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
