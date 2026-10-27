@@ -54,6 +54,15 @@ void main() {
     expect(find.textContaining('Continuer avec'), findsNothing);
   });
 
+  testWidgets('PayPal account on the email form is told to use PayPal, in the app language', (tester) async {
+    await tester.pumpWidget(_app(const WelcomeScreen(), overrides: [
+      authProvider.overrideWith((ref) => AuthNotifier.withState(
+          AuthState(errorCode: 'USE_PAYPAL_SIGN_IN', errorMessage: 'This account uses PayPal sign-in.'))),
+    ]));
+    await tester.pump();
+    expect(find.textContaining('Ce compte utilise la connexion PayPal'), findsOneWidget);
+  });
+
   testWidgets('biometric step is skipped when the device has no biometrics', (tester) async {
     final container = ProviderContainer(overrides: [biometricServiceProvider.overrideWithValue(_NoBiometrics())]);
     addTearDown(container.dispose);

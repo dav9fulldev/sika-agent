@@ -81,6 +81,8 @@ class AuthState {
   final String? accessToken;
   final UserProfileData? user;
   final String? errorMessage;
+  /// Code d'erreur du serveur (ex. USE_PAYPAL_SIGN_IN) pour afficher le message dans la langue de l'app.
+  final String? errorCode;
   /// Vrai tant que la session enregistrée n'a pas été vérifiée au lancement.
   final bool isRestoring;
   /// Vrai si la session vient du stockage sécurisé (et non d'une connexion saisie) :
@@ -94,6 +96,7 @@ class AuthState {
     this.accessToken,
     this.user,
     this.errorMessage,
+    this.errorCode,
     this.isRestoring = false,
     this.restoredSession = false,
   });
@@ -105,6 +108,8 @@ class AuthState {
     String? accessToken,
     UserProfileData? user,
     String? errorMessage,
+    String? errorCode,
+    bool clearError = false,
     bool? isRestoring,
     bool? restoredSession,
   }) {
@@ -114,7 +119,8 @@ class AuthState {
       isLoading: isLoading ?? this.isLoading,
       accessToken: accessToken ?? this.accessToken,
       user: user ?? this.user,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: clearError ? errorMessage : (errorMessage ?? this.errorMessage),
+      errorCode: clearError ? errorCode : (errorCode ?? this.errorCode),
       isRestoring: isRestoring ?? this.isRestoring,
       restoredSession: restoredSession ?? this.restoredSession,
     );
@@ -189,6 +195,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       _applyProfile(res);
       _syncContextWithNative(token, state.user);
+      await _rememberSignInMethod('paypal');
       return true;
     } on TimeoutException {
       state = state.copyWith(isLoading: false, errorMessage: "PayPal n'a pas renvoyé de réponse. Réessayez.");
@@ -219,6 +226,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(user: state.user!.copyWith(name: name, country: country));
     }
     _applyProfile(res);
+  }
+
+  static const String keyLastSignInMethod = 'sika_last_sign_in_method';
+
+  /// Dernier moyen de connexion utilisé (email, google, paypal), rappelé sur l'écran Bienvenue.
+  Future<void> _rememberSignInMethod(String method) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(keyLastSignInMethod, method);
+    } catch (_) {}
   }
 
   /// Client API porteur du jeton de la session courante (requis par les routes protégées).
@@ -320,7 +337,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Connexion OAuth2 avec génération de jeton Bearer JWT
   Future<bool> loginWithEmail(String email, String password) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, clearError: true);
 
     if (email.trim().isEmpty || password.trim().isEmpty) {
       state = state.copyWith(
@@ -360,8 +377,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Sync context with native side
       _applyProfile(Map<String, dynamic>.from(res));
       _syncContextWithNative(token, state.user);
+      await _rememberSignInMethod('email');
 
       return true;
+    } on AuthApiException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message, errorCode: e.code);
+      return false;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur login API: $e');
@@ -566,6 +587,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Sync context with native side
       _applyProfile(Map<String, dynamic>.from(res));
       _syncContextWithNative(token, state.user);
+      await _rememberSignInMethod('google');
 
       return true;
     } catch (e) {

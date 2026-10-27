@@ -118,5 +118,5 @@ The rules allow testers to use their own sandbox credentials. Follow steps 1 to 
 | `PAYPAL_NOT_CONFIGURED` (503) | Client ID or secret missing in `backend/.env`; restart the backend |
 | `AUTHENTICATION_FAILURE` | Live credentials used instead of sandbox, or the secret was regenerated |
 | PayPal page never returns to SIKA | `PUBLIC_BASE_URL` is not reachable from the phone. Come back to the app manually: it re-checks the status on resume, and "I've approved — check" also works |
-| `ORDER_NOT_APPROVED` on "Pay now" | The order was not approved with the sandbox buyer yet |
+| `ORDER_NOT_APPROVED` on "Complete the payment" | The order was not approved with the sandbox buyer yet |
 | `INSTRUMENT_DECLINED` | PayPal asks the payer to choose another funding source: tap **Open PayPal** again |

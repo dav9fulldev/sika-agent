@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import hashlib
+import hmac
 import uuid
 from datetime import datetime, timedelta, timezone
 # pyrefly: ignore [missing-import]
@@ -30,8 +31,30 @@ from .security_rate_limiter import security_rate_limiter
 logger = logging.getLogger("SikaAuthService")
 
 
+_SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 14, 8, 1
+
+
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    """Hachage lent et salé (scrypt) : format scrypt$N$r$p$sel$empreinte."""
+    salt = os.urandom(16)
+    digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=_SCRYPT_N, r=_SCRYPT_R, p=_SCRYPT_P, dklen=32)
+    return "scrypt${}${}${}${}${}".format(
+        _SCRYPT_N, _SCRYPT_R, _SCRYPT_P, base64.b64encode(salt).decode(), base64.b64encode(digest).decode())
+
+
+def _verify_password(password: str, stored: Optional[str]) -> bool:
+    """Vérifie un mot de passe ; accepte encore l'ancien format SHA-256 (converti à la connexion suivante)."""
+    if not stored:
+        return False
+    if stored.startswith("scrypt$"):
+        try:
+            _, n, r, p, salt_b64, digest_b64 = stored.split("$")
+            digest = hashlib.scrypt(password.encode("utf-8"), salt=base64.b64decode(salt_b64),
+                                    n=int(n), r=int(r), p=int(p), dklen=32)
+        except (ValueError, TypeError):
+            return False
+        return hmac.compare_digest(digest, base64.b64decode(digest_b64))
+    return hmac.compare_digest(stored, hashlib.sha256(password.encode("utf-8")).hexdigest())
 
 
 def verify_google_id_token(token_str: str, client_id: Optional[str] = None) -> Dict[str, Any]:
@@ -149,14 +172,25 @@ class OAuth2AuthService:
         db = SessionLocal()
         try:
             user = db.query(UserModel).filter(UserModel.email == clean_email).first()
-            if not user or user.password_hash != _hash_password(password):
+            if user and not user.password_hash and user.auth_provider in ("paypal", "google"):
+                # Compte créé avec PayPal ou Google : il n'a pas de mot de passe SIKA
                 security_rate_limiter.record_login_failure(clean_email)
-                raise HTTPException(
-                    status_code=401,
-                    detail="Identifiants invalides. Vérifiez votre adresse email et votre mot de passe."
-                )
+                provider = "PayPal" if user.auth_provider == "paypal" else "Google"
+                raise HTTPException(status_code=401, detail={
+                    "error_code": f"USE_{user.auth_provider.upper()}_SIGN_IN",
+                    "message": f"This account uses {provider} sign-in. Tap {provider} below, or set a password with \"Forgot password\".",
+                })
+            if not user or not _verify_password(password, user.password_hash):
+                security_rate_limiter.record_login_failure(clean_email)
+                raise HTTPException(status_code=401, detail={
+                    "error_code": "INVALID_CREDENTIALS",
+                    "message": "Invalid email or password.",
+                })
 
             security_rate_limiter.reset_login_failures(clean_email)
+            if not user.password_hash.startswith("scrypt$"):
+                user.password_hash = _hash_password(password)  # migration de l'ancien hachage SHA-256
+                db.commit()
 
             user_data = {
                 "id": str(user.id),

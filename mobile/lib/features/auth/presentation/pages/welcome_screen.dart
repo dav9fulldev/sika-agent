@@ -66,11 +66,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
+  String? _lastMethod;
 
   @override
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((prefs) {
+      final last = prefs.getString(AuthNotifier.keyLastSignInMethod);
+      if (last != null && mounted) setState(() => _lastMethod = last);
       final email = prefs.getString(_rememberedEmailKey);
       if (email != null && mounted) {
         setState(() {
@@ -79,6 +82,22 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         });
       }
     });
+  }
+
+  /// Message d'erreur dans la langue de l'app quand le serveur fournit un code.
+  String _errorText(AuthState auth, LanguageNotifier lang) {
+    switch (auth.errorCode) {
+      case 'USE_PAYPAL_SIGN_IN':
+        return lang.tr('Ce compte utilise la connexion PayPal : touchez PayPal ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
+            'This account uses PayPal sign-in: tap PayPal below, or set a password with "Forgot password?".');
+      case 'USE_GOOGLE_SIGN_IN':
+        return lang.tr('Ce compte utilise la connexion Google : touchez Google ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
+            'This account uses Google sign-in: tap Google below, or set a password with "Forgot password?".');
+      case 'INVALID_CREDENTIALS':
+        return lang.tr('Adresse e-mail ou mot de passe incorrect.', 'Invalid email or password.');
+      default:
+        return auth.errorMessage ?? '';
+    }
   }
 
   @override
@@ -187,7 +206,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ]),
           if (!auth.isLoading && auth.errorMessage != null) ...[
             const SizedBox(height: 4),
-            Text(auth.errorMessage!, style: const TextStyle(color: SikaBrand.danger, fontSize: 13.5)),
+            Text(_errorText(auth, lang), style: const TextStyle(color: SikaBrand.danger, fontSize: 13.5)),
           ],
           const SizedBox(height: 14),
           SikaPrimaryButton(label: lang.tr('Se connecter', 'Sign in'), loading: auth.isLoading && !_socialPending, onPressed: _onLogin),
@@ -227,6 +246,16 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               ),
             ),
           ]),
+          if (_lastMethod == 'paypal' || _lastMethod == 'google') ...[
+            const SizedBox(height: 10),
+            Text(
+              _lastMethod == 'paypal'
+                  ? lang.tr('La dernière fois, vous avez utilisé PayPal.', 'Last time you used PayPal.')
+                  : lang.tr('La dernière fois, vous avez utilisé Google.', 'Last time you used Google.'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: SikaBrand.muted, fontSize: 12.5),
+            ),
+          ],
           if (_socialPending && auth.isLoading) ...[
             const SizedBox(height: 14),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
