@@ -76,6 +76,6 @@ async def channel3_webhook(request: Request):
         event = json.loads(body or b"{}")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid JSON.")
-    outcome = price_watch_service.handle_event(event)
+    outcome = price_watch_service.handle_event(event, message_id=headers.get("svix-id") or headers.get("webhook-id"))
     logger.info(f"[CHANNEL3 WEBHOOK] {event.get('type')} {str(event.get('id'))[:12]}: {outcome}")
     return {"received": True, "outcome": outcome}

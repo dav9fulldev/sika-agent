@@ -140,3 +140,14 @@ def test_watch_tool_is_read_only():
         assert name in tool_registry.agent_tool_names()
         assert tool_registry.get_definition(name).risk_level.value == "READ_ONLY"
         assert "user_id" not in tool_registry.get_definition(name).input_schema.get("properties", {})
+
+
+def test_legacy_price_changed_event_is_handled_and_deduplicated_on_svix_id(setup):
+    client.post("/api/v1/shopping/price-watches", json={"product_id": "p1", "target_price": "50"}, headers=_auth(1))
+    legacy = {"type": "price.changed", "canonical_product_id": "p1", "domain": "store-d.com", "old_price": 59.0,
+              "new_price": 49.5, "currency": "USD", "buy_url": "https://buy.example/d", "timestamp": "2026-10-27T15:49:00Z"}
+    body, headers = _signed(legacy, msg_id="msg_legacy_1")
+    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1"
+    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "DUPLICATE"
+    w = client.get("/api/v1/shopping/price-watches", headers=_auth(1)).json()["watches"][0]
+    assert w["status"] == "triggered" and w["last_price"] == "49.50" and w["last_merchant"] == "store-d.com"
