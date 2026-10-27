@@ -33,6 +33,11 @@ SIKA Pay is an **agentic checkout assistant** built on PayPal Orders v2:
 
 "Order created", "approved" and "captured" are always shown as **distinct states**.
 
+### Two ways to shop
+
+- **Partner stores (paid in the app):** the full PayPal flow above, with server-side prices, your confirmation or authorization, PayPal approval, then capture.
+- **The web (compare, then buy on the merchant's site):** SIKA searches real products at real online merchants through **[Channel3](https://trychannel3.com)**. It compares their offers (price, stock, new or used), checks your budget, and shows the best one. Opening the offer takes you to the merchant's page, where you pay there, with PayPal if the merchant offers it. SIKA never claims it paid on those sites: no API lets an agent check out at an arbitrary third-party merchant, and PayPal's agentic checkout for third-party merchants is not open in sandbox.
+
 ### Hybrid control
 
 By default you confirm every purchase yourself. In **Profile → SIKA authorization** you can let SIKA confirm purchases for you, within limits you choose:
@@ -51,6 +56,7 @@ You can withdraw it at any time. The agent's confirmation tool is **not even sho
 |---|---|
 | Understand intent, budget and quantity | Gemini 3.5 Flash (Vertex AI or Gemini API) with function calling |
 | Find real products, never invented | `search_demo_catalog` tool (READ_ONLY) |
+| Compare real merchants on the web | `search_web_products` tool (READ_ONLY, Channel3): offers per merchant, best in-stock new offer within budget |
 | Ask when ambiguous | System policy + tests: several matches → it asks which one |
 | Prepare, never pay | `prepare_paypal_checkout` tool (CONFIRMATION_REQUIRED): no PayPal call, no charge |
 | Confirm only when you allowed it | `confirm_checkout_with_authorization` tool, shown to the model only under an active user authorization; per-purchase, daily and expiry limits checked server-side |
@@ -149,6 +155,7 @@ cp .env.example .env
 #   PAYPAL_CLIENT_SECRET=...   (sandbox)
 #   PUBLIC_BASE_URL=http://<your-LAN-IP>:8001   (reachable from the phone)
 #   AI: either GEMINI_API_KEY=...  or  `gcloud auth application-default login` + GOOGLE_CLOUD_PROJECT
+#   Optional web shopping: CHANNEL3_API_KEY=...  (free key at https://trychannel3.com/developers)
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 

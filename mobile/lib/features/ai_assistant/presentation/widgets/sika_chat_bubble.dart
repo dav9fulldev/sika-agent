@@ -1,3 +1,4 @@
+import '../../../paypal/presentation/widgets/web_offers_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -121,6 +122,10 @@ class SikaChatBubble extends ConsumerWidget {
     // SIKA Pay : checkout PayPal préparé par l'agent (statuts réels suivis par le backend)
     if (data['type'] == 'paypal_checkout' && data['checkout'] is Map) {
       return PayPalCheckoutCard(initialCheckout: Map<String, dynamic>.from(data['checkout'] as Map));
+    }
+    // Recherche web : offres de vrais marchands (comparaison, paiement sur leur site)
+    if (data['type'] == 'web_offers' && data['products'] is List) {
+      return WebOffersCard(data: data);
     }
 
     // Fallback card simple if not a known rich response

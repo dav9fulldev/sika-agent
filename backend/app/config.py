@@ -106,6 +106,13 @@ class Settings:
         self.PAYPAL_CLIENT_SECRET: Optional[str] = resolved_secrets.get(
             "PAYPAL_CLIENT_SECRET", overrides.get("PAYPAL_CLIENT_SECRET", os.getenv("PAYPAL_CLIENT_SECRET") or None)
         )
+        # Recherche de produits chez de vrais marchands (Channel3, sponsor du hackathon) — lecture seule
+        self.CHANNEL3_API_KEY: Optional[str] = resolved_secrets.get(
+            "CHANNEL3_API_KEY", overrides.get("CHANNEL3_API_KEY", os.getenv("CHANNEL3_API_KEY") or None)
+        )
+        self.CHANNEL3_API_BASE: str = overrides.get(
+            "CHANNEL3_API_BASE", os.getenv("CHANNEL3_API_BASE", "https://api.trychannel3.com")
+        ).rstrip("/")
         # URL publique du backend, utilisée pour les redirections return/cancel de PayPal
         self.PUBLIC_BASE_URL: str = overrides.get("PUBLIC_BASE_URL", os.getenv("PUBLIC_BASE_URL", "http://localhost:8001")).rstrip("/")
         self.PAYPAL_RETURN_URL: str = overrides.get(
@@ -171,7 +178,7 @@ class Settings:
             return secrets
 
         target_secrets = ["JWT_SECRET_KEY", "DATABASE_URL", "REDIS_URL", "GOOGLE_CLIENT_ID",
-                          "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]
+                          "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "CHANNEL3_API_KEY"]
         try:
             # pyrefly: ignore [missing-import]
             from google.cloud import secretmanager

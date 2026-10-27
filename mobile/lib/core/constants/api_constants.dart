@@ -34,6 +34,7 @@ class ApiConstants {
   static const String paypalStatus = '/api/v1/paypal/status';
   static const String paypalCheckouts = '/api/v1/paypal/checkouts';
   static const String paypalAgentAuthorization = '/api/v1/paypal/agent-authorization';
+  static const String paypalWebProducts = '/api/v1/paypal/web-products';
 
   // Perception SMS
   static const String perceptionSms = '/api/v1/perception/sms';

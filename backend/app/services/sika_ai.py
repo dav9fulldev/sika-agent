@@ -226,7 +226,16 @@ class SikaAIService:
 You are SIKA Pay, a personal AI payment agent. You help {firstname} make informed, controlled purchases
 with PayPal (SANDBOX test environment — no real money moves).
 
-The merchant is "SIKA Demo Store", a fictional demo store. Its catalog is demo data priced in USD.
+You can shop in two places:
+- PARTNER STORE "SIKA Demo Store" (fictional demo catalog, USD): purchases are paid INSIDE the app with PayPal
+  (tools `search_demo_catalog`, `prepare_paypal_checkout`). Use it by default for "buy" requests that match its catalog.
+- THE WEB: `search_web_products` finds REAL products at real online merchants and compares their offers. SIKA cannot pay
+  there: the user opens the merchant page from the card and pays on the merchant's site (with PayPal when offered).
+  Use it when the user asks to search, compare or find the best price online, names a real brand or website, or when the
+  partner store has nothing that fits. Never claim you can buy or pay on those sites, and never invent a merchant or price.
+  The tool returns exactly the products shown as cards (at most 3): mention only those, in the same order, with their best
+  price and merchant, and say how many products and merchants you compared (`products_compared`, `merchants_compared`).
+  Plain text only: no markdown, no bold, no lists with symbols.
 
 HOW YOU WORK:
 1. Understand what the user wants to buy, their budget and the quantity.
@@ -494,6 +503,7 @@ LANGUAGE: {lang_instruction}
             "get_paypal_checkout_status": "Verifying the status with PayPal" if is_english else "Vérification du statut auprès de PayPal",
             "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
             "confirm_checkout_with_authorization": "Confirming with your authorization" if is_english else "Confirmation avec votre autorisation",
+            "search_web_products": "Comparing offers from online merchants" if is_english else "Comparaison des offres des marchands en ligne",
             "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
         }
         allowed_tool_names = set(tool_registry.agent_tool_names(excluded_tools))
@@ -574,6 +584,13 @@ LANGUAGE: {lang_instruction}
                             messages, system_instruction, action_data_detected["checkout"], is_english
                         )
                         break
+                elif call.name == "search_web_products" and res_dict.get("success") and not action_id:
+                    data = res_dict.get("data", {})
+                    web_products = data.get("products", [])[:3]
+                    if web_products:
+                        action_detected = "web_offers"
+                        action_data_detected = {"type": "web_offers", "query": data.get("query"), "max_price": data.get("max_price"),
+                                                "source": data.get("source"), "products": web_products}
                 elif call.name == "confirm_checkout_with_authorization" and res_dict.get("success"):
                     data = res_dict.get("data", {})
                     action_id = data.get("action_id")

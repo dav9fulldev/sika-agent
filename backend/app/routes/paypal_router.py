@@ -154,6 +154,22 @@ def cancel_checkout(checkout_id: str, data: Optional[CancelCheckoutRequest] = No
 
 
 # ----------------------------------------------------------------------
+# Recherche web (Channel3) : offres à jour juste avant d'ouvrir le site du marchand
+# ----------------------------------------------------------------------
+
+@router.get("/web-products/{product_id}", summary="Fresh offers for a web product",
+            description="Prix, stock et liens d'achat à jour (les liens d'offre expirent). Aucun paiement.")
+def web_product_offers(product_id: str, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    from ..services.web_shopping_service import web_shopping_service, WebShoppingError
+    try:
+        return web_shopping_service.refresh_offers(product_id, user_ref=str(user_id))
+    except WebShoppingError as e:
+        status = 404 if e.code == "INVALID_PRODUCT" else 503
+        raise HTTPException(status_code=status, detail={"success": False, "error_code": e.code, "message": e.message})
+
+
+# ----------------------------------------------------------------------
 # Mode hybride : autorisation accordée par l'utilisateur à l'agent
 # ----------------------------------------------------------------------
 
