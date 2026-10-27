@@ -1,3 +1,4 @@
+import '../../../../core/widgets/sika_pay_brand.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import '../../../../core/providers/language_provider.dart';
 
 class SikaInputBar extends ConsumerWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final bool isListening;
   final bool isSpeaking;
   final VoidCallback onMicTap;
@@ -15,6 +17,7 @@ class SikaInputBar extends ConsumerWidget {
   const SikaInputBar({
     super.key,
     required this.controller,
+    this.focusNode,
     required this.isListening,
     required this.isSpeaking,
     required this.onMicTap,
@@ -72,16 +75,16 @@ class SikaInputBar extends ConsumerWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       color: (isListening || isSpeaking)
-                          ? AppColors.error.withValues(alpha: 0.1)
+                          ? SikaBrand.action.withValues(alpha: 0.1)
                           : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isListening
-                          ? Icons.mic_off_rounded
-                          : (isSpeaking ? Icons.stop_circle_outlined : Icons.mic_none_rounded),
+                          ? Icons.mic_rounded
+                          : (isSpeaking ? Icons.stop_rounded : Icons.mic_none_rounded),
                       color: (isListening || isSpeaking)
-                          ? AppColors.error
+                          ? SikaBrand.action
                           : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       size: 24,
                     ),
@@ -96,6 +99,7 @@ class SikaInputBar extends ConsumerWidget {
                     child: Center(
                       child: TextField(
                         controller: controller,
+                        focusNode: focusNode,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 15,
@@ -129,15 +133,11 @@ class SikaInputBar extends ConsumerWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF635BFF), Color(0xFF4F46E5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: SikaBrand.action,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                          color: SikaBrand.action.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

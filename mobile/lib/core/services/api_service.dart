@@ -589,10 +589,7 @@ class ApiService {
     final response = await http
         .post(
           Uri.parse('$safeBaseUrl${ApiConstants.sikaTts}'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
+          headers: _headers, // la synthèse vocale est réservée aux utilisateurs connectés
           body: jsonEncode(body),
         )
         .timeout(AppConfig.agentTimeout);

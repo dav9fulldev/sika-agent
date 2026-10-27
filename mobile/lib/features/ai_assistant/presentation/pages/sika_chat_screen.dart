@@ -21,9 +21,11 @@ class SikaChatScreen extends ConsumerStatefulWidget {
 class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _inputFocus = FocusNode();
 
   @override
   void dispose() {
+    _inputFocus.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -52,6 +54,13 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Raccourci de l'accueil : la phrase est commencée, l'utilisateur la complète
+    ref.listen<String?>(chatDraftProvider, (_, draft) {
+      if (draft == null) return;
+      _textController.value = TextEditingValue(text: draft, selection: TextSelection.collapsed(offset: draft.length));
+      _inputFocus.requestFocus();
+      ref.read(chatDraftProvider.notifier).state = null;
+    });
     ref.listen<SikaData>(sikaProvider, (previous, next) {
       if (next.state == SikaState.listening &&
           next.currentText != null &&
@@ -132,6 +141,7 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
               duration: const Duration(milliseconds: 250),
               child: SikaInputBar(
                 controller: _textController,
+                focusNode: _inputFocus,
                 isListening: sikaData.state == SikaState.listening,
                 isSpeaking: sikaData.state == SikaState.speaking,
                 onMicTap: () {
@@ -306,32 +316,25 @@ class _SikaChatScreenState extends ConsumerState<SikaChatScreen> {
           ).animate().fade(delay: 400.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 40),
           
-          // Suggestions SIKA Pay
-          SikaPromptSuggestion(
-            text: langNotifier.tr('Acheter un cours Excel à moins de 50 \$', 'Buy an Excel course under \$50'),
-            icon: Icons.shopping_bag_outlined,
-            delay: 500.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
-                'Aide-moi à acheter un cours Excel sans dépasser 50 dollars.',
-                'Help me buy an Excel course without going over 50 dollars.')),
-          ),
-          const SizedBox(height: 12),
-          SikaPromptSuggestion(
-            text: langNotifier.tr('Du stockage cloud, budget 40 \$', 'Cloud storage, \$40 budget'),
-            icon: Icons.cloud_outlined,
-            delay: 600.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
-                'Je veux acheter du stockage cloud, mon budget est de 40 dollars.',
-                'I want to buy cloud storage, my budget is 40 dollars.')),
-          ),
-          const SizedBox(height: 12),
-          SikaPromptSuggestion(
-            text: langNotifier.tr('Où en est mon dernier paiement ?', 'Did my last payment go through?'),
-            icon: Icons.fact_check_outlined,
-            delay: 700.ms,
-            onTap: () => sikaNotifier.sendTextMessage(langNotifier.tr(
-                'Où en est mon dernier paiement ?', 'Did my last payment go through?')),
-          ),
+          // Suggestions : une par capacité (achat, comparaison web, abonnement, suivi)
+          for (final (i, icon, label, prompt) in [
+            (0, Icons.shopping_bag_outlined, langNotifier.tr('Acheter un cours en ligne sous 50 \$', 'Buy an online course under \$50'),
+                langNotifier.tr('Aide-moi à acheter un cours en ligne sans dépasser 50 dollars.', 'Help me buy an online course without going over 50 dollars.')),
+            (1, Icons.compare_arrows_rounded, langNotifier.tr('Comparer les prix d\'un casque sans fil', 'Compare prices for wireless headphones'),
+                langNotifier.tr('Compare les prix en ligne pour un casque sans fil sous 80 dollars.', 'Compare prices online for wireless headphones under 80 dollars.')),
+            (2, Icons.autorenew_rounded, langNotifier.tr('Un abonnement musique pas cher', 'A cheap music subscription'),
+                langNotifier.tr('Trouve-moi l\'abonnement musique le moins cher.', 'Find me the cheapest music subscription.')),
+            (3, Icons.fact_check_outlined, langNotifier.tr('Où en est mon dernier paiement ?', 'Did my last payment go through?'),
+                langNotifier.tr('Où en est mon dernier paiement ?', 'Did my last payment go through?')),
+          ]) ...[
+            if (i > 0) const SizedBox(height: 12),
+            SikaPromptSuggestion(
+              text: label,
+              icon: icon,
+              delay: (500 + i * 100).ms,
+              onTap: () => sikaNotifier.sendTextMessage(prompt),
+            ),
+          ],
         ],
       ),
     );

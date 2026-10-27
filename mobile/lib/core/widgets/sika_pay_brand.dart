@@ -37,7 +37,7 @@ class SikaPayWordmark extends StatelessWidget {
     final base = TextStyle(fontSize: fontSize, fontWeight: FontWeight.w800, letterSpacing: -0.6, height: 1);
     return Text.rich(
       TextSpan(children: [
-        TextSpan(text: 'SIKA ', style: base.copyWith(color: SikaBrand.ink)),
+        TextSpan(text: 'SIKA ', style: base.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : SikaBrand.ink)),
         TextSpan(text: 'Pay', style: base.copyWith(color: SikaBrand.action, fontWeight: FontWeight.w700)),
       ]),
       semanticsLabel: 'SIKA Pay',
