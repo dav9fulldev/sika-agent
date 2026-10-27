@@ -1,7 +1,7 @@
 name: sika_assistant_mobile
 description: "SIKA - Agent Financier Autonome Mobile App"
 publish_to: 'none'
-version: 2.5.0 # x-release-please-version
+version: 2.6.0 # x-release-please-version
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
