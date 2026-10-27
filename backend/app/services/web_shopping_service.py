@@ -166,8 +166,9 @@ class WebShoppingService:
         except ValueError:
             raise WebShoppingError("WEB_SEARCH_UNAVAILABLE", "The product search service returned an invalid response.")
         products = [p for p in (normalize_product(r, budget) for r in raw_products) if p]
-        # Les produits avec une offre éligible d'abord, puis par meilleur prix
-        products.sort(key=lambda p: (p["best_offer"] is None, Decimal(p["best_offer"]["price"]) if p["best_offer"] else Decimal(0)))
+        # Ordre de pertinence de Channel3 conservé (trier par prix fait remonter les accessoires) ;
+        # seuls les produits sans offre dans le budget passent à la fin
+        products.sort(key=lambda p: p["best_offer"] is None)
         merchants = {o["merchant"] for p in products for o in p["offers"]}
         # Le modèle et l'app voient exactement les mêmes produits (au plus 3), pour que le texte corresponde aux cartes
         shown = products[:3]

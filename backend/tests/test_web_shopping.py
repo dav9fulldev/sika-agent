@@ -72,7 +72,7 @@ def test_search_sends_budget_and_key_and_ranks_results(configured):
     url, body, headers = configured.calls[0]
     assert url.endswith("/v1/search") and headers["x-api-key"] == "test-key"
     assert body["filters"]["price"] == {"max_price": 50.0}
-    assert [p["product_id"] for p in data["products"]] == ["p2", "p1", "p3"]
+    assert [p["product_id"] for p in data["products"]] == ["p1", "p2", "p3"]  # pertinence conservée, hors budget à la fin
     assert data["products_compared"] == 3 and data["merchants_compared"] == 6
     assert "cannot pay" in data["payment_note"]
 
@@ -115,7 +115,7 @@ def test_agent_returns_web_offer_cards(configured):
     res = asyncio.run(ai.chat("Find wireless headphones under $50 online", user_id="1"))
     assert res["action"] == "web_offers" and res["requires_confirmation"] is False
     cards = res["action_data"]["products"]
-    assert [c["product_id"] for c in cards] == ["p2", "p1", "p3"]  # mêmes produits que ceux vus par le modèle
+    assert [c["product_id"] for c in cards] == ["p1", "p2", "p3"]  # mêmes produits que ceux vus par le modèle
     assert cards[2]["best_offer"] is None  # p3 : aucune offre dans le budget, la carte le dit
     assert all(c["best_offer"]["url"].startswith("https://") for c in cards if c["best_offer"])
 
