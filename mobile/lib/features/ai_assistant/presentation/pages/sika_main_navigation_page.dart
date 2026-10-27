@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/widgets/sika_pay_brand.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_voice_overlay_widget.dart';
 import 'sika_chat_screen.dart';
@@ -18,28 +19,8 @@ class SikaMainNavigationPage extends ConsumerStatefulWidget {
 }
 
 class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
-    with TickerProviderStateMixin {
+{
   int _currentIndex = 0;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,65 +126,70 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
     );
   }
 
+  /// Bouton vocal central : bleu SIKA, micro. Écoute : halo cyan qui suit le niveau réel du micro.
+  /// Réflexion : arc qui tourne. Réponse vocale : carré d'arrêt (interrompt SIKA).
   Widget _buildCentralSikaButton(bool isListening, bool isProcessing, AppLanguage currentAppLang, SikaNotifier sikaNotifier) {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return GestureDetector(
-          onLongPressStart: (_) async {
-            await sikaNotifier.startListening(sttLocale: currentAppLang.sttLocale);
-          },
-          onLongPressEnd: (_) async {
-            await sikaNotifier.stopListening();
-          },
-          onTap: () async {
+    final data = ref.watch(sikaProvider);
+    final isSpeaking = data.state == SikaState.speaking;
+    final langNotifier = ref.read(languageProvider.notifier);
+    final halo = isListening ? 1.0 + data.soundLevel * 0.45 : 1.0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Semantics(
+      button: true,
+      label: isSpeaking
+          ? langNotifier.tr('Arrêter SIKA', 'Stop SIKA')
+          : isListening
+              ? langNotifier.tr('Envoyer', 'Send')
+              : langNotifier.tr('Parler à SIKA', 'Talk to SIKA'),
+      child: GestureDetector(
+        onTap: () async {
+          if (isSpeaking) {
+            await sikaNotifier.stopSpeaking(resetState: true);
+          } else if (!isProcessing) {
             await sikaNotifier.toggleListening(sttLocale: currentAppLang.sttLocale);
-          },
-          child: Transform.scale(
-            scale: isListening ? _pulseAnimation.value : 1.0,
-            child: Container(
-              width: 54,
-              height: 54,
-              margin: const EdgeInsets.only(bottom: 8), // Slight elevation
+          }
+        },
+        child: SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(alignment: Alignment.center, children: [
+            // Halo du niveau sonore
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 90),
+              width: 56 * halo,
+              height: 56 * halo,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isListening
-                      ? [AppColors.success, const Color(0xFF059669)]
-                      : [const Color(0xFFA855F7), const Color(0xFF635BFF)],
-                ),
+                color: isListening ? SikaBrand.cyan.withValues(alpha: 0.28) : Colors.transparent,
+              ),
+            ),
+            if (isProcessing)
+              const SizedBox(
+                width: 62,
+                height: 62,
+                child: CircularProgressIndicator(strokeWidth: 2.5, color: SikaBrand.cyan, strokeCap: StrokeCap.round),
+              ),
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSpeaking ? SikaBrand.ink : SikaBrand.action,
+                border: Border.all(color: isDark ? AppColors.darkSurface : Colors.white, width: 3),
                 boxShadow: [
-                  BoxShadow(
-                    color: (isListening ? AppColors.success : const Color(0xFF635BFF))
-                        .withValues(alpha: isListening ? 0.6 : 0.4),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 4),
-                  ),
+                  BoxShadow(color: SikaBrand.action.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 5)),
                 ],
               ),
-              child: isProcessing
-                  ? const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      ),
-                    )
-                  : Icon(
-                      isListening ? Icons.mic_rounded : Icons.auto_awesome_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+              child: Icon(
+                isSpeaking ? Icons.stop_rounded : Icons.mic_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
             ),
-          ),
-        );
-      },
+          ]),
+        ),
+      ),
     );
   }
 

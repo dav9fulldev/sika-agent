@@ -1,390 +1,241 @@
 import 'dart:math' as math;
-import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/providers/language_provider.dart';
-import '../../providers/sika_provider.dart';
-import '../../../paypal/presentation/widgets/paypal_checkout_card.dart';
 
+import '../../../../core/providers/language_provider.dart';
+import '../../../../core/widgets/sika_pay_brand.dart';
+import '../../providers/sika_provider.dart';
+
+/// Panneau vocal : la transcription en direct est l'élément principal, sous elle le niveau réel du micro.
+/// Quand la réponse contient une carte (achat, abonnement, offres), le panneau s'efface et la conversation
+/// l'affiche ; la voix continue.
 class SikaVoiceOverlayWidget extends ConsumerStatefulWidget {
   const SikaVoiceOverlayWidget({super.key});
 
   @override
-  ConsumerState<SikaVoiceOverlayWidget> createState() =>
-      _SikaVoiceOverlayWidgetState();
+  ConsumerState<SikaVoiceOverlayWidget> createState() => _SikaVoiceOverlayWidgetState();
 }
 
-class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget>
-    with TickerProviderStateMixin {
-  late AnimationController _orbController;
-  late AnimationController _waveController;
-  late Animation<double> _orbPulseAnimation;
+class _SikaVoiceOverlayWidgetState extends ConsumerState<SikaVoiceOverlayWidget> with SingleTickerProviderStateMixin {
+  static const _bars = 28;
+  final List<double> _levels = List.filled(_bars, 0.04);
+  late final AnimationController _ticker = AnimationController(vsync: this, duration: const Duration(milliseconds: 90))
+    ..addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        _pushLevel();
+        _ticker.forward(from: 0);
+      }
+    })
+    ..forward();
+  final _rand = math.Random(7);
 
-  @override
-  void initState() {
-    super.initState();
-
-    _orbController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-
-    _orbPulseAnimation = Tween<double>(begin: 0.92, end: 1.08).animate(
-      CurvedAnimation(
-        parent: _orbController,
-        curve: Curves.easeInOut,
-      ),
-    );
+  /// Historique glissant : niveau réel du micro en écoute, enveloppe douce quand SIKA parle.
+  void _pushLevel() {
+    final data = ref.read(sikaProvider);
+    double v;
+    if (data.state == SikaState.listening) {
+      v = 0.06 + data.soundLevel * 0.94;
+    } else if (data.state == SikaState.speaking) {
+      v = 0.25 + _rand.nextDouble() * 0.5;
+    } else {
+      v = 0.04;
+    }
+    setState(() {
+      _levels.removeAt(0);
+      _levels.add(v);
+    });
   }
 
   @override
   void dispose() {
-    _orbController.dispose();
-    _waveController.dispose();
+    _ticker.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final sikaData = ref.watch(sikaProvider);
-    final sikaNotifier = ref.read(sikaProvider.notifier);
+    final data = ref.watch(sikaProvider);
+    final sika = ref.read(sikaProvider.notifier);
     ref.watch(languageProvider);
-    final langNotifier = ref.read(languageProvider.notifier);
+    final lang = ref.read(languageProvider.notifier);
 
-    final String recognizedText = sikaData.currentText ?? '';
-
-    // L'overlay vocal ne doit s'afficher que si on est en mode vocal !
-    if (!sikaData.isVoiceMode) return const SizedBox.shrink();
-
-    // Check if there is an active confirmation card to display
-    final String? actionId = sikaData.activeActionId ?? sikaData.pendingActionId;
-    final bool hasPendingConfirmation = actionId != null &&
-        (sikaData.state == SikaState.securityValidation ||
-            sikaData.state == SikaState.speaking ||
-            sikaData.state == SikaState.waitingVoiceConfirmation ||
-            sikaData.state == SikaState.idle);
-
-    Map<String, dynamic>? transactionData = sikaData.pendingActionData;
-    if (transactionData == null || transactionData.isEmpty) {
-      for (final msg in sikaData.messages.reversed) {
-        if (msg.suggestedTransaction != null &&
-            msg.suggestedTransaction!.isNotEmpty) {
-          transactionData = msg.suggestedTransaction;
-          break;
-        }
-      }
-    }
-
-    String titleText = '';
-    String subText = '';
-    bool hasSubText = false;
-    bool showError = false;
-
-    if (sikaData.state == SikaState.idle) {
-      titleText = langNotifier.tr('En attente...', 'Waiting...');
-      subText = langNotifier.tr('Appuyez sur l\'orbe pour parler', 'Tap the orb to speak');
-      hasSubText = true;
-    } else if (sikaData.state == SikaState.listening) {
-      titleText = langNotifier.tr('Je vous écoute', 'I\'m listening');
-      subText = langNotifier.tr('Parlez maintenant...', 'Speak now...');
-      hasSubText = true;
-    } else if (sikaData.state == SikaState.processing) {
-      titleText = langNotifier.tr('SIKA analyse votre demande', 'SIKA is analyzing your request');
-      subText = '';
-      hasSubText = false;
-    } else if (sikaData.state == SikaState.speaking) {
-      titleText = langNotifier.tr('SIKA vous répond', 'SIKA is speaking');
-      subText = '';
-      hasSubText = false;
-    } else if (sikaData.state == SikaState.waitingVoiceConfirmation) {
-      titleText = langNotifier.tr('Confirmation requise', 'Confirmation required');
-      subText = langNotifier.tr('Veuillez confirmer l\'opération.', 'Please confirm the operation.');
-      hasSubText = true;
-    } else if (sikaData.state == SikaState.securityValidation) {
-      titleText = langNotifier.tr('Validation de sécurité', 'Security validation');
-      subText = langNotifier.tr('SIKA sécurise la transaction...', 'SIKA is securing the transaction...');
-      hasSubText = true;
-    } else if (sikaData.state == SikaState.executingAction) {
-      titleText = langNotifier.tr('Exécution en cours', 'Executing transaction');
-      subText = langNotifier.tr('Paiement PayPal en cours...', 'PayPal payment in progress...');
-      hasSubText = true;
-    } else if (sikaData.state == SikaState.error) {
-      titleText = langNotifier.tr('Une erreur est survenue', 'An error occurred');
-      subText = sikaData.errorMessage ?? langNotifier.tr('SIKA n\'a pas pu répondre.', 'SIKA could not respond.');
-      hasSubText = true;
-      showError = true;
-    }
+    if (!data.isVoiceMode) return const SizedBox.shrink();
+    final lastSika = data.messages.where((m) => !m.isUser).toList();
+    final replyHasCard = data.state != SikaState.listening &&
+        data.state != SikaState.processing &&
+        lastSika.isNotEmpty &&
+        lastSika.last.suggestedTransaction != null;
+    if (replyHasCard) return const SizedBox.shrink();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF111A2E) : Colors.white;
+    final ink = isDark ? Colors.white : SikaBrand.ink;
+    final muted = isDark ? Colors.white60 : SikaBrand.muted;
+
+    final (label, color) = switch (data.state) {
+      SikaState.listening => (lang.tr('À l\'écoute', 'Listening'), SikaBrand.cyan),
+      SikaState.processing => (lang.tr('SIKA réfléchit', 'SIKA is thinking'), SikaBrand.action),
+      SikaState.speaking => (lang.tr('SIKA répond', 'SIKA is answering'), SikaBrand.action),
+      SikaState.error => (lang.tr('Réessayez', 'Try again'), SikaBrand.danger),
+      _ => (lang.tr('Prêt', 'Ready'), muted),
+    };
+
+    final userText = (data.currentText ?? '').trim();
+    final reply = lastSika.isNotEmpty ? lastSika.last.text : '';
+    final String mainText;
+    final bool placeholder;
+    if (data.state == SikaState.error) {
+      mainText = data.errorMessage ?? lang.tr("SIKA n'a pas pu vous entendre.", 'SIKA could not hear you.');
+      placeholder = false;
+    } else if (data.state == SikaState.speaking && reply.isNotEmpty) {
+      mainText = reply;
+      placeholder = false;
+    } else if (userText.isNotEmpty) {
+      mainText = userText;
+      placeholder = false;
+    } else {
+      mainText = lang.tr('Dites ce que vous voulez acheter, comparer ou payer.', 'Say what you want to buy, compare or pay.');
+      placeholder = true;
+    }
 
     return Positioned.fill(
       child: Material(
-        color: Colors.transparent,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            color: isDark 
-                ? AppColors.darkBackground.withValues(alpha: 0.88)
-                : AppColors.lightBackground.withValues(alpha: 0.92),
-            child: SafeArea(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 12),
-                    
-                    // 1. IDENTITÉ SIKA (Petite icône haut)
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF635BFF), Color(0xFF4F46E5)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.brandPrimary.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.auto_awesome_rounded, size: 22, color: Colors.white),
-                      ),
-                    ).animate().fade().slideY(begin: -0.2, end: 0),
-                    
-                    const SizedBox(height: 24),
-
-                    // 2. ÉTAT ACTUEL (Titre)
-                    Text(
-                      titleText,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: showError ? AppColors.error : Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
-                          ),
-                    ).animate().fade().slideY(begin: 0.1, end: 0),
-                    
-                    const SizedBox(height: 12),
-
-                    // 3. TRANSCRIPTION OU SUBTEXT
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: hasSubText
-                          ? Text(
-                              subText,
-                              key: ValueKey<String>(subText),
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: showError
-                                        ? AppColors.error.withValues(alpha: 0.8)
-                                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                    fontWeight: recognizedText.isNotEmpty ? FontWeight.w500 : FontWeight.normal,
-                                    fontStyle: recognizedText.isNotEmpty ? FontStyle.italic : FontStyle.normal,
-                                    height: 1.4,
-                                  ),
-                            )
-                          : const SizedBox(height: 16),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 4. SI CONFIRMATION EN COURS -> CARTE DE CONFIRMATION AVEC BIOMÉTRIE AUTO
-                    if (hasPendingConfirmation && transactionData != null) ...[
-                      Builder(
-                        builder: (context) {
-                          final checkout = transactionData!['checkout'];
-                          if (transactionData['type'] != 'paypal_checkout' || checkout is! Map) {
-                            return const SizedBox.shrink();
-                          }
-                          return PayPalCheckoutCard(initialCheckout: Map<String, dynamic>.from(checkout));
-                        },
-                      ).animate().fade(duration: 400.ms).slideY(begin: 0.1, end: 0),
-                      const SizedBox(height: 24),
-                    ] else ...[
-                      // ORBE VOCAL & ONDES AUDIO CLASSIQUES
-                      SizedBox(
-                        height: 180,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Ondes Audio
-                            if (sikaData.state == SikaState.listening || sikaData.state == SikaState.speaking)
-                              Positioned.fill(
-                                child: AnimatedBuilder(
-                                  animation: _waveController,
-                                  builder: (context, child) {
-                                    return CustomPaint(
-                                      painter: _SiriWavePainter(progress: _waveController.value),
-                                    );
-                                  },
-                                ),
-                              ).animate().fade(duration: 600.ms),
-                              
-                            // Orbe Central
-                            GestureDetector(
-                              onTap: () async {
-                                if (sikaData.state == SikaState.listening) {
-                                  await sikaNotifier.stopListening();
-                                } else if (sikaData.state == SikaState.speaking) {
-                                  sikaNotifier.stopSpeaking(resetState: false);
-                                } else if (sikaData.state == SikaState.idle || sikaData.state == SikaState.error) {
-                                  sikaNotifier.startListening();
-                                }
-                              },
-                              child: AnimatedBuilder(
-                                animation: _orbPulseAnimation,
-                                builder: (context, child) {
-                                  return Transform.scale(
-                                    scale: (sikaData.state == SikaState.listening || sikaData.state == SikaState.speaking) ? _orbPulseAnimation.value : 1.0,
-                                    child: Container(
-                                      width: 130,
-                                      height: 130,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: RadialGradient(
-                                          colors: [
-                                            showError ? AppColors.error : const Color(0xFF38BDF8),
-                                            showError ? AppColors.error.withValues(alpha: 0.5) : const Color(0xFF635BFF),
-                                            Colors.transparent,
-                                          ],
-                                          stops: const [0.1, 0.5, 1.0],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: (showError ? AppColors.error : AppColors.brandPrimary).withValues(alpha: 0.4),
-                                            blurRadius: 40,
-                                            spreadRadius: 10,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: Container(
-                                          width: 38,
-                                          height: 38,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: isDark ? AppColors.darkSurfaceHighlight : Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ).animate().fade(duration: 800.ms).scale(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // 5. BOUTON D'ACTION (Annuler / Fermer)
-                    GestureDetector(
-                      onTap: () async {
-                        if (showError) {
-                          sikaNotifier.clearConversation();
-                        } else {
-                          await sikaNotifier.stopListening();
-                          sikaNotifier.clearConversation();
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
-                        ),
-                        child: Text(
-                          showError
-                              ? langNotifier.tr('Fermer', 'Close')
-                              : langNotifier.tr('Annuler', 'Cancel'),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-                    ).animate().fade().slideY(begin: 0.2, end: 0),
-                    
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
+        color: Colors.black.withValues(alpha: isDark ? 0.55 : 0.32),
+        child: Column(children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _close(sika),
             ),
           ),
-        ),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(24, 14, 24, 24 + MediaQuery.of(context).padding.bottom),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 30, offset: const Offset(0, -6))],
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Center(
+                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: muted.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
+              ),
+              const SizedBox(height: 18),
+              Row(children: [
+                Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13.5, letterSpacing: 0.2)),
+              ]),
+              const SizedBox(height: 14),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 84, maxHeight: 220),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Text(
+                      mainText,
+                      key: ValueKey(placeholder ? 'p' : mainText.length ~/ 12),
+                      style: TextStyle(
+                        fontSize: data.state == SikaState.speaking ? 18 : 23,
+                        height: 1.32,
+                        fontWeight: placeholder ? FontWeight.w400 : FontWeight.w600,
+                        color: placeholder ? muted : ink,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 44,
+                child: data.state == SikaState.processing
+                    ? Center(
+                        child: SizedBox(
+                          width: 160,
+                          child: LinearProgressIndicator(
+                            minHeight: 3,
+                            borderRadius: BorderRadius.circular(2),
+                            color: SikaBrand.action,
+                            backgroundColor: SikaBrand.action.withValues(alpha: 0.12),
+                          ),
+                        ),
+                      )
+                    : CustomPaint(size: Size.infinite, painter: _LevelBars(_levels, color: color)),
+              ),
+              const SizedBox(height: 18),
+              _actions(data, sika, lang, ink, muted),
+            ]),
+          ),
+        ]),
       ),
     );
   }
+
+  Future<void> _close(SikaNotifier sika) async {
+    final state = ref.read(sikaProvider).state;
+    if (state == SikaState.listening) await sika.cancelListening();
+    if (state == SikaState.speaking) await sika.stopSpeaking(resetState: false);
+    sika.exitVoiceMode();
+  }
+
+  Widget _actions(SikaData data, SikaNotifier sika, LanguageNotifier lang, Color ink, Color muted) {
+    Widget textButton(String text, VoidCallback onTap) => TextButton(
+          onPressed: onTap,
+          child: Text(text, style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 15)),
+        );
+    Widget round(IconData icon, String semantic, VoidCallback? onTap, {Color bg = SikaBrand.action}) => Semantics(
+          button: true,
+          label: semantic,
+          child: Material(
+            color: onTap == null ? bg.withValues(alpha: 0.35) : bg,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: SizedBox(width: 60, height: 60, child: Icon(icon, color: Colors.white, size: 26)),
+            ),
+          ),
+        );
+
+    final hasText = (data.currentText ?? '').trim().isNotEmpty;
+    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      textButton(lang.tr('Fermer', 'Close'), () => _close(sika)),
+      switch (data.state) {
+        SikaState.listening => round(Icons.arrow_upward_rounded, lang.tr('Envoyer', 'Send'), hasText ? sika.stopListening : null),
+        SikaState.processing => round(Icons.more_horiz_rounded, lang.tr('En cours', 'Working'), null),
+        SikaState.speaking => round(Icons.stop_rounded, lang.tr('Arrêter', 'Stop'), () => sika.stopSpeaking(resetState: true), bg: SikaBrand.ink),
+        _ => round(Icons.mic_rounded, lang.tr('Parler', 'Talk'), () => sika.startListening()),
+      },
+      const SizedBox(width: 64),
+    ]);
+  }
 }
 
-class _SiriWavePainter extends CustomPainter {
-  final double progress;
-
-  _SiriWavePainter({required this.progress});
+/// Barres de niveau symétriques, arrondies, les plus récentes à droite.
+class _LevelBars extends CustomPainter {
+  final List<double> levels;
+  final Color color;
+  _LevelBars(this.levels, {required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final midY = size.height / 2;
-    final width = size.width;
-
-    // 1. ONDE BLEUE PRINCIPALE
-    final paintBlue = Paint()
-      ..color = const Color(0xFF38BDF8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final pathBlue = Path();
-    pathBlue.moveTo(0, midY);
-
-    for (double x = 0; x <= width; x += 1) {
-      final normalizedX = x / width;
-      final envelope = math.sin(normalizedX * math.pi);
-      final y = midY +
-          math.sin((normalizedX * 4 * math.pi) + (progress * 2 * math.pi)) *
-              16 *
-              envelope;
-      pathBlue.lineTo(x, y);
+    final n = levels.length;
+    final gap = size.width / n;
+    final w = math.min(4.0, gap * 0.55);
+    final mid = size.height / 2;
+    for (var i = 0; i < n; i++) {
+      final h = math.max(4.0, levels[i] * size.height);
+      final paint = Paint()..color = color.withValues(alpha: 0.35 + 0.65 * (i / n));
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(gap * (i + 0.5), mid), width: w, height: h), Radius.circular(w)),
+        paint,
+      );
     }
-    canvas.drawPath(pathBlue, paintBlue);
-
-    // 2. ONDE VIOLETTE EN DÉCALAGE DE PHASE
-    final paintPurple = Paint()
-      ..color = const Color(0xFFA855F7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final pathPurple = Path();
-    pathPurple.moveTo(0, midY);
-
-    for (double x = 0; x <= width; x += 1) {
-      final normalizedX = x / width;
-      final envelope = math.sin(normalizedX * math.pi);
-      final y = midY +
-          math.sin((normalizedX * 3 * math.pi) - (progress * 2 * math.pi)) *
-              12 *
-              envelope;
-      pathPurple.lineTo(x, y);
-    }
-    canvas.drawPath(pathPurple, paintPurple);
   }
 
   @override
-  bool shouldRepaint(covariant _SiriWavePainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
+  bool shouldRepaint(covariant _LevelBars old) => true;
 }

@@ -1,3 +1,4 @@
+import re
 import base64
 import logging
 from typing import Dict, Any, Optional
@@ -5,13 +6,30 @@ from google.cloud import texttospeech
 
 logger = logging.getLogger(__name__)
 
+_URL = re.compile(r"https?://\S+")
+# Identifiants techniques (commande PayPal, capture, checkout) : illisibles à voix haute
+_TECH_ID = re.compile(r"\b(?=[A-Z0-9_-]*\d)(?=[A-Z0-9_-]*[A-Z])[A-Z0-9_-]{10,}\b|\bchk_[a-f0-9]+\b|\bsub_[a-f0-9]+\b")
+
+
+def speakable_text(text: str) -> str:
+    """Texte prêt à être lu : sans liens, sans identifiants techniques, sans ponctuation vide."""
+    text = _URL.sub("", text or "")
+    text = _TECH_ID.sub("", text)
+    text = re.sub(r"\b(Order|Capture|Commande|capture|order),?\s*(?=[,.])", "", text)
+    text = re.sub(r"\s+([,.;:])", r"\1", text)
+    text = re.sub(r"([,.;:]){2,}", r"\1", text)
+    return re.sub(r"\s{2,}", " ", text).strip()[:1200]
+
+
 class GCPTTSService:
     """Service d'intégration officiel Google Cloud Text-to-Speech (GCP TTS).
-    Génère une synthèse vocale haute-fidélité en Français (ex: fr-FR-Neural2-C) via ADC.
+    Voix Chirp 3 HD (dernière génération Google, la plus naturelle), en français et en anglais, via ADC.
     """
 
-    DEFAULT_VOICE_FR = "fr-FR-Neural2-C"
-    DEFAULT_VOICE_EN = "en-US-Neural2-F"
+    DEFAULT_VOICE_FR = "fr-FR-Chirp3-HD-Aoede"
+    DEFAULT_VOICE_EN = "en-US-Chirp3-HD-Aoede"
+    # Seules ces familles de voix peuvent être demandées par l'app (les autres retombent sur la voix par défaut)
+    ALLOWED_VOICE_PREFIXES = ("fr-FR-Chirp3-HD-", "en-US-Chirp3-HD-", "fr-FR-Neural2-", "en-US-Neural2-")
     DEFAULT_LANG_FR = "fr-FR"
     DEFAULT_LANG_EN = "en-US"
 
@@ -38,6 +56,10 @@ class GCPTTSService:
         """Synthétise un texte en audio MP3 encodé en base64 via l'API Google Cloud TTS."""
         if not text or not text.strip():
             return {"success": False, "error": "Le texte à synthétiser est vide."}
+
+        if voice_name and not voice_name.startswith(self.ALLOWED_VOICE_PREFIXES):
+            voice_name = None
+        text = speakable_text(text)
 
         client = self._get_client()
         if not client:

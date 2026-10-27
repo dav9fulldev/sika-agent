@@ -52,6 +52,8 @@ class SikaData {
   final String? errorMessage;
   final bool isInitialized;
   final bool isVoiceMode;
+  /// Niveau sonore du micro pendant l'écoute (0 à 1), pour l'indicateur visuel.
+  final double soundLevel;
   final SikaState? pendingNextState;
   final String? pendingActionId;
   final Map<String, dynamic>? pendingActionData;
@@ -68,6 +70,7 @@ class SikaData {
     this.errorMessage,
     this.isInitialized = false,
     this.isVoiceMode = false,
+    this.soundLevel = 0,
     this.pendingNextState,
     this.pendingActionId,
     this.pendingActionData,
@@ -83,6 +86,8 @@ class SikaData {
     String? errorMessage,
     bool? isInitialized,
     bool? isVoiceMode,
+    double? soundLevel,
+    bool clearText = false,
     SikaState? pendingNextState,
     String? pendingActionId,
     Map<String, dynamic>? pendingActionData,
@@ -95,10 +100,11 @@ class SikaData {
     return SikaData(
       state: state ?? this.state,
       messages: messages ?? this.messages,
-      currentText: currentText ?? this.currentText,
+      currentText: clearText ? null : (currentText ?? this.currentText),
       errorMessage: errorMessage ?? this.errorMessage,
       isInitialized: isInitialized ?? this.isInitialized,
       isVoiceMode: isVoiceMode ?? this.isVoiceMode,
+      soundLevel: soundLevel ?? this.soundLevel,
       pendingNextState: pendingNextState ?? this.pendingNextState,
       pendingActionId:
           clearActionData ? null : (pendingActionId ?? this.pendingActionId),
@@ -152,9 +158,16 @@ class SikaNotifier extends StateNotifier<SikaData> {
     _speechEnabled = await _speechToText.initialize(
       onError: (val) {
         debugPrint('[SIKA STT] Speech error: ${val.errorMsg}');
-        if (val.errorMsg == 'error_speech_timeout') {
-          // Timeout normal (l'utilisateur n'a rien dit)
-          state = state.copyWith(state: SikaState.idle);
+        if (val.errorMsg == 'error_speech_timeout' || val.errorMsg == 'error_no_match') {
+          // Rien entendu : on le dit clairement plutôt que de revenir silencieusement à « Prêt »
+          final isEn = _ref.read(languageProvider).code == 'en';
+          state = state.copyWith(
+            state: SikaState.error,
+            soundLevel: 0,
+            errorMessage: isEn
+                ? "I didn't hear anything. Tap the microphone and speak."
+                : "Je n'ai rien entendu. Touchez le micro et parlez.",
+          );
         } else {
           final isEn = _ref.read(languageProvider).code == 'en';
           String friendlyError = isEn
@@ -246,7 +259,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     try {
       state = state.copyWith(
         state: SikaState.listening,
-        currentText: null,
+        clearText: true,
         errorMessage: null,
         isVoiceMode: true,
       );
@@ -261,6 +274,11 @@ class SikaNotifier extends StateNotifier<SikaData> {
                 '[SIKA STT] Triggering _onSpeechComplete because isFinal is true');
             _onSpeechComplete();
           }
+        },
+        // Niveau du micro (environ -2 à 10 sur Android) ramené entre 0 et 1, lissé
+        onSoundLevelChange: (level) {
+          final v = ((level + 2) / 12).clamp(0.0, 1.0);
+          state = state.copyWith(soundLevel: state.soundLevel * 0.5 + v * 0.5);
         },
         listenOptions: SpeechListenOptions(
           listenFor: const Duration(seconds: 45),
@@ -291,6 +309,23 @@ class SikaNotifier extends StateNotifier<SikaData> {
     }
   }
 
+  /// Arrête l'écoute sans envoyer ce qui a été dicté.
+  Future<void> cancelListening() async {
+    if (state.state != SikaState.listening) return;
+    state = state.copyWith(state: SikaState.idle, clearText: true, soundLevel: 0);
+    try {
+      await _speechToText.cancel();
+    } catch (e) {
+      debugPrint('[SIKA VOICE] Error cancelling STT: $e');
+    }
+  }
+
+  /// Ferme le panneau vocal ; la conversation et les cartes restent dans le chat.
+  void exitVoiceMode() {
+    state = state.copyWith(isVoiceMode: false, soundLevel: 0, clearText: true,
+        state: state.state == SikaState.processing ? SikaState.processing : SikaState.idle);
+  }
+
   Future<void> toggleListening({String? sttLocale}) async {
     if (state.state == SikaState.listening) {
       await stopListening();
@@ -301,6 +336,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   void _onSpeechComplete() {
     if (state.state != SikaState.listening) return;
+    state = state.copyWith(soundLevel: 0);
 
     final text = state.currentText;
     if (text != null && text.trim().isNotEmpty) {
@@ -323,7 +359,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     );
     // Relancer le service Wake Word natif en arrière-plan UNIQUEMENT s'il est activé
     final prefs = await SharedPreferences.getInstance();
-    final isEnabled = prefs.getBool('wake_word_enabled') ?? true;
+    final isEnabled = prefs.getBool('wake_word_enabled') ?? false;
     if (isEnabled) {
       SikaNativeService.resumeSikaService();
     }
@@ -344,7 +380,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
           ? 'Please confirm or cancel the pending action before continuing.'
           : 'Veuillez confirmer ou annuler l\'action en cours avant de continuer.';
       debugPrint(
-          '[SIKA GUARD] 🛑 Blocked query while awaiting confirmation/execution: "$query"');
+          '[SIKA GUARD] Blocked query while awaiting confirmation/execution: "$query"');
       final reminderMsg = SikaMessage(text: reminderText, isUser: false);
       state = state.copyWith(
         messages: List<SikaMessage>.from(state.messages)..add(reminderMsg),
@@ -409,7 +445,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
     state = state.copyWith(
       state: SikaState.processing,
       messages: updatedMessages,
-      currentText: null,
+      clearText: true,
       agentSteps: const [],
     );
 
@@ -613,11 +649,10 @@ class SikaNotifier extends StateNotifier<SikaData> {
   Future<void> _speak(String text, {required String ttsLocale}) async {
     final currentRequestId = ++_activeSpeechRequestId;
     final isEn = ttsLocale.toLowerCase().startsWith('en');
-    final voiceName = isEn ? 'en-US-Neural2-F' : 'fr-FR-Neural2-C';
-    final langCode = isEn ? 'en-US' : 'fr-FR';
+    final langCode = isEn ? 'en-US' : 'fr-FR'; // voix choisie par le serveur (Google Chirp 3 HD)
 
     debugPrint(
-        '[SIKA TTS] Preparing speech output (ReqID: $currentRequestId, $langCode, Voice: $voiceName): "$text"');
+        '[SIKA TTS] Preparing speech output (ReqID: $currentRequestId, $langCode)');
 
     // Interrompt tout flux audio précédent
     await stopSpeaking(resetState: false);
@@ -627,16 +662,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
       // 1. MOTEUR PRINCIPAL : Appel de l'endpoint dédié POST /api/v1/sika/tts
       try {
-        final ttsRes = await _apiService.fetchGcpTtsAudio(
-          text,
-          voiceName: voiceName,
-          languageCode: langCode,
-        );
+        final ttsRes = await _apiService.fetchGcpTtsAudio(text, languageCode: langCode);
 
         // Protection anti-course (Race Condition / Stale Request Protection)
         if (currentRequestId != _activeSpeechRequestId) {
           debugPrint(
-              '[GCP TTS] 🛑 Requête obsolète (ReqID $currentRequestId vs Active $_activeSpeechRequestId). Abandon de l\'audio.');
+              '[GCP TTS] Stale request (ReqID $currentRequestId vs active $_activeSpeechRequestId), audio dropped.');
           return;
         }
 
@@ -653,7 +684,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       // 2. LECTURE AUDIO GCP TTS MP3
       if (b64 != null && b64.isNotEmpty) {
         debugPrint(
-            '[GCP TTS] 🔊 Lecture Audio MP3 Google Cloud Text-to-Speech (${b64.length} octets, ReqID: $currentRequestId, Voice: $voiceName)');
+            '[GCP TTS] Playing Google Cloud TTS audio (${b64.length} bytes, ReqID: $currentRequestId)');
         final bytes = base64Decode(b64);
         await _audioPlayer.play(BytesSource(bytes));
 
@@ -669,7 +700,7 @@ class SikaNotifier extends StateNotifier<SikaData> {
       // 3. FALLBACK : flutter_tts
       if (currentRequestId != _activeSpeechRequestId) return;
       debugPrint(
-          '[FLUTTER TTS FALLBACK] 🔊 Élocution via la synthèse vocale locale (ReqID: $currentRequestId, Locale: $langCode)');
+          '[FLUTTER TTS FALLBACK] On-device speech (ReqID: $currentRequestId, Locale: $langCode)');
       await _flutterTts.setLanguage(langCode);
       await _flutterTts.speak(text);
     } catch (e) {
@@ -691,12 +722,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
     if (nextState == SikaState.waitingVoiceConfirmation ||
         nextState == SikaState.ambiguityAsked) {
       debugPrint(
-          '[HANDS-FREE] 🎙️ Auto-resuming STT listening for user voice response (State: $nextState)');
+          '[HANDS-FREE] Auto-resuming STT listening for user voice response (State: $nextState)');
       state = state.copyWith(state: nextState);
       startListening();
     } else if (nextState == SikaState.securityValidation && actionId != null) {
       debugPrint(
-          '[SECURITY] 🔐 Awaiting user biometric or PIN confirmation on card for action_id: $actionId');
+          '[SECURITY] Awaiting user biometric or PIN confirmation on card for action_id: $actionId');
       state = state.copyWith(
         state: SikaState.securityValidation,
         pendingActionId: actionId,

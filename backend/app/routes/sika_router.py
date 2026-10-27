@@ -243,9 +243,11 @@ from ..services.gcp_tts_service import gcp_tts_service
 
 
 @router.post("/tts", summary="Generate TTS", description="Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS).")
-def sika_text_to_speech(data: TTSRequest):
-    """Génère la synthèse vocale MP3 haute fidélité via Google Cloud Text-to-Speech (GCP TTS)."""
-    text = data.text or data.speech_text or ""
+def sika_text_to_speech(data: TTSRequest, authorization: Optional[str] = Header(None)):
+    """Génère la synthèse vocale MP3 (Google Cloud TTS). Réservé aux utilisateurs connectés : chaque appel est facturé."""
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    security_rate_limiter.check_ai_rate_limit(f"tts_{user_id}", max_requests=40)
+    text = (data.text or data.speech_text or "")[:2000]
     voice_name = data.voice_name
     language_code = data.language_code
     speaking_rate = float(data.speaking_rate)

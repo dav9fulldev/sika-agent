@@ -31,6 +31,23 @@ def test_gcp_tts_service_synthesis():
     assert len(res["audio_base64"]) > 100
     assert res.get("content_type") == "audio/mp3"
 
+def _auth():
+    from app.services.auth_service import oauth2_auth_service
+    return {"Authorization": "Bearer " + oauth2_auth_service.create_access_token({"user_id": 1, "email": "tts@sika.test"})}
+
+
+def test_tts_requires_login_and_cleans_ids():
+    from app.services.gcp_tts_service import speakable_text
+    assert client.post("/api/v1/sika/tts", json={"text": "Hello"}).status_code == 401
+    spoken = speakable_text("Done. Order 5VN16317FJ728053P, capture 36C64892CH755443D. See https://x.y/z")
+    assert "5VN16317FJ728053P" not in spoken and "https" not in spoken and spoken.startswith("Done.")
+
+
+def test_unknown_voice_falls_back_to_default():
+    res = gcp_tts_service.synthesize_speech("Bonjour", voice_name="xx-Evil-Voice")
+    assert res["voice_name"] == gcp_tts_service.DEFAULT_VOICE_FR
+
+
 def test_gcp_tts_endpoint():
     """Vérifie l'endpoint HTTP POST /api/v1/sika/tts."""
     response = client.post(
@@ -38,7 +55,8 @@ def test_gcp_tts_endpoint():
         json={
             "text": "Sika prépare votre virement.",
             "voice_name": "fr-FR-Neural2-C"
-        }
+        },
+        headers=_auth(),
     )
     assert response.status_code == 200
     data = response.json()
@@ -73,7 +91,8 @@ def test_gcp_tts_empty_text_validation():
     """Vérifie que /tts retourne HTTP 400 si le texte est vide."""
     response = client.post(
         "/api/v1/sika/tts",
-        json={"text": ""}
+        json={"text": ""},
+        headers=_auth(),
     )
     assert response.status_code == 400
 
