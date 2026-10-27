@@ -46,9 +46,11 @@ At the owner's request, the previous Mobile Money provider integration was remov
 
 | Check | Before (commit `e0fcaea`) | After |
 |---|---|---|
-| Backend tests | 2 failing; 1 file hung for more than 150 s | **130 passed** (incl. version consistency), repeated runs, about 15 s, no network |
-| PayPal-specific tests | none | 65 (checkout state machine: 38, HTTP client: 9, agent: 18) |
+| Backend tests | 2 failing; 1 file hung for more than 150 s | **131 passed** (incl. version consistency and Secret Manager config), repeated runs, 10–18 s, no network |
+| PayPal-specific tests | none | 66 (checkout state machine: 38, HTTP client and config: 10, agent: 18) |
 | `flutter analyze` | – | 0 issues |
 | `flutter test` | – | 12 passed |
 | Live Gemini check (Vertex AI) | – | prepares within budget, refuses over budget with alternatives, asks when ambiguous |
-| Real PayPal sandbox run | – | ⏳ pending sandbox credentials (`backend/scripts/paypal_sandbox_e2e.py`) |
+| Real PayPal sandbox run | – | ✅ **passed on 2026-10-24** (`scripts/paypal_sandbox_e2e.py`): OAuth2 → order `9PJ70960RC924761S` created (`PAYER_ACTION_REQUIRED`) → approved by the sandbox buyer → verified `APPROVED` → capture `25J37924GR192080C` `COMPLETED` 49.00 USD → second capture refused (`already_completed`). Re-checked independently with `GET /v2/checkout/orders` |
+| Open-source license | none | MIT (`LICENSE`) |
+| Deployed backend (Cloud Run) | v1 | v2.0.0 live; PayPal `configured: false` until the sandbox secrets are added to Secret Manager |

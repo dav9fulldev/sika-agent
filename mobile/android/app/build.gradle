@@ -13,10 +13,6 @@ android {
         buildConfig = true
     }
 
-    packagingOptions {
-        doNotStrip "**/*.so"
-    }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -30,8 +26,9 @@ android {
         applicationId "com.sika.assistant"
         minSdk 24
         targetSdk 36
-        versionCode 1
-        versionName "1.0.0"
+        // Version issue de pubspec.yaml (version: x.y.z+build)
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {

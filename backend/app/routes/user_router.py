@@ -16,6 +16,7 @@ router = APIRouter(
 class UserUpdate(BaseModel):
     name: str = None
     phone: str = None
+    country: str = None
 
 class PaymentMethodCreate(BaseModel):
     type: str
@@ -33,19 +34,31 @@ async def update_user(
         current_user.full_name = update_data.name
     if update_data.phone:
         current_user.phone = update_data.phone
-        
+    if update_data.country:
+        current_user.country = update_data.country.strip()[:64]
+
     db.commit()
     db.refresh(current_user)
-    return {"message": "User updated", "user": {"name": current_user.full_name, "phone": current_user.phone}}
+    from ..services.user_profile import profile_status
+    return {
+        "message": "User updated",
+        "user": {"name": current_user.full_name, "phone": current_user.phone, "country": current_user.country},
+        "profile": profile_status(current_user),
+    }
 
 @router.post("/me/kyc")
 async def submit_kyc(
     current_user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    current_user.is_kyc_verified = True
+    # Aucune vérification automatique d'identité n'existe dans SIKA Pay : la demande reste en attente.
+    # Seul un compte vérifié par PayPal (Log in with PayPal) rend l'identité « vérifiée ».
+    if current_user.kyc_status != "paypal":
+        current_user.kyc_status = "submitted"
+        current_user.is_kyc_verified = False
     db.commit()
-    return {"message": "KYC verified successfully"}
+    from ..services.user_profile import profile_status
+    return {"message": "KYC submitted — pending review", "profile": profile_status(current_user)}
 
 @router.get("/me/payment-methods")
 async def get_payment_methods(

@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -16,6 +20,13 @@ class UserProfileData {
   final bool isPremium;
   final bool isGoogleAuth;
   final bool isKycVerified;
+  /// Code pays ISO (ex. CI, US) ou nom saisi.
+  final String? country;
+  /// Champs que le serveur considère manquants (ex. full_name, country).
+  final List<String> missingFields;
+  /// none | submitted (en attente) | paypal (vérifié par PayPal)
+  final String kycStatus;
+  final bool paypalLinked;
 
   UserProfileData({
     required this.id,
@@ -26,6 +37,10 @@ class UserProfileData {
     this.isPremium = true,
     this.isGoogleAuth = false,
     this.isKycVerified = false,
+    this.country,
+    this.missingFields = const [],
+    this.kycStatus = 'none',
+    this.paypalLinked = false,
   });
 
   UserProfileData copyWith({
@@ -37,6 +52,10 @@ class UserProfileData {
     bool? isPremium,
     bool? isGoogleAuth,
     bool? isKycVerified,
+    String? country,
+    List<String>? missingFields,
+    String? kycStatus,
+    bool? paypalLinked,
   }) {
     return UserProfileData(
       id: id ?? this.id,
@@ -47,6 +66,10 @@ class UserProfileData {
       isPremium: isPremium ?? this.isPremium,
       isGoogleAuth: isGoogleAuth ?? this.isGoogleAuth,
       isKycVerified: isKycVerified ?? this.isKycVerified,
+      country: country ?? this.country,
+      missingFields: missingFields ?? this.missingFields,
+      kycStatus: kycStatus ?? this.kycStatus,
+      paypalLinked: paypalLinked ?? this.paypalLinked,
     );
   }
 }
@@ -58,6 +81,11 @@ class AuthState {
   final String? accessToken;
   final UserProfileData? user;
   final String? errorMessage;
+  /// Vrai tant que la session enregistrée n'a pas été vérifiée au lancement.
+  final bool isRestoring;
+  /// Vrai si la session vient du stockage sécurisé (et non d'une connexion saisie) :
+  /// l'application demande alors l'empreinte avant d'afficher les données.
+  final bool restoredSession;
 
   AuthState({
     this.isAuthenticated = false,
@@ -66,6 +94,8 @@ class AuthState {
     this.accessToken,
     this.user,
     this.errorMessage,
+    this.isRestoring = false,
+    this.restoredSession = false,
   });
 
   AuthState copyWith({
@@ -75,6 +105,8 @@ class AuthState {
     String? accessToken,
     UserProfileData? user,
     String? errorMessage,
+    bool? isRestoring,
+    bool? restoredSession,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -83,6 +115,8 @@ class AuthState {
       accessToken: accessToken ?? this.accessToken,
       user: user ?? this.user,
       errorMessage: errorMessage ?? this.errorMessage,
+      isRestoring: isRestoring ?? this.isRestoring,
+      restoredSession: restoredSession ?? this.restoredSession,
     );
   }
 }
@@ -96,10 +130,108 @@ class AuthNotifier extends StateNotifier<AuthState> {
     scopes: ['email', 'profile'],
   );
 
+  /// Applique l'état du profil renvoyé par le serveur (champs manquants, statut KYC).
+  void _applyProfile(Map<String, dynamic> res) {
+    final userMap = res['user'] is Map ? Map<String, dynamic>.from(res['user'] as Map) : <String, dynamic>{};
+    final profile = res['profile'] ?? userMap['profile'];
+    if (state.user == null || profile is! Map) return;
+    state = state.copyWith(
+      user: state.user!.copyWith(
+        country: userMap['country']?.toString(),
+        missingFields: List<String>.from(profile['missing_fields'] as List? ?? const []),
+        kycStatus: profile['kyc_status']?.toString() ?? 'none',
+        isKycVerified: profile['kyc_verified'] == true,
+        paypalLinked: profile['paypal_linked'] == true,
+      ),
+    );
+  }
+
+  Completer<Uri>? _paypalRedirect;
+  StreamSubscription<Uri>? _paypalLinkSub;
+
+  /// Connexion avec PayPal : autorisation sur la page officielle PayPal (sandbox), retour par
+  /// `sikapay://paypal/login`, puis échange du code par le serveur.
+  Future<bool> loginWithPayPal() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final start = await _apiService.paypalLoginStart();
+      final waiter = Completer<Uri>();
+      _paypalRedirect = waiter;
+      await _paypalLinkSub?.cancel();
+      _paypalLinkSub = AppLinks().uriLinkStream.listen((uri) {
+        if (uri.scheme == 'sikapay' && uri.host == 'paypal' && uri.path == '/login' && !waiter.isCompleted) {
+          waiter.complete(uri);
+        }
+      });
+      final launched = await launchUrl(Uri.parse(start['authorize_url'].toString()), mode: LaunchMode.externalApplication);
+      if (!launched) throw Exception("Impossible d'ouvrir la page PayPal.");
+
+      final uri = await waiter.future.timeout(const Duration(minutes: 5));
+      if (uri.queryParameters['error'] != null || uri.queryParameters['code'] == null) {
+        state = state.copyWith(isLoading: false, errorMessage: 'Connexion PayPal annulée.');
+        return false;
+      }
+      final res = await _apiService.paypalLoginComplete(uri.queryParameters['code']!, uri.queryParameters['state'] ?? '');
+      final token = res['access_token'] as String;
+      final uData = Map<String, dynamic>.from(res['user'] as Map);
+      await _secureStorage.saveAccessToken(token);
+      state = state.copyWith(
+        isAuthenticated: true,
+        hasSeenOnboarding: true,
+        isLoading: false,
+        accessToken: token,
+        user: UserProfileData(
+          id: (uData['id'] ?? '').toString(),
+          name: (uData['full_name'] ?? '').toString(),
+          email: (uData['email'] ?? '').toString(),
+          phone: uData['phone']?.toString(),
+        ),
+      );
+      _applyProfile(res);
+      _syncContextWithNative(token, state.user);
+      return true;
+    } on TimeoutException {
+      state = state.copyWith(isLoading: false, errorMessage: "PayPal n'a pas renvoyé de réponse. Réessayez.");
+      return false;
+    } catch (e) {
+      final msg = e.toString().replaceAll('Exception: ', '');
+      state = state.copyWith(isLoading: false, errorMessage: msg.isEmpty ? 'Connexion PayPal impossible.' : msg);
+      return false;
+    } finally {
+      _paypalRedirect = null;
+      await _paypalLinkSub?.cancel();
+      _paypalLinkSub = null;
+    }
+  }
+
+  /// L'utilisateur est revenu sans terminer la connexion PayPal.
+  void cancelPayPalLogin() {
+    final waiter = _paypalRedirect;
+    if (waiter != null && !waiter.isCompleted) {
+      waiter.complete(Uri.parse('sikapay://paypal/login?error=cancelled'));
+    }
+  }
+
+  /// Met à jour le profil (nom, pays) et l'état renvoyé par le serveur.
+  Future<void> updateProfile({required String name, String? country}) async {
+    final res = await _authedApi.updateUserInfo(name, state.user?.phone ?? '', country: country);
+    if (state.user != null) {
+      state = state.copyWith(user: state.user!.copyWith(name: name, country: country));
+    }
+    _applyProfile(res);
+  }
+
+  /// Client API porteur du jeton de la session courante (requis par les routes protégées).
+  ApiService get _authedApi => _apiService..token = state.accessToken;
+
   AuthNotifier()
-      : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false)) {
+      : super(AuthState(isAuthenticated: false, hasSeenOnboarding: false, isRestoring: true)) {
     _loadInitialPreferences();
   }
+
+  /// État fixé, sans restauration de session (tests d'écrans).
+  @visibleForTesting
+  AuthNotifier.withState(super.initial);
 
   Future<void> _syncContextWithNative(String? token, UserProfileData? user) async {
     try {
@@ -135,6 +267,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
             state = state.copyWith(
               hasSeenOnboarding: hasSeen,
               isAuthenticated: true,
+              isRestoring: false,
+              restoredSession: true,
               accessToken: token,
               user: UserProfileData(
                 id: (uData["id"] ?? '1').toString(),
@@ -145,6 +279,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                     uData["is_kyc_verified"] == true,
               ),
             );
+            _applyProfile(Map<String, dynamic>.from(res));
             _syncContextWithNative(token, state.user!);
             return;
           }
@@ -157,6 +292,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = state.copyWith(
           hasSeenOnboarding: hasSeen,
           isAuthenticated: false,
+          isRestoring: false,
           accessToken: null,
           user: null,
         );
@@ -165,6 +301,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH PREFS] Erreur chargement initial: $e');
       }
+      if (mounted) state = state.copyWith(isRestoring: false);
     }
   }
 
@@ -221,6 +358,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await prefs.setBool(_keyHasSeenOnboarding, true);
 
       // Sync context with native side
+      _applyProfile(Map<String, dynamic>.from(res));
       _syncContextWithNative(token, state.user);
 
       return true;
@@ -288,6 +426,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await prefs.setBool(_keyHasSeenOnboarding, true);
 
       // Sync context with native side
+      _applyProfile(Map<String, dynamic>.from(res));
       _syncContextWithNative(token, state.user);
 
       return true;
@@ -322,7 +461,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final res = await _apiService.forgotPassword(email.trim());
       state = state.copyWith(isLoading: false);
-      return res['otp']?.toString();
+      // Le serveur ne renvoie un code qu'en développement (`dev_otp`) ; sinon il est envoyé hors application.
+      return res['dev_otp']?.toString() ?? '';
     } catch (e) {
       String msg = e.toString().replaceAll('Exception: ', '');
       if (msg.contains('SocketException') ||
@@ -424,6 +564,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await prefs.setBool(_keyHasSeenOnboarding, true);
 
       // Sync context with native side
+      _applyProfile(Map<String, dynamic>.from(res));
       _syncContextWithNative(token, state.user);
 
       return true;
@@ -450,7 +591,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> updateUserInfo(String name, String phone) async {
     try {
-      await _apiService.updateUserInfo(name, phone);
+      await _authedApi.updateUserInfo(name, phone);
       if (state.user != null) {
         state = state.copyWith(
           user: state.user!.copyWith(name: name, phone: phone),
@@ -464,19 +605,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> updateKycStatus(bool isVerified) async {
+  /// Envoi des documents d'identité : le serveur les enregistre comme « en attente » ;
+  /// seule une vérification PayPal marque le compte comme vérifié.
+  Future<void> submitKyc() async {
     try {
-      if (isVerified) {
-        await _apiService.submitKyc();
-      }
+      await _authedApi.submitKyc();
       if (state.user != null) {
-        state = state.copyWith(
-          user: state.user!.copyWith(isKycVerified: isVerified),
-        );
+        state = state.copyWith(user: state.user!.copyWith(kycStatus: 'submitted', isKycVerified: false));
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[AUTH ERROR] updateKycStatus: $e');
+        debugPrint('[AUTH ERROR] submitKyc: $e');
       }
       rethrow;
     }
@@ -485,7 +624,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Déconnexion sécurisée (Log Out)
   Future<void> logout() async {
     try {
-      await _apiService.logout();
+      await _authedApi.logout();
     } catch (_) {}
 
     await _secureStorage.clearAll();

@@ -70,19 +70,21 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
               ),
               Text('${v.total} ${v.currency}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
             ]),
-            if (budget['limit'] != null) ...[
-              const SizedBox(height: 10),
-              Row(children: [
-                Icon(budget['within_budget'] == true ? Icons.check_circle_rounded : Icons.warning_rounded,
-                    size: 15, color: budget['within_budget'] == true ? AppColors.success : AppColors.error),
-                const SizedBox(width: 6),
-                Text(
-                  lang.tr('Budget ${budget['limit']} ${budget['currency']} respecté · reste ${budget['remaining_after_purchase']}',
-                      'Within your ${budget['limit']} ${budget['currency']} budget · ${budget['remaining_after_purchase']} left'),
-                  style: TextStyle(fontSize: 12, color: onSurface.withValues(alpha: 0.7)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              if (budget['limit'] != null)
+                _reason(
+                  budget['within_budget'] == true ? Icons.check_circle_rounded : Icons.warning_rounded,
+                  budget['within_budget'] == true
+                      ? lang.tr('Dans votre budget (${budget['limit']} ${budget['currency']})',
+                          'Within your budget (${budget['limit']} ${budget['currency']})')
+                      : lang.tr('Hors budget', 'Over budget'),
+                  budget['within_budget'] == true ? AppColors.success : AppColors.error,
                 ),
-              ]),
-            ],
+              // Le prix vient du catalogue côté serveur, jamais du texte généré par l'IA
+              if ((v.provenance['verified'] as List?)?.isNotEmpty ?? false)
+                _reason(Icons.verified_rounded, lang.tr('Prix vérifié', 'Price verified'), AppColors.brandPrimary),
+            ]),
             if (v.status == 'CANCELLED' && v.lastError?['code'] == 'REPLACED_BY_NEW_REQUEST') ...[
               const SizedBox(height: 8),
               Text(lang.tr('Remplacé par une demande plus récente.', 'Replaced by a newer request.'),
@@ -101,7 +103,7 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
                     v.status == 'COMPLETED'
                         ? lang.tr('Voir le reçu', 'View receipt')
                         : v.status == 'AWAITING_USER_CONFIRMATION'
-                            ? lang.tr('Vérifier et payer', 'Review and pay')
+                            ? lang.tr('Voir le récapitulatif', 'View summary')
                             : lang.tr('Continuer le paiement', 'Continue payment'),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
@@ -113,4 +115,14 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
       ),
     );
   }
+
+  Widget _reason(IconData icon, String label, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(20)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ]),
+      );
 }

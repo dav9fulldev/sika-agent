@@ -196,18 +196,56 @@ class ApiService {
   // USER PROFILE & KYC API ENDPOINTS
   // ============================================================================
 
-  Future<void> updateUserInfo(String name, String phone) async {
+  Future<Map<String, dynamic>> updateUserInfo(String name, String phone, {String? country}) async {
     final response = await http
         .put(
           Uri.parse('$safeBaseUrl${ApiConstants.usersMe}'),
           headers: _headers,
-          body: jsonEncode({'name': name, 'phone': phone}),
+          body: jsonEncode({'name': name, 'phone': phone, if (country != null) 'country': country}),
         )
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_extractErrorMessage(response, 'Erreur de mise à jour'));
     }
+    return Map<String, dynamic>.from(jsonDecode(response.body));
+  }
+
+  // ============================================================================
+  // CONNEXION AVEC PAYPAL (Log in with PayPal — sandbox)
+  // ============================================================================
+
+  /// URL d'autorisation PayPal construite par le serveur (avec un `state` signé).
+  Future<Map<String, dynamic>> paypalLoginStart() async {
+    final response = await http
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.authPayPalStart}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    if (response.statusCode == 200) return Map<String, dynamic>.from(jsonDecode(response.body));
+    throw Exception(_paypalLoginError(response, 'La connexion PayPal est indisponible.'));
+  }
+
+  /// Le serveur échange le code PayPal et ouvre la session SIKA Pay.
+  Future<Map<String, dynamic>> paypalLoginComplete(String code, String state) async {
+    final response = await http
+        .post(
+          Uri.parse('$safeBaseUrl${ApiConstants.authPayPal}'),
+          headers: _headers,
+          body: jsonEncode({'code': code, 'state': state}),
+        )
+        .timeout(AppConfig.agentTimeout);
+    if (response.statusCode == 200) return Map<String, dynamic>.from(jsonDecode(response.body));
+    throw Exception(_paypalLoginError(response, 'PayPal a refusé la connexion.'));
+  }
+
+  String _paypalLoginError(http.Response response, String fallback) {
+    // Route absente (serveur pas encore à jour) ou panne : message lisible plutôt que « Not Found »
+    if (response.statusCode == 404 || response.statusCode >= 500) return fallback;
+    try {
+      final detail = jsonDecode(response.body)['detail'];
+      if (detail is Map && detail['message'] != null) return detail['message'].toString();
+      if (detail != null) return detail.toString();
+    } catch (_) {}
+    return '$fallback (${response.statusCode})';
   }
 
   Future<void> submitKyc() async {

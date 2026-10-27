@@ -63,6 +63,26 @@ class UserModel(Base):
         default=False
     )
 
+    # SIKA Pay — Log in with PayPal et statut d'identité
+    paypal_payer_id = Column(
+        String(64),
+        nullable=True,
+        unique=True,
+        index=True
+    )
+
+    country = Column(
+        String(64),
+        nullable=True
+    )
+
+    # none | submitted (en attente, non vérifié) | paypal (compte vérifié par PayPal)
+    kyc_status = Column(
+        String(20),
+        nullable=False,
+        default="none"
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow

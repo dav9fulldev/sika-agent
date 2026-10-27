@@ -59,7 +59,7 @@ Critères notés à égalité : Technological Implementation, Design, Potential 
 
 ## 5. Inconnus / non vérifiés
 
-- **Flux sandbox réel** : aucun identifiant PayPal sandbox n'était disponible dans l'environnement. Le client HTTP suit le schéma OpenAPI officiel (`/api/orders/v2/schema.json`, téléchargé et analysé : statuts, `PayPal-Request-Id`, `payer-action`, `experience_context`) et les codes d'erreur officiels (`ORDER_NOT_APPROVED`, `ORDER_ALREADY_CAPTURED`, `INSTRUMENT_DECLINED`…). Il **n'a pas encore été exécuté contre le sandbox**. → Lancer `backend/scripts/paypal_sandbox_e2e.py` dès que les identifiants sont dans `.env`.
+- **Flux sandbox réel** : ✅ exécuté le 24 oct. 2026 avec `backend/scripts/paypal_sandbox_e2e.py` et une application sandbox dédiée. Commande `9PJ70960RC924761S` créée (`PAYER_ACTION_REQUIRED`), approuvée par le compte acheteur sandbox, statut `APPROVED` vérifié, capture `25J37924GR192080C` `COMPLETED` pour 49.00 USD, seconde capture refusée (`already_completed`). Résultat confirmé indépendamment par `GET /v2/checkout/orders/{id}`. Non encore exécuté : le même flux depuis l'application mobile sur téléphone physique.
 - **Gemini réel** : vérifié en direct via Vertex AI (projet `sika-all-things-agentic`) sur quatre requêtes : préparation conforme, refus hors budget avec alternatives, question en cas d'ambiguïté, réponse en français. Une requête a reçu un `429 RESOURCE_EXHAUSTED` (quota Vertex), puis le repli déterministe a pris le relais.
 - **APK** : compilation debug lancée (voir rapport final) ; non testée sur téléphone physique dans cette session.
 - La vidéo et le dépôt public restent à produire par le propriétaire.

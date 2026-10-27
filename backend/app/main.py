@@ -32,6 +32,8 @@ async def lifespan(app: FastAPI):
     if settings.ENV not in ["production", "prod"]:
         try:
             Base.metadata.create_all(bind=engine)
+            from app.database.dev_schema import ensure_dev_columns
+            ensure_dev_columns(engine)
         except Exception as e:
             logger.warning(f"[DB INIT DEV] Notification lors de l'initialisation locale des tables: {e}")
     yield

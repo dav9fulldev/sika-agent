@@ -134,7 +134,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
   Future<void> _initializeSika() async {
     try {
-      await _initSpeechToText();
+      // La reconnaissance vocale (et donc la demande d'accès au micro) n'est initialisée qu'au
+      // premier appui sur le micro, dans startListening — jamais au démarrage de l'application.
       await _initTextToSpeech();
       state = state.copyWith(isInitialized: true);
     } catch (e) {
@@ -228,8 +229,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
     if (!_speechEnabled) {
       debugPrint(
-          '[SIKA VOICE] Cannot listen: STT not enabled. Re-initializing...');
-      await _initializeSika();
+          '[SIKA VOICE] STT not initialized yet. Initializing (microphone permission requested now)...');
+      await _initSpeechToText();
       if (!_speechEnabled) {
         debugPrint('[SIKA VOICE] Initialization failed again, aborting.');
         return;

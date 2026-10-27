@@ -95,7 +95,7 @@ jobs:
             --service-account ${{ env.SERVICE_ACCOUNT }} \
             --vpc-connector sika-vpc-connector \
             --set-cloudsql-instances sika-all-things-agentic:europe-west9:sika-db-instance \
-            --set-env-vars ENV=production,USE_GCP_SECRET_MANAGER=true \
+            --set-env-vars ENV=production,USE_GCP_SECRET_MANAGER=true,PUBLIC_BASE_URL=https://sika-backend-1064195418653.europe-west9.run.app \
             --allow-unauthenticated \
             --platform managed
 

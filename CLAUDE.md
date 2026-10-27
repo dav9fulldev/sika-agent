@@ -18,7 +18,7 @@ Guide for AI coding agents working in this repository. Read `CONTEXT.md` (produc
 ```bash
 # backend
 cd backend && source venv/bin/activate        # or test_venv/bin/python locally
-pytest -q                                       # 130 tests, no network
+pytest -q                                       # 131 tests, no network
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 python scripts/paypal_sandbox_e2e.py            # REAL sandbox run (needs PAYPAL_* in .env)
 

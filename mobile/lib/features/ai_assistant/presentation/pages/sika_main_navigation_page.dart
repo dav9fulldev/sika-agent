@@ -65,6 +65,7 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
       SikaPayHomeScreen(
         onOpenChat: () => setState(() => _currentIndex = 2),
         onOpenHistory: () => setState(() => _currentIndex = 1),
+        onOpenProfile: () => setState(() => _currentIndex = 3),
       ),
       const SikaPayHistoryScreen(),
       SikaChatScreen(
