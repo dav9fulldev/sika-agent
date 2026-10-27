@@ -16,6 +16,8 @@ from .agent_memory import AgentMemoryModel
 from .savings_goal import SavingsGoalModel
 from .payment_method import PaymentMethodModel
 from .paypal_checkout import PayPalCheckoutModel
+from .agent_mandate import AgentMandateModel
+from .paypal_webhook_event import PayPalWebhookEventModel
 
 __all__ = [
     "PayPalCheckoutModel",

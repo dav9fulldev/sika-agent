@@ -138,6 +138,8 @@ class Settings:
         self.PAYPAL_LOGIN_APP_REDIRECT: str = overrides.get(
             "PAYPAL_LOGIN_APP_REDIRECT", os.getenv("PAYPAL_LOGIN_APP_REDIRECT", "sikapay://paypal/login")
         )
+        # ID du webhook PayPal ; vide = retrouvé automatiquement par son URL (/api/v1/paypal/webhook)
+        self.PAYPAL_WEBHOOK_ID: str = overrides.get("PAYPAL_WEBHOOK_ID", os.getenv("PAYPAL_WEBHOOK_ID", ""))
         self.PAYPAL_LOGIN_SCOPES: str = overrides.get(
             "PAYPAL_LOGIN_SCOPES",
             os.getenv("PAYPAL_LOGIN_SCOPES", "openid profile email address https://uri.paypal.com/services/paypalattributes"),

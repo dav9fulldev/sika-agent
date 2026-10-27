@@ -209,6 +209,31 @@ class PayPalAPIService:
         return self._request("POST", f"/v2/checkout/orders/{order_id}/capture", json_body={}, request_id=request_id)
 
     # ------------------------------------------------------------------
+    # Webhooks (Notifications v1)
+    # ------------------------------------------------------------------
+
+    def list_webhooks(self) -> List[Dict[str, Any]]:
+        return self._request("GET", "/v1/notifications/webhooks").get("webhooks") or []
+
+    def create_webhook(self, url: str, event_types: List[str]) -> Dict[str, Any]:
+        body = {"url": url, "event_types": [{"name": n} for n in event_types]}
+        return self._request("POST", "/v1/notifications/webhooks", json_body=body)
+
+    def verify_webhook_signature(self, *, headers: Dict[str, str], event: Dict[str, Any], webhook_id: str) -> bool:
+        """Vérification officielle de la signature (POST /v1/notifications/verify-webhook-signature)."""
+        body = {
+            "auth_algo": headers.get("paypal-auth-algo", ""),
+            "cert_url": headers.get("paypal-cert-url", ""),
+            "transmission_id": headers.get("paypal-transmission-id", ""),
+            "transmission_sig": headers.get("paypal-transmission-sig", ""),
+            "transmission_time": headers.get("paypal-transmission-time", ""),
+            "webhook_id": webhook_id,
+            "webhook_event": event,
+        }
+        result = self._request("POST", "/v1/notifications/verify-webhook-signature", json_body=body)
+        return result.get("verification_status") == "SUCCESS"
+
+    # ------------------------------------------------------------------
     # Log in with PayPal (OpenID Connect)
     # ------------------------------------------------------------------
 

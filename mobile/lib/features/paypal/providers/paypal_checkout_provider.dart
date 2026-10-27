@@ -176,3 +176,8 @@ final paypalHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynami
 final paypalStatusProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   return ref.watch(apiServiceProvider).getPayPalStatus();
 });
+
+/// Autorisation accordée à l'agent (mode hybride), telle que le serveur la connaît.
+final agentAuthorizationProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(apiServiceProvider).getAgentAuthorization();
+});

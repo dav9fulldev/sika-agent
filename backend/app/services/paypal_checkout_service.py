@@ -64,6 +64,32 @@ NEXT_ACTIONS = {
     "PENDING": "VERIFY",
 }
 
+# Erreurs PayPal à la capture (https://developer.paypal.com/api/handle-payment-failures) :
+# le payeur doit repasser sur PayPal pour choisir un autre moyen de paiement (le lien d'approbation reste valable)…
+PAYER_MUST_REAPPROVE = {
+    "INSTRUMENT_DECLINED": "The payment method was declined. Choose another one on PayPal.",
+    "REDIRECT_PAYER_FOR_ALTERNATE_FUNDING": "PayPal asks you to choose another payment method.",
+    "PAYER_ACTION_REQUIRED": "PayPal needs one more action from you. Open PayPal to continue.",
+    "ORDER_NOT_APPROVED": "The order is not approved yet. Approve it on PayPal.",
+}
+# … ou le paiement est refusé et ne peut pas aboutir avec ce compte : aucune nouvelle tentative automatique.
+PAYMENT_REFUSED = {
+    "PAYER_CANNOT_PAY": "PayPal cannot accept a payment from this account (funds, limits or verification). Try another PayPal account.",
+    "TRANSACTION_REFUSED": "PayPal refused this transaction. Check your PayPal account or try another payment method.",
+    "MAX_NUMBER_OF_PAYMENT_ATTEMPTS_EXCEEDED": "Too many payment attempts. Use another payment method or contact PayPal.",
+    "PAYMENT_DENIED": "PayPal denied this payment. Use another payment method.",
+    "INVALID_ACCOUNT_STATUS": "Your PayPal account cannot pay right now (for example locked). Contact PayPal.",
+    "CANNOT_PAY_SELF": "The payer and the merchant are the same PayPal account. Pay with a different buyer account.",
+    "PAYEE_ACCOUNT_RESTRICTED": "The merchant's PayPal account cannot receive payments right now.",
+    "COMPLIANCE_VIOLATION": "PayPal blocked this payment for compliance reasons.",
+    "CURRENCY_NOT_SUPPORTED": "PayPal does not support this currency for this account.",
+    "UNSUPPORTED_PAYEE_CURRENCY": "The merchant account does not accept this currency.",
+}
+
+
+def paypal_error_message(issue: str, fallback: str) -> str:
+    return PAYER_MUST_REAPPROVE.get(issue) or PAYMENT_REFUSED.get(issue) or fallback
+
 
 class CheckoutError(Exception):
     """Erreur métier explicite renvoyée à l'agent et au client mobile."""
@@ -201,6 +227,7 @@ class PayPalCheckoutService:
                 "remaining_after_purchase": remaining,
             },
             "details_hash": row.details_hash,
+            "confirmed_by": row.confirmed_by,
             "paypal": {
                 "order_id": row.paypal_order_id,
                 "order_status": row.paypal_order_status,
@@ -378,6 +405,14 @@ class PayPalCheckoutService:
     # ==================================================================
 
     def confirm_and_create_order(self, user_id: int, checkout_id: str, details_hash: str) -> Dict[str, Any]:
+        """Confirmation explicite de l'utilisateur dans l'app (empreinte des détails affichés)."""
+        return self._confirm(user_id, checkout_id, by="USER", details_hash=details_hash)
+
+    def confirm_by_agent(self, user_id: int, checkout_id: str) -> Dict[str, Any]:
+        """Confirmation par l'agent, uniquement sous une autorisation active de l'utilisateur (limites vérifiées ici)."""
+        return self._confirm(user_id, checkout_id, by="AGENT")
+
+    def _confirm(self, user_id: int, checkout_id: str, by: str, details_hash: Optional[str] = None) -> Dict[str, Any]:
         with Session(engine) as db:
             row = self._load_owned(db, user_id, checkout_id)
 
@@ -393,10 +428,24 @@ class PayPalCheckoutService:
                 raise CheckoutError("INVALID_STATE", f"This checkout cannot be confirmed (status {row.status}).", 409,
                                     data={"checkout": self.to_public_dict(row)})
 
-            if not details_hash or not hmac.compare_digest(str(details_hash), row.details_hash) \
-                    or row.details_hash != _compute_details_hash(row):
+            if row.details_hash != _compute_details_hash(row):
                 raise CheckoutError("DETAILS_CHANGED",
-                                    "The confirmed details do not match this checkout. Review the latest summary and confirm again.", 409)
+                                    "The checkout details changed. Review the latest summary and confirm again.", 409)
+            mandate_meta = None
+            if by == "USER":
+                if not details_hash or not hmac.compare_digest(str(details_hash), row.details_hash):
+                    raise CheckoutError("DETAILS_CHANGED",
+                                        "The confirmed details do not match this checkout. Review the latest summary and confirm again.", 409)
+            else:
+                from .agent_mandate_service import agent_mandate_service, MandateError
+                if row.budget_limit and Decimal(row.total_amount) > Decimal(row.budget_limit):
+                    raise CheckoutError("OVER_BUDGET", "This purchase is above the budget you gave. Confirm it yourself in the app.", 403)
+                try:
+                    mandate = agent_mandate_service.check_purchase(db, user_id, row.total_amount, row.currency)
+                except MandateError as e:
+                    raise CheckoutError(e.code, e.message, e.http_status)
+                mandate_meta = {"max_per_purchase": mandate.max_per_purchase, "daily_limit": mandate.daily_limit,
+                                "mandate_expires_at": _utc(mandate.expires_at).isoformat()}
 
             if not self.api.is_configured():
                 raise CheckoutError("PAYPAL_NOT_CONFIGURED",
@@ -405,11 +454,15 @@ class PayPalCheckoutService:
             locked = db.query(PayPalCheckoutModel).filter(
                 PayPalCheckoutModel.checkout_id == row.checkout_id,
                 PayPalCheckoutModel.status == "AWAITING_USER_CONFIRMATION",
-            ).update({"status": "CREATING_ORDER", "updated_at": _now()}, synchronize_session=False)
+            ).update({"status": "CREATING_ORDER", "confirmed_by": by, "updated_at": _now()}, synchronize_session=False)
             if locked != 1:
                 db.rollback()
                 raise CheckoutError("CONCURRENT_REQUEST", "This checkout is already being processed.", 409)
-            _log_event(db, row, "AWAITING_USER_CONFIRMATION", "CREATING_ORDER", "USER_CONFIRMED", "EXPLICIT_USER_CONFIRMATION")
+            if by == "USER":
+                _log_event(db, row, "AWAITING_USER_CONFIRMATION", "CREATING_ORDER", "USER_CONFIRMED", "EXPLICIT_USER_CONFIRMATION")
+            else:
+                _log_event(db, row, "AWAITING_USER_CONFIRMATION", "CREATING_ORDER", "AGENT_CONFIRMED",
+                           "UNDER_USER_AUTHORIZATION", mandate_meta)
             db.commit()
             db.refresh(row)
 
@@ -442,9 +495,9 @@ class PayPalCheckoutService:
                 self._transition(db, row, "AWAITING_USER_CONFIRMATION", "PAYPAL_NOT_CONFIGURED", error=("PAYPAL_NOT_CONFIGURED", str(e)))
                 raise CheckoutError("PAYPAL_NOT_CONFIGURED", str(e), 503)
             except PayPalAPIError as e:
-                self._transition(db, row, "FAILED", "ORDER_CREATE_REJECTED",
-                                 error=(e.issue or e.name, e.message or "PayPal rejected the order."), debug_id=e.debug_id)
-                raise CheckoutError("PAYPAL_REJECTED", f"PayPal rejected the order ({e.issue or e.name}).", 502,
+                message = paypal_error_message(e.issue, f"PayPal rejected the order ({e.issue or e.name}).") + " No payment was made."
+                self._transition(db, row, "FAILED", "ORDER_CREATE_REJECTED", error=(e.issue or e.name, message), debug_id=e.debug_id)
+                raise CheckoutError(e.issue if e.issue in PAYMENT_REFUSED else "PAYPAL_REJECTED", message, 502,
                                     data={"checkout": self.to_public_dict(row)})
 
             order_id = str(order.get("id") or "")
@@ -485,6 +538,8 @@ class PayPalCheckoutService:
                 try:
                     order = self.api.get_order(row.paypal_order_id)
                     self._apply_order_state(db, row, order, source="SYNC")
+                    if row.status == "APPROVED":
+                        self._auto_capture(db, row, source="SYNC")
                 except PayPalNetworkError:
                     sync_error = "PayPal could not be reached to verify the status. The last verified status is shown."
                 except PayPalAPIError as e:
@@ -527,6 +582,14 @@ class PayPalCheckoutService:
         row.captured_amount = amount.get("value")
         row.captured_currency = amount.get("currency_code")
 
+        if row.status == "COMPLETED" and cap_status in ("REFUNDED", "PARTIALLY_REFUNDED"):
+            # Le paiement a bien eu lieu puis a été remboursé : on le dit, sans effacer la capture
+            self._transition(db, row, "COMPLETED", f"PAYPAL_CAPTURE_{cap_status}_{source}",
+                             metadata={"capture_id": row.capture_id, "capture_status": cap_status})
+            return
+        if row.status == "COMPLETED" and cap_status == "COMPLETED":
+            db.commit()
+            return
         if cap_status == "COMPLETED":
             if row.captured_amount != row.total_amount or row.captured_currency != row.currency:
                 self._transition(db, row, "UNKNOWN_RESULT", f"CAPTURE_AMOUNT_MISMATCH_{source}",
@@ -550,93 +613,118 @@ class PayPalCheckoutService:
     # ==================================================================
 
     def capture(self, user_id: int, checkout_id: str) -> Dict[str, Any]:
+        """Capture demandée depuis l'app (repli si la capture automatique n'a pas encore eu lieu)."""
         with Session(engine) as db:
             row = self._load_owned(db, user_id, checkout_id)
+            return self._capture_row(db, row, source="USER")
 
-            if row.status == "COMPLETED":
-                return {**self.to_public_dict(row), "already_completed": True,
-                        "message": "This payment was already captured. No second capture was attempted."}
-            if row.status == "CAPTURING":
-                raise CheckoutError("CAPTURE_IN_PROGRESS", "A capture is already in progress for this checkout.", 409)
-            if row.status not in ("APPROVED", "AWAITING_PAYPAL_APPROVAL", "UNKNOWN_RESULT") or not row.paypal_order_id:
-                raise CheckoutError("INVALID_STATE", f"This checkout cannot be captured (status {row.status}).", 409,
+    def _auto_capture(self, db: Session, row: PayPalCheckoutModel, source: str):
+        """L'acheteur a confirmé dans SIKA (ou via son autorisation) puis approuvé sur PayPal :
+        comme dans le parcours PayPal standard, la capture suit l'approbation sans nouvelle question."""
+        try:
+            self._capture_row(db, row, source=source)
+        except CheckoutError as e:
+            logger.info(f"[SIKA PAY] Auto-capture {row.checkout_id} not completed ({source}): {e.code}")
+
+    def _capture_row(self, db: Session, row: PayPalCheckoutModel, source: str) -> Dict[str, Any]:
+        if row.status == "COMPLETED":
+            return {**self.to_public_dict(row), "already_completed": True,
+                    "message": "This payment was already captured. No second capture was attempted."}
+        if row.status == "CAPTURING":
+            raise CheckoutError("CAPTURE_IN_PROGRESS", "A capture is already in progress for this checkout.", 409)
+        if row.status not in ("APPROVED", "AWAITING_PAYPAL_APPROVAL", "UNKNOWN_RESULT") or not row.paypal_order_id:
+            raise CheckoutError("INVALID_STATE", f"This checkout cannot be captured (status {row.status}).", 409,
+                                data={"checkout": self.to_public_dict(row)})
+
+        # Vérification serveur : seule la réponse de PayPal fait foi, jamais le client mobile
+        try:
+            order = self.api.get_order(row.paypal_order_id)
+        except PayPalNetworkError:
+            raise CheckoutError("PAYPAL_UNREACHABLE", "PayPal could not be reached to verify the approval. Nothing was captured.", 503)
+        except PayPalAPIError as e:
+            if e.status_code == 404:
+                self._transition(db, row, "EXPIRED", "PAYPAL_ORDER_NOT_FOUND",
+                                 error=("INVALID_RESOURCE_ID", "PayPal no longer knows this order (expired). No payment was made."))
+                raise CheckoutError("ORDER_EXPIRED", "PayPal no longer knows this order (expired). No payment was made.", 410,
                                     data={"checkout": self.to_public_dict(row)})
+            raise CheckoutError("PAYPAL_REJECTED", f"PayPal could not verify the order ({e.issue or e.name}).", 502)
 
-            # Vérification serveur : seule la réponse de PayPal fait foi, jamais le client mobile
-            try:
-                order = self.api.get_order(row.paypal_order_id)
-            except PayPalNetworkError:
-                raise CheckoutError("PAYPAL_UNREACHABLE", "PayPal could not be reached to verify the approval. Nothing was captured.", 503)
-            except PayPalAPIError as e:
-                raise CheckoutError("PAYPAL_REJECTED", f"PayPal could not verify the order ({e.issue or e.name}).", 502)
-
-            order_status = str(order.get("status") or "")
-            if order_status == "COMPLETED":
-                self._apply_order_state(db, row, order, source="PRE_CAPTURE_CHECK")
-                return {**self.to_public_dict(row), "already_completed": row.status == "COMPLETED",
-                        "message": "PayPal reports this order as already completed. No second capture was attempted."}
-            if order_status != "APPROVED":
-                row.paypal_order_status = order_status or row.paypal_order_status
-                db.commit()
-                raise CheckoutError("ORDER_NOT_APPROVED",
-                                    "PayPal has not approved this order yet. Approve it on PayPal first.", 409,
-                                    data={"checkout": self.to_public_dict(row)})
-
-            unit = ((order.get("purchase_units") or [{}])[0] or {}).get("amount") or {}
-            if unit and (unit.get("value") != row.total_amount or unit.get("currency_code") != row.currency):
-                self._transition(db, row, "FAILED", "PRE_CAPTURE_AMOUNT_MISMATCH",
-                                 error=("AMOUNT_MISMATCH", "PayPal order amount differs from the confirmed amount. Capture refused."))
-                raise CheckoutError("AMOUNT_MISMATCH", "PayPal order amount differs from the confirmed amount. Capture refused.", 409)
-
-            previous = row.status
-            locked = db.query(PayPalCheckoutModel).filter(
-                PayPalCheckoutModel.checkout_id == row.checkout_id,
-                PayPalCheckoutModel.status == previous,
-            ).update({"status": "CAPTURING", "paypal_order_status": "APPROVED", "updated_at": _now()}, synchronize_session=False)
-            if locked != 1:
-                db.rollback()
-                raise CheckoutError("CONCURRENT_REQUEST", "This checkout is already being processed.", 409)
-            _log_event(db, row, previous, "CAPTURING", "CAPTURE_STARTED", "PAYPAL_APPROVAL_VERIFIED")
+        order_status = str(order.get("status") or "")
+        if order_status == "COMPLETED":
+            self._apply_order_state(db, row, order, source=f"PRE_CAPTURE_CHECK_{source}")
+            return {**self.to_public_dict(row), "already_completed": row.status == "COMPLETED",
+                    "message": "PayPal reports this order as already completed. No second capture was attempted."}
+        if order_status != "APPROVED":
+            row.paypal_order_status = order_status or row.paypal_order_status
             db.commit()
-            db.refresh(row)
+            raise CheckoutError("ORDER_NOT_APPROVED",
+                                "PayPal has not approved this order yet. Approve it on PayPal first.", 409,
+                                data={"checkout": self.to_public_dict(row)})
 
-            try:
-                captured_order = self.api.capture_order(row.paypal_order_id, request_id=row.capture_request_id)
-            except PayPalNetworkError:
-                self._transition(db, row, "UNKNOWN_RESULT", "CAPTURE_NETWORK_ERROR",
-                                 error=("NETWORK_ERROR", "The capture result is unknown. SIKA will verify with PayPal; "
-                                                         "a retry reuses the same PayPal-Request-Id and cannot double-charge."))
-                return {**self.to_public_dict(row), "message": "The capture result is unknown. Verify the status before any retry."}
-            except PayPalAPIError as e:
-                if e.issue == "ORDER_ALREADY_CAPTURED":
-                    try:
-                        self._apply_order_state(db, row, self.api.get_order(row.paypal_order_id), source="ALREADY_CAPTURED")
-                    except (PayPalNetworkError, PayPalAPIError):
-                        self._transition(db, row, "UNKNOWN_RESULT", "ALREADY_CAPTURED_UNVERIFIED",
-                                         error=("ORDER_ALREADY_CAPTURED", "PayPal says this order was already captured."))
-                    return {**self.to_public_dict(row), "message": "PayPal reports this order as already captured."}
-                if e.issue in ("INSTRUMENT_DECLINED", "PAYER_ACTION_REQUIRED", "ORDER_NOT_APPROVED"):
-                    self._transition(db, row, "AWAITING_PAYPAL_APPROVAL", f"CAPTURE_REJECTED_{e.issue}",
-                                     error=(e.issue, "PayPal needs the payer to approve again (for example, choose another funding source)."),
-                                     debug_id=e.debug_id)
-                    raise CheckoutError(e.issue, "PayPal needs you to approve the payment again on PayPal.", 409,
-                                        data={"checkout": self.to_public_dict(row)})
-                self._transition(db, row, "FAILED", "CAPTURE_REJECTED",
-                                 error=(e.issue or e.name, e.message or "PayPal rejected the capture."), debug_id=e.debug_id)
-                raise CheckoutError("PAYPAL_REJECTED", f"PayPal rejected the capture ({e.issue or e.name}). No funds were captured.", 502,
+        unit = ((order.get("purchase_units") or [{}])[0] or {}).get("amount") or {}
+        if unit and (unit.get("value") != row.total_amount or unit.get("currency_code") != row.currency):
+            self._transition(db, row, "FAILED", "PRE_CAPTURE_AMOUNT_MISMATCH",
+                             error=("AMOUNT_MISMATCH", "PayPal order amount differs from the confirmed amount. Capture refused."))
+            raise CheckoutError("AMOUNT_MISMATCH", "PayPal order amount differs from the confirmed amount. Capture refused.", 409)
+
+        previous = row.status
+        locked = db.query(PayPalCheckoutModel).filter(
+            PayPalCheckoutModel.checkout_id == row.checkout_id,
+            PayPalCheckoutModel.status == previous,
+        ).update({"status": "CAPTURING", "paypal_order_status": "APPROVED", "updated_at": _now()}, synchronize_session=False)
+        if locked != 1:
+            db.rollback()
+            raise CheckoutError("CONCURRENT_REQUEST", "This checkout is already being processed.", 409)
+        _log_event(db, row, previous, "CAPTURING", "CAPTURE_STARTED", f"PAYPAL_APPROVAL_VERIFIED_{source}")
+        db.commit()
+        db.refresh(row)
+
+        try:
+            captured_order = self.api.capture_order(row.paypal_order_id, request_id=row.capture_request_id)
+        except PayPalNetworkError:
+            self._transition(db, row, "UNKNOWN_RESULT", "CAPTURE_NETWORK_ERROR",
+                             error=("NETWORK_ERROR", "The capture result is unknown. SIKA will verify with PayPal; "
+                                                     "a retry reuses the same PayPal-Request-Id and cannot double-charge."))
+            return {**self.to_public_dict(row), "message": "The capture result is unknown. Verify the status before any retry."}
+        except PayPalAPIError as e:
+            if e.issue == "ORDER_ALREADY_CAPTURED":
+                try:
+                    self._apply_order_state(db, row, self.api.get_order(row.paypal_order_id), source="ALREADY_CAPTURED")
+                except (PayPalNetworkError, PayPalAPIError):
+                    self._transition(db, row, "UNKNOWN_RESULT", "ALREADY_CAPTURED_UNVERIFIED",
+                                     error=("ORDER_ALREADY_CAPTURED", "PayPal says this order was already captured."))
+                return {**self.to_public_dict(row), "message": "PayPal reports this order as already captured."}
+            if e.issue in PAYER_MUST_REAPPROVE:
+                # Le lien d'approbation reste valable : le payeur choisit un autre moyen de paiement sur PayPal
+                message = PAYER_MUST_REAPPROVE[e.issue]
+                self._transition(db, row, "AWAITING_PAYPAL_APPROVAL", f"CAPTURE_REJECTED_{e.issue}",
+                                 error=(e.issue, message), debug_id=e.debug_id)
+                raise CheckoutError(e.issue, message, 409, data={"checkout": self.to_public_dict(row)})
+            if e.issue in PAYMENT_REFUSED:
+                message = PAYMENT_REFUSED[e.issue] + " No funds were captured."
+                self._transition(db, row, "DECLINED", f"CAPTURE_REFUSED_{e.issue}", error=(e.issue, message), debug_id=e.debug_id)
+                raise CheckoutError(e.issue, message, 422, data={"checkout": self.to_public_dict(row)})
+            if e.status_code == 404:
+                self._transition(db, row, "EXPIRED", "PAYPAL_ORDER_NOT_FOUND",
+                                 error=("INVALID_RESOURCE_ID", "PayPal no longer knows this order (expired). No payment was made."))
+                raise CheckoutError("ORDER_EXPIRED", "PayPal no longer knows this order (expired). No payment was made.", 410,
                                     data={"checkout": self.to_public_dict(row)})
+            self._transition(db, row, "FAILED", "CAPTURE_REJECTED",
+                             error=(e.issue or e.name, e.message or "PayPal rejected the capture."), debug_id=e.debug_id)
+            raise CheckoutError("PAYPAL_REJECTED", f"PayPal rejected the capture ({e.issue or e.name}). No funds were captured.", 502,
+                                data={"checkout": self.to_public_dict(row)})
 
-            row.paypal_order_status = str(captured_order.get("status") or row.paypal_order_status)
-            capture = self.api.extract_capture(captured_order)
-            if not capture:
-                self._transition(db, row, "UNKNOWN_RESULT", "CAPTURE_RESPONSE_WITHOUT_CAPTURE",
-                                 error=("MISSING_CAPTURE", "PayPal did not return capture details. Verify before any retry."))
-            else:
-                self._apply_capture(db, row, capture, source="CAPTURE")
-                row.result_json = json.dumps({"order_status": row.paypal_order_status, "capture_id": row.capture_id,
-                                              "capture_status": row.capture_status})
-                db.commit()
-            return {**self.to_public_dict(row), "message": STATUS_LABELS.get(row.status, row.status)}
+        row.paypal_order_status = str(captured_order.get("status") or row.paypal_order_status)
+        capture = self.api.extract_capture(captured_order)
+        if not capture:
+            self._transition(db, row, "UNKNOWN_RESULT", "CAPTURE_RESPONSE_WITHOUT_CAPTURE",
+                             error=("MISSING_CAPTURE", "PayPal did not return capture details. Verify before any retry."))
+        else:
+            self._apply_capture(db, row, capture, source=f"CAPTURE_{source}")
+            row.result_json = json.dumps({"order_status": row.paypal_order_status, "capture_id": row.capture_id,
+                                          "capture_status": row.capture_status})
+            db.commit()
+        return {**self.to_public_dict(row), "message": STATUS_LABELS.get(row.status, row.status)}
 
     # ==================================================================
     # Annulation et redirections PayPal
@@ -666,18 +754,19 @@ class PayPalCheckoutService:
             return {**self.to_public_dict(row), "message": "Checkout cancelled. No payment was captured."}
 
     def handle_payer_return(self, order_id: str) -> Optional[str]:
-        """Retour depuis PayPal (non authentifié) : on ne fait confiance qu'à un GET order côté serveur."""
+        """Retour depuis PayPal (non authentifié) : on ne fait confiance qu'à un GET order côté serveur,
+        puis on capture si PayPal confirme l'approbation."""
         with Session(engine) as db:
             row = db.query(PayPalCheckoutModel).filter(PayPalCheckoutModel.paypal_order_id == str(order_id)).first()
             if not row:
                 return None
-            _log_event(db, row, row.status, row.status, "PAYER_RETURNED_FROM_PAYPAL")
-            db.commit()
             if row.status == "AWAITING_PAYPAL_APPROVAL":
                 try:
                     self._apply_order_state(db, row, self.api.get_order(row.paypal_order_id), source="RETURN")
                 except (PayPalNetworkError, PayPalAPIError, PayPalConfigurationError, ValueError) as e:
                     logger.warning(f"[SIKA PAY] Return sync failed for {row.checkout_id}: {type(e).__name__}")
+            if row.status == "APPROVED":
+                self._auto_capture(db, row, source="RETURN")
             return row.status
 
     def handle_payer_cancel(self, order_id: str) -> Optional[str]:
@@ -689,6 +778,50 @@ class PayPalCheckoutService:
                 self._transition(db, row, "CANCELLED", "PAYER_CANCELLED_AT_PAYPAL",
                                  error=("PAYER_CANCELLED", "You cancelled on PayPal. No payment was made."))
             return row.status
+
+    # ==================================================================
+    # Webhooks PayPal (signature déjà vérifiée par la route)
+    # ==================================================================
+
+    WEBHOOK_EVENTS = (
+        "CHECKOUT.ORDER.APPROVED",
+        "PAYMENT.CAPTURE.COMPLETED",
+        "PAYMENT.CAPTURE.PENDING",
+        "PAYMENT.CAPTURE.DENIED",
+        "PAYMENT.CAPTURE.DECLINED",
+        "PAYMENT.CAPTURE.REFUNDED",
+        "PAYMENT.CAPTURE.REVERSED",
+    )
+
+    def handle_webhook_event(self, event: Dict[str, Any]) -> str:
+        """Applique un événement PayPal. Le contenu de l'événement sert seulement à retrouver la commande :
+        l'état appliqué vient toujours d'un GET /v2/checkout/orders côté serveur."""
+        event_type = str(event.get("event_type") or "")
+        resource = event.get("resource") or {}
+        if event_type == "CHECKOUT.ORDER.APPROVED":
+            order_id = resource.get("id")
+        else:
+            order_id = (((resource.get("supplementary_data") or {}).get("related_ids") or {}).get("order_id"))
+        if event_type not in self.WEBHOOK_EVENTS:
+            return "IGNORED_EVENT_TYPE"
+        if not order_id:
+            return "NO_ORDER_ID"
+        with Session(engine) as db:
+            row = db.query(PayPalCheckoutModel).filter(PayPalCheckoutModel.paypal_order_id == str(order_id)).first()
+            if not row:
+                return "UNKNOWN_ORDER"
+            _log_event(db, row, row.status, row.status, "PAYPAL_WEBHOOK_RECEIVED", event_type[:100])
+            db.commit()
+            if row.status == "CAPTURING":
+                return "CAPTURE_IN_PROGRESS"
+            try:
+                self._apply_order_state(db, row, self.api.get_order(row.paypal_order_id), source="WEBHOOK")
+            except (PayPalNetworkError, PayPalAPIError, PayPalConfigurationError) as e:
+                logger.warning(f"[SIKA PAY] Webhook sync failed for {row.checkout_id}: {type(e).__name__}")
+                return "SYNC_FAILED"
+            if row.status == "APPROVED":
+                self._auto_capture(db, row, source="WEBHOOK")
+            return f"STATUS_{row.status}"
 
     # ==================================================================
     # Utilitaires internes

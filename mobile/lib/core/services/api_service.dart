@@ -387,6 +387,36 @@ class ApiService {
     throw PayPalApiException(code, message, response.statusCode, checkout: checkout);
   }
 
+  // Mode hybride : autorisation accordée par l'utilisateur à l'agent
+  Future<Map<String, dynamic>> getAgentAuthorization() async {
+    final response = await http
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalAgentAuthorization}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> setAgentAuthorization({
+    required String maxPerPurchase,
+    required String dailyLimit,
+    required int durationHours,
+  }) async {
+    final response = await http
+        .put(
+          Uri.parse('$safeBaseUrl${ApiConstants.paypalAgentAuthorization}'),
+          headers: _headers,
+          body: jsonEncode({'max_per_purchase': maxPerPurchase, 'daily_limit': dailyLimit, 'duration_hours': durationHours}),
+        )
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> revokeAgentAuthorization() async {
+    final response = await http
+        .delete(Uri.parse('$safeBaseUrl${ApiConstants.paypalAgentAuthorization}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   Future<Map<String, dynamic>> getPayPalStatus() async {
     final response = await http
         .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalStatus}'), headers: _headers)

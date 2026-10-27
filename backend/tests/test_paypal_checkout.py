@@ -203,7 +203,8 @@ def test_create_rejected_by_paypal_marks_failed(setup_db_and_fake):
     chk = _prepare()
     with pytest.raises(CheckoutError) as e:
         paypal_checkout_service.confirm_and_create_order(1, chk["checkout_id"], chk["details_hash"])
-    assert e.value.code == "PAYPAL_REJECTED"
+    assert e.value.code == "CURRENCY_NOT_SUPPORTED"
+    assert "does not support this currency" in e.value.message and "No payment was made" in e.value.message
     assert _status(chk["checkout_id"]) == "FAILED"
 
 
@@ -240,10 +241,8 @@ def test_full_flow_completes_and_never_double_captures(setup_db_and_fake):
     fake = setup_db_and_fake
     cid, order_id = _created(fake)
     fake.approve(order_id)
-    synced = paypal_checkout_service.sync_with_paypal(1, cid)
-    assert synced["status"] == "APPROVED" and synced["next_action"] == "CAPTURE"
-
-    done = paypal_checkout_service.capture(1, cid)
+    # Après l'approbation PayPal, la vérification capture automatiquement (pas de 4e confirmation)
+    done = paypal_checkout_service.sync_with_paypal(1, cid)
     assert done["status"] == "COMPLETED"
     assert done["paypal"]["capture_status"] == "COMPLETED"
     assert done["paypal"]["captured_amount"] == "49.00" and done["paypal"]["captured_currency"] == "USD"
@@ -255,7 +254,8 @@ def test_full_flow_completes_and_never_double_captures(setup_db_and_fake):
     events = paypal_checkout_service.get_checkout(1, cid)["events"]
     types_ = [e["event_type"] for e in events]
     assert types_[0] == "CHECKOUT_PREPARED" and "USER_CONFIRMED" in types_ and "PAYPAL_ORDER_CREATED" in types_
-    assert "CAPTURE_STARTED" in types_ and types_[-1] == "PAYPAL_CAPTURE_COMPLETED_CAPTURE"
+    assert "PAYPAL_APPROVED_SYNC" in types_ and "CAPTURE_STARTED" in types_
+    assert types_[-1] == "PAYPAL_CAPTURE_COMPLETED_CAPTURE_SYNC"
 
 
 def test_capture_network_error_gives_unknown_result_then_safe_retry(setup_db_and_fake):
@@ -341,7 +341,8 @@ def test_payer_cancel_and_return_handlers(setup_db_and_fake):
     fake = setup_db_and_fake
     cid, order_id = _created(fake)
     fake.approve(order_id)
-    assert paypal_checkout_service.handle_payer_return(order_id) == "APPROVED"
+    assert paypal_checkout_service.handle_payer_return(order_id) == "COMPLETED"
+    assert fake.capture_count() == 1
     cid2, order2 = _created(fake)
     assert paypal_checkout_service.handle_payer_cancel(order2) == "CANCELLED"
     assert paypal_checkout_service.handle_payer_return("UNKNOWNORDER123") is None
@@ -391,10 +392,12 @@ def test_http_happy_path_and_cross_user_isolation(setup_db_and_fake):
 
     fake.approve(order_id)
     page = client.get(f"/api/v1/paypal/return?token={order_id}")
-    assert page.status_code == 200 and "Approval received" in page.text and "SANDBOX" in page.text
+    assert page.status_code == 200 and "Payment completed" in page.text and "SANDBOX" in page.text
 
+    # Capture déjà faite au retour : la capture manuelle ne recapture pas
     cap = client.post(f"/api/v1/paypal/checkouts/{cid}/capture", headers=h1)
-    assert cap.status_code == 200 and cap.json()["status"] == "COMPLETED"
+    assert cap.status_code == 200 and cap.json()["status"] == "COMPLETED" and cap.json()["already_completed"] is True
+    assert fake.capture_count() == 1
 
     history = client.get("/api/v1/paypal/checkouts", headers=h1).json()["checkouts"]
     assert history[0]["checkout_id"] == cid and history[0]["status"] == "COMPLETED"

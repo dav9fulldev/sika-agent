@@ -84,6 +84,9 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
               // Le prix vient du catalogue côté serveur, jamais du texte généré par l'IA
               if ((v.provenance['verified'] as List?)?.isNotEmpty ?? false)
                 _reason(Icons.verified_rounded, lang.tr('Prix vérifié', 'Price verified'), AppColors.brandPrimary),
+              if (v.data['confirmed_by'] == 'AGENT')
+                _reason(Icons.auto_awesome_rounded, lang.tr('Confirmé par SIKA (votre autorisation)', 'Confirmed by SIKA (your authorization)'),
+                    SikaPayColors.paypalBlue),
             ]),
             if (v.status == 'CANCELLED' && v.lastError?['code'] == 'REPLACED_BY_NEW_REQUEST') ...[
               const SizedBox(height: 8),
@@ -98,13 +101,21 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                       backgroundColor: SikaPayColors.paypalBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  onPressed: id.isEmpty ? null : () => PayPalCheckoutScreen.open(context, id),
+                  onPressed: id.isEmpty
+                      ? null
+                      : () {
+                          // Achat confirmé (par vous ou par SIKA) : l'étape suivante est l'approbation sur PayPal
+                          if (v.status == 'AWAITING_PAYPAL_APPROVAL') ref.read(paypalCheckoutsProvider.notifier).openApproval(id);
+                          PayPalCheckoutScreen.open(context, id);
+                        },
                   child: Text(
                     v.status == 'COMPLETED'
                         ? lang.tr('Voir le reçu', 'View receipt')
                         : v.status == 'AWAITING_USER_CONFIRMATION'
-                            ? lang.tr('Voir le récapitulatif', 'View summary')
-                            : lang.tr('Continuer le paiement', 'Continue payment'),
+                            ? lang.tr('Voir le récapitulatif', 'Review summary')
+                            : v.status == 'AWAITING_PAYPAL_APPROVAL'
+                                ? lang.tr('Approuver sur PayPal', 'Approve on PayPal')
+                                : lang.tr('Continuer le paiement', 'Continue payment'),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),

@@ -210,10 +210,13 @@ def test_production_config_rejects_default_jwt_secret(monkeypatch):
 # ============================================================================
 
 def test_prompt_injection_cannot_bypass_human_confirmation():
-    """La préparation PayPal exige une confirmation humaine ; aucun tool de paiement n'est exposé au modèle."""
+    """Aucun tool de capture ; la confirmation par l'agent n'est présentée qu'avec une autorisation de l'utilisateur."""
+    from app.agent.tools import AUTHORIZATION_ONLY_TOOLS
     assert tool_registry.get_definition("prepare_paypal_checkout").risk_level.value == "CONFIRMATION_REQUIRED"
     for name in tool_registry.agent_tool_names():
-        assert "capture" not in name and "confirm" not in name
+        assert "capture" not in name
+    without_authorization = tool_registry.agent_tool_names(set(AUTHORIZATION_ONLY_TOOLS))
+    assert not any("confirm" in name for name in without_authorization)
 
 
 def test_prompt_injection_cannot_set_server_side_amount():

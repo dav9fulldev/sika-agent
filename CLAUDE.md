@@ -18,9 +18,10 @@ Guide for AI coding agents working in this repository. Read `CONTEXT.md` (produc
 ```bash
 # backend
 cd backend && source venv/bin/activate        # or test_venv/bin/python locally
-pytest -q                                       # 131 tests, no network
+pytest -q tests                                 # 162 tests, no network
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 python scripts/paypal_sandbox_e2e.py            # REAL sandbox run (needs PAYPAL_* in .env)
+python scripts/paypal_register_webhook.py https://<public-url>   # one-time webhook registration
 
 # mobile
 cd mobile && flutter analyze && flutter test
@@ -29,7 +30,7 @@ flutter run --dart-define=SIKA_API_URL=http://<LAN-IP>:8001
 
 ## Hard rules
 1. **Sandbox only.** `Settings._validate_paypal_constraints` must keep rejecting non-sandbox hosts.
-2. **Never expose a tool that creates, confirms or captures a payment to the model.** New tools that touch money must be `CONFIRMATION_REQUIRED` and must not call PayPal.
+2. **Hybrid control.** By default only the user confirms a purchase in the app. The model may confirm (`confirm_checkout_with_authorization`) only when the user granted an active authorization (`agent_mandates`): the tool is hidden otherwise, and `AgentMandateService.check_purchase` enforces per-purchase, daily and expiry limits server-side. No tool ever captures: capture follows the payer's PayPal approval, verified server-side.
 3. Amounts come from the server (catalog), never from the model or the mobile client. Use `Decimal` and two-decimal strings.
 4. `user_id` is always injected server-side in the agent loop; never trust model arguments for identity.
 5. Keep `PayPal-Request-Id` stable per checkout for create and capture. Network errors → `UNKNOWN_RESULT`, never success.

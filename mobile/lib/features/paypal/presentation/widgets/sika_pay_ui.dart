@@ -254,3 +254,67 @@ class SikaPayCard extends StatelessWidget {
     );
   }
 }
+
+/// Libellé lisible d'un événement du journal d'audit (null = détail technique non affiché).
+String? eventLabel(Map<String, dynamic> e, LanguageNotifier lang) {
+  final type = e['event_type']?.toString() ?? '';
+  final reason = e['reason']?.toString() ?? '';
+  if (type == 'CHECKOUT_PREPARED') return lang.tr('Préparé par SIKA', 'Prepared by SIKA');
+  if (type == 'USER_CONFIRMED') return lang.tr('Confirmé par vous', 'Confirmed by you');
+  if (type == 'AGENT_CONFIRMED') return lang.tr('Confirmé par SIKA avec votre autorisation', 'Confirmed by SIKA with your authorization');
+  if (type == 'PAYPAL_ORDER_CREATED') return lang.tr('Commande PayPal créée', 'PayPal order created');
+  if (type.startsWith('PAYPAL_APPROVED')) return lang.tr('Approuvé par vous sur PayPal', 'Approved by you on PayPal');
+  if (type.startsWith('PAYPAL_CAPTURE_COMPLETED')) return lang.tr('Paiement capturé par PayPal', 'Payment captured by PayPal');
+  if (type.startsWith('PAYPAL_CAPTURE_PENDING')) return lang.tr('Capture en attente chez PayPal', 'Capture pending at PayPal');
+  if (type.startsWith('PAYPAL_CAPTURE_REFUNDED') || type.startsWith('PAYPAL_CAPTURE_PARTIALLY_REFUNDED')) {
+    return lang.tr('Remboursé par le marchand', 'Refunded by the merchant');
+  }
+  if (type.startsWith('PAYPAL_CAPTURE_DECLINED') || type.startsWith('PAYPAL_CAPTURE_FAILED') || type.startsWith('CAPTURE_REFUSED')) {
+    return lang.tr('Paiement refusé par PayPal', 'Payment refused by PayPal');
+  }
+  if (type.startsWith('CAPTURE_REJECTED')) return lang.tr('PayPal demande une nouvelle approbation', 'PayPal asks for a new approval');
+  if (type == 'PAYPAL_WEBHOOK_RECEIVED') {
+    return lang.tr('Notification PayPal reçue', 'PayPal notification received') + (reason.isNotEmpty ? ' · $reason' : '');
+  }
+  if (type == 'CHECKOUT_CANCELLED' || type == 'PAYER_CANCELLED_AT_PAYPAL' || type.startsWith('PAYPAL_VOIDED')) {
+    return lang.tr('Annulé — aucun paiement', 'Cancelled — no payment');
+  }
+  if (type == 'CHECKOUT_EXPIRED' || type == 'PAYPAL_ORDER_NOT_FOUND') return lang.tr('Expiré — aucun paiement', 'Expired — no payment');
+  if (type == 'CHECKOUT_INVALIDATED') return lang.tr('Remplacé par une demande plus récente', 'Replaced by a newer request');
+  if (type.contains('NETWORK_ERROR') || type.contains('UNVERIFIED') || type.contains('MISMATCH')) {
+    return lang.tr('Résultat à vérifier auprès de PayPal', 'Result to verify with PayPal');
+  }
+  if (type.contains('REJECTED') || type.contains('INVALID')) return lang.tr('Refusé par PayPal', 'Rejected by PayPal');
+  return null; // étapes internes (début de capture, retour du navigateur…)
+}
+
+/// Message d'erreur dans la langue de l'utilisateur ; repli sur le message du serveur (anglais).
+String paypalErrorText(String? code, String? serverMessage, LanguageNotifier lang) {
+  final fr = <String, String>{
+    'INSTRUMENT_DECLINED': 'Le moyen de paiement a été refusé. Choisissez-en un autre sur PayPal.',
+    'REDIRECT_PAYER_FOR_ALTERNATE_FUNDING': 'PayPal vous demande de choisir un autre moyen de paiement.',
+    'PAYER_ACTION_REQUIRED': 'PayPal attend encore une action de votre part. Ouvrez PayPal pour continuer.',
+    'ORDER_NOT_APPROVED': "La commande n'est pas encore approuvée. Approuvez-la sur PayPal.",
+    'PAYER_CANNOT_PAY': 'PayPal ne peut pas accepter de paiement depuis ce compte. Essayez un autre compte PayPal. Aucun débit.',
+    'TRANSACTION_REFUSED': 'PayPal a refusé cette transaction. Vérifiez votre compte PayPal. Aucun débit.',
+    'MAX_NUMBER_OF_PAYMENT_ATTEMPTS_EXCEEDED': 'Trop de tentatives. Utilisez un autre moyen de paiement. Aucun débit.',
+    'PAYMENT_DENIED': 'PayPal a refusé ce paiement. Aucun débit.',
+    'CANNOT_PAY_SELF': "L'acheteur et le marchand sont le même compte PayPal. Payez avec un autre compte. Aucun débit.",
+    'CURRENCY_NOT_SUPPORTED': "PayPal n'accepte pas cette devise pour ce compte. Aucun paiement.",
+    'ORDER_EXPIRED': "PayPal ne connaît plus cette commande (expirée). Aucun paiement n'a été fait.",
+    'CHECKOUT_EXPIRED': 'Ce paiement a expiré avant confirmation. Demandez à SIKA de le préparer à nouveau.',
+    'PAYPAL_UNREACHABLE': "PayPal est injoignable. Rien n'a été débité ; vous pouvez réessayer.",
+    'NO_ACTIVE_AUTHORIZATION': "Vous n'avez pas autorisé SIKA à confirmer pour vous. Confirmez dans l'app.",
+    'ABOVE_AUTHORIZED_AMOUNT': 'Montant au-dessus de votre autorisation. Confirmez-le vous-même.',
+    'DAILY_LIMIT_REACHED': 'Limite quotidienne de votre autorisation atteinte. Confirmez-le vous-même.',
+    'TIMEOUT': 'Pas de réponse à temps. Le dernier statut vérifié est affiché : revérifiez avant de réessayer.',
+    'NETWORK': "Pas de connexion au serveur SIKA. Rien de nouveau n'a été envoyé à PayPal.",
+  };
+  if (!lang.isEnglish && code != null && fr.containsKey(code)) return fr[code]!;
+  return serverMessage ?? lang.tr('Une erreur est survenue.', 'Something went wrong.');
+}
+
+bool isRefunded(Map<String, dynamic> paypal) {
+  final s = paypal['capture_status']?.toString() ?? '';
+  return s == 'REFUNDED' || s == 'PARTIALLY_REFUNDED';
+}

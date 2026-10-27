@@ -18,6 +18,9 @@ _DEV_COLUMNS = {
         "country": "VARCHAR(64)",
         "kyc_status": "VARCHAR(20) NOT NULL DEFAULT 'none'",
     },
+    "paypal_checkouts": {
+        "confirmed_by": "VARCHAR(10)",
+    },
 }
 
 

@@ -7,19 +7,29 @@ qu'à une vérification serveur GET /v2/checkout/orders/{id}).
 """
 
 import html
+import json
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..services import demo_catalog
 from ..services.auth_service import oauth2_auth_service
 from ..services.security_rate_limiter import security_rate_limiter
 from ..services.paypal_checkout_service import paypal_checkout_service, CheckoutError
+from ..services.agent_mandate_service import agent_mandate_service, MandateError
+from ..services.wallet_integrations.paypal_api_service import paypal_api_service, PayPalAPIError, PayPalNetworkError
+from ..database import engine
+from ..models.paypal_webhook_event import PayPalWebhookEventModel
+
+logger = logging.getLogger("SikaPayPalRouter")
 
 router = APIRouter(prefix="/api/v1/paypal", tags=["paypal"])
 
@@ -40,6 +50,12 @@ class ConfirmCheckoutRequest(BaseModel):
 
 class CancelCheckoutRequest(BaseModel):
     reason: str = Field("USER_CANCELLED", max_length=100)
+
+
+class AgentAuthorizationRequest(BaseModel):
+    max_per_purchase: str = Field(..., max_length=20)
+    daily_limit: str = Field(..., max_length=20)
+    duration_hours: int = Field(..., ge=1, le=720)
 
 
 def _raise(err: CheckoutError):
@@ -137,6 +153,101 @@ def cancel_checkout(checkout_id: str, data: Optional[CancelCheckoutRequest] = No
         _raise(e)
 
 
+# ----------------------------------------------------------------------
+# Mode hybride : autorisation accordée par l'utilisateur à l'agent
+# ----------------------------------------------------------------------
+
+@router.get("/agent-authorization", summary="Current agent authorization")
+def get_agent_authorization(authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return agent_mandate_service.get(user_id)
+
+
+@router.put("/agent-authorization", summary="Authorize SIKA to confirm purchases",
+            description="L'utilisateur autorise l'agent à confirmer des achats pour lui, dans les limites qu'il fixe.")
+def put_agent_authorization(data: AgentAuthorizationRequest, authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    try:
+        return agent_mandate_service.grant(user_id, data.max_per_purchase, data.daily_limit, data.duration_hours)
+    except MandateError as e:
+        raise HTTPException(status_code=e.http_status, detail=e.to_dict())
+
+
+@router.delete("/agent-authorization", summary="Revoke the agent authorization")
+def delete_agent_authorization(authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return agent_mandate_service.revoke(user_id)
+
+
+# ----------------------------------------------------------------------
+# Webhooks PayPal (signature vérifiée par l'API PayPal avant tout traitement)
+# ----------------------------------------------------------------------
+
+_webhook_id_cache: dict = {}
+
+
+def webhook_url() -> str:
+    return f"{settings.PUBLIC_BASE_URL}/api/v1/paypal/webhook"
+
+
+def _resolve_webhook_id() -> Optional[str]:
+    """PAYPAL_WEBHOOK_ID si défini, sinon l'ID du webhook enregistré chez PayPal pour cette URL."""
+    if settings.PAYPAL_WEBHOOK_ID:
+        return settings.PAYPAL_WEBHOOK_ID
+    if "id" not in _webhook_id_cache:
+        url = webhook_url()
+        found = next((w.get("id") for w in paypal_api_service.list_webhooks() if w.get("url") == url), None)
+        if not found:
+            return None
+        _webhook_id_cache["id"] = found
+    return _webhook_id_cache["id"]
+
+
+@router.post("/webhook", include_in_schema=False)
+async def paypal_webhook(request: Request):
+    raw = await request.body()
+    try:
+        event = json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON.")
+    event_id = str(event.get("id") or "")[:64]
+    event_type = str(event.get("event_type") or "")[:80]
+    if not event_id or not event_type:
+        raise HTTPException(status_code=400, detail="Not a PayPal event.")
+
+    try:
+        webhook_id = _resolve_webhook_id()
+        verified = bool(webhook_id) and paypal_api_service.verify_webhook_signature(
+            headers={k.lower(): v for k, v in request.headers.items()}, event=event, webhook_id=webhook_id)
+    except (PayPalAPIError, PayPalNetworkError) as e:
+        # PayPal renverra l'événement : on répond en erreur plutôt que d'accepter sans vérification
+        logger.warning(f"[PAYPAL WEBHOOK] Verification unavailable for {event_type}: {type(e).__name__}")
+        raise HTTPException(status_code=503, detail="Signature verification unavailable.")
+    if not verified:
+        logger.warning(f"[PAYPAL WEBHOOK] Rejected unverified event {event_type}")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature.")
+
+    with Session(engine) as db:
+        if db.get(PayPalWebhookEventModel, event_id):
+            return {"received": True, "duplicate": True}
+        record = PayPalWebhookEventModel(event_id=event_id, event_type=event_type,
+                                         resource_id=str((event.get("resource") or {}).get("id") or "")[:64] or None)
+        db.add(record)
+        try:
+            db.commit()
+        except IntegrityError:
+            return {"received": True, "duplicate": True}
+
+    outcome = paypal_checkout_service.handle_webhook_event(event)
+    with Session(engine) as db:
+        record = db.get(PayPalWebhookEventModel, event_id)
+        if record:
+            record.outcome = outcome[:80]
+            db.commit()
+    logger.info(f"[PAYPAL WEBHOOK] {event_type} {event_id}: {outcome}")
+    return {"received": True, "outcome": outcome}
+
+
 def _page(title: str, body: str) -> HTMLResponse:
     content = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>SIKA Pay</title>
@@ -146,7 +257,8 @@ def _page(title: str, body: str) -> HTMLResponse:
 a.btn{{display:block;margin-top:24px;background:#635bff;color:#fff;text-decoration:none;padding:14px;border-radius:14px;font-weight:600}}
 p{{color:#cbd5e1;line-height:1.5}}</style></head>
 <body><div class="card"><span class="badge">PayPal SANDBOX — test mode</span><h2>{html.escape(title)}</h2>
-<p>{html.escape(body)}</p><a class="btn" href="sikapay://paypal/return">Return to SIKA</a></div></body></html>"""
+<p>{html.escape(body)}</p><a class="btn" href="sikapay://paypal/return">Return to SIKA Pay</a></div>
+<script>setTimeout(function(){{location.href="sikapay://paypal/return"}},600)</script></body></html>"""
     return HTMLResponse(content=content)
 
 
@@ -155,11 +267,13 @@ def paypal_return(token: str = Query("", max_length=64)):
     if not _ORDER_ID.match(token or ""):
         return _page("Unknown order", "This PayPal return link is not valid.")
     status = paypal_checkout_service.handle_payer_return(token)
-    if status == "APPROVED":
-        return _page("Approval received", "PayPal confirmed your approval. Go back to SIKA to review and complete the payment. Nothing has been captured yet.")
+    if status == "COMPLETED":
+        return _page("Payment completed", "PayPal confirmed the payment. Return to SIKA Pay to see your receipt.")
+    if status in ("APPROVED", "CAPTURING", "PENDING", "UNKNOWN_RESULT"):
+        return _page("Approval received", "PayPal confirmed your approval. Return to SIKA Pay: it is verifying the payment with PayPal.")
     if status is None:
         return _page("Unknown order", "SIKA does not know this PayPal order.")
-    return _page("Back from PayPal", "Go back to SIKA: it will verify the order status with PayPal.")
+    return _page("Back from PayPal", "Return to SIKA Pay: it will verify the order status with PayPal.")
 
 
 @router.get("/cancel", include_in_schema=False)

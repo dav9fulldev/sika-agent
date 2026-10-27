@@ -45,7 +45,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
     // Retour depuis le navigateur PayPal : revérification immédiate auprès de PayPal
     if (state == AppLifecycleState.resumed) {
       final v = ref.read(paypalCheckoutsProvider)[widget.checkoutId];
-      if (v != null && const ['AWAITING_PAYPAL_APPROVAL', 'UNKNOWN_RESULT', 'PENDING'].contains(v.status)) {
+      if (v != null && const ['AWAITING_PAYPAL_APPROVAL', 'APPROVED', 'UNKNOWN_RESULT', 'PENDING'].contains(v.status)) {
         _notifier.refresh(widget.checkoutId);
       }
     }
@@ -57,7 +57,17 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
       final ok = await bio.authenticate(
         localizedReason: lang.tr('Confirmez pour créer la commande PayPal sandbox.', 'Confirm to create the PayPal sandbox order.'),
       );
-      if (!ok) return; // aucune commande créée sans authentification réussie
+      if (!ok) {
+        // aucune commande créée sans authentification réussie
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(lang.tr("Identité non confirmée : aucune commande n'a été créée.",
+                'Identity not confirmed: no order was created.')),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+        return;
+      }
     }
     await _notifier.confirmAndOpenPayPal(widget.checkoutId);
   }
@@ -99,7 +109,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
   }
 
   String _title(String? status, LanguageNotifier lang) {
-    if (status == 'COMPLETED') return lang.tr('Résultat', 'Result');
+    if (const ['COMPLETED', 'DECLINED', 'CANCELLED', 'EXPIRED', 'FAILED'].contains(status)) return lang.tr('Résultat', 'Result');
     if (status == 'AWAITING_PAYPAL_APPROVAL' || status == 'APPROVED' || status == 'CAPTURING') return 'PayPal';
     if (status == 'AWAITING_USER_CONFIRMATION') return lang.tr('Récapitulatif', 'Summary');
     return lang.tr('Détails du paiement', 'Payment details');
@@ -179,8 +189,8 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
     switch (v.status) {
       case 'APPROVED':
         title = lang.tr('Approuvé sur PayPal', 'Approved on PayPal');
-        body = lang.tr('PayPal confirme votre approbation. Rien n\'est encore payé : finalisez le paiement ci-dessous.',
-            'PayPal confirms your approval. Nothing is paid yet: complete the payment below.');
+        body = lang.tr('PayPal confirme votre approbation. SIKA finalise le paiement…',
+            'PayPal confirms your approval. SIKA is completing the payment…');
         break;
       case 'CAPTURING':
         title = lang.tr('Paiement en cours', 'Completing payment');
@@ -197,8 +207,11 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
         break;
       default:
         title = lang.tr('Approuvez sur PayPal', 'Approve on PayPal');
-        body = lang.tr('Connectez-vous avec votre compte acheteur sandbox et approuvez la commande, puis revenez dans SIKA.',
-            'Log in with your sandbox buyer account, approve the order, then come back to SIKA.');
+        body = v.data['confirmed_by'] == 'AGENT'
+            ? lang.tr('SIKA a confirmé cet achat avec votre autorisation. Approuvez-le sur PayPal : le paiement se termine ensuite tout seul.',
+                'SIKA confirmed this purchase with your authorization. Approve it on PayPal: the payment then completes on its own.')
+            : lang.tr('Approuvez la commande sur PayPal avec votre compte acheteur sandbox. Le paiement se termine ensuite tout seul.',
+                'Approve the order on PayPal with your sandbox buyer account. The payment then completes on its own.');
     }
     final st = statusStyle(v.status);
     return Padding(
@@ -331,11 +344,16 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
         ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
       ),
       const SizedBox(height: 16),
-      Center(child: Text(lang.tr('Paiement capturé !', 'Payment captured!'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800))),
+      Center(
+          child: Text(
+              isRefunded(p) ? lang.tr('Paiement remboursé', 'Payment refunded') : lang.tr('Paiement réussi', 'Payment successful'),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800))),
       const SizedBox(height: 6),
       Center(
         child: Text(
-          lang.tr('PayPal a confirmé la capture du paiement en sandbox.', 'PayPal confirmed the payment capture in the sandbox.'),
+          isRefunded(p)
+              ? lang.tr('PayPal a capturé puis remboursé ce paiement (sandbox).', 'PayPal captured then refunded this payment (sandbox).')
+              : lang.tr('PayPal a confirmé la capture du paiement en sandbox.', 'PayPal confirmed the payment capture in the sandbox.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
         ),
@@ -407,8 +425,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
         ]);
       case 'APPROVED':
         return Column(children: [
-          primary(lang.tr('Payer ${v.total} ${v.currency} maintenant', 'Pay ${v.total} ${v.currency} now'), () => _notifier.capture(id),
-              color: AppColors.success),
+          primary(lang.tr('Finaliser le paiement', 'Complete the payment'), () => _notifier.capture(id), color: AppColors.success),
           gap,
           secondary(lang.tr('Annuler', 'Cancel'), () => _notifier.cancel(id)),
         ]);
@@ -430,7 +447,9 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
             child: Row(children: [
               Icon(statusStyle(v.status).icon, color: statusStyle(v.status).color),
               const SizedBox(width: 10),
-              Expanded(child: Text(v.lastError?['message']?.toString() ?? v.statusLabel)),
+              Expanded(child: Text(v.lastError != null
+                  ? paypalErrorText(v.lastError!['code']?.toString(), v.lastError!['message']?.toString(), lang)
+                  : statusShortLabel(v.status, lang))),
             ]),
           ),
           gap,
@@ -447,7 +466,7 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
         const SizedBox(width: 10),
-        Expanded(child: Text(v.errorMessage!, style: const TextStyle(fontSize: 13, height: 1.35))),
+        Expanded(child: Text(paypalErrorText(v.errorCode, v.errorMessage, lang), style: const TextStyle(fontSize: 13, height: 1.35))),
       ]),
     );
   }
@@ -469,14 +488,15 @@ class _PayPalCheckoutScreenState extends ConsumerState<PayPalCheckoutScreen> wit
             const Divider(height: 24),
             Text(lang.tr('Historique du paiement', 'Payment history'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 4),
-            ...v.events.map((e) {
+            ...v.events.where((e) => eventLabel(e, lang) != null).map((e) {
               final at = DateTime.tryParse(e['created_at']?.toString() ?? '')?.toLocal();
+              final st = statusStyle(e['new_status']?.toString() ?? '');
               return ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(statusStyle(e['new_status']?.toString() ?? '').icon, color: statusStyle(e['new_status']?.toString() ?? '').color),
-                title: Text(e['event_type']?.toString() ?? ''),
-                subtitle: Text('${e['previous_status'] ?? '—'} → ${e['new_status']}${at != null ? '  ·  ${DateFormat('HH:mm:ss').format(at)}' : ''}'),
+                leading: Icon(st.icon, color: st.color),
+                title: Text(eventLabel(e, lang)!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: at != null ? Text(DateFormat('d MMM, HH:mm:ss').format(at)) : null,
               );
             }),
           ],
