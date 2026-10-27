@@ -136,8 +136,8 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
                 label: langNotifier.tr('Transactions', 'Transactions')),
             _buildNavItem(
                 index: 3,
-                icon: Icons.face_rounded,
-                activeIcon: Icons.face_rounded,
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
                 label: langNotifier.tr('Profil', 'Profile')),
           ],
         ),

@@ -18,7 +18,9 @@ class SikaLoadingScreen extends ConsumerWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(children: [
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(children: [
             const Spacer(flex: 4),
             const SikaPayLogo(size: 84),
             const SizedBox(height: 20),
@@ -40,6 +42,7 @@ class SikaLoadingScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
           ]),
+          ),
         ),
       ),
     );

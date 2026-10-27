@@ -578,8 +578,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         break;
       case 'COMPLETED':
         text = isEn
-            ? 'Done. PayPal captured ${paypal['captured_amount']} ${paypal['captured_currency']} for $item (sandbox). Order ${paypal['order_id']}, capture ${paypal['capture_id']}, status ${paypal['capture_status']}.'
-            : 'C\'est fait. PayPal a capturé ${paypal['captured_amount']} ${paypal['captured_currency']} pour $item (sandbox). Commande ${paypal['order_id']}, capture ${paypal['capture_id']}, statut ${paypal['capture_status']}.';
+            ? 'Done. PayPal captured ${paypal['captured_amount']} ${paypal['captured_currency']} for $item. Order ${paypal['order_id']}, capture ${paypal['capture_id']}, status ${paypal['capture_status']}.'
+            : 'C\'est fait. PayPal a capturé ${paypal['captured_amount']} ${paypal['captured_currency']} pour $item. Commande ${paypal['order_id']}, capture ${paypal['capture_id']}, statut ${paypal['capture_status']}.';
         break;
       case 'UNKNOWN_RESULT':
       case 'PENDING':

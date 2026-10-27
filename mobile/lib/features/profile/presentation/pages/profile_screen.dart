@@ -31,7 +31,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
         title: Text(
-          langNotifier.tr('Déconnexion', 'Log Out'),
+          langNotifier.tr('Se déconnecter', 'Log out'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -71,7 +71,7 @@ class ProfileScreen extends ConsumerWidget {
                 // Le routeur de main.dart affiche l'écran suivant selon l'état d'authentification
       Navigator.of(context).popUntil((route) => route.isFirst);
               },
-              text: langNotifier.tr('Déconnexion', 'Log Out'),
+              text: langNotifier.tr('Se déconnecter', 'Log out'),
             ),
           ),
         ],
@@ -98,7 +98,7 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          langNotifier.tr('Profil & Compte', 'Profile & Account'),
+          langNotifier.tr('Profil', 'Profile'),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -200,34 +200,6 @@ class ProfileScreen extends ConsumerWidget {
                                       ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.warning.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color:
-                                          AppColors.warning.withValues(alpha: 0.5)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.star_rounded,
-                                        size: 12, color: AppColors.warning),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Premium',
-                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                            color: AppColors.warning,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -235,7 +207,9 @@ class ProfileScreen extends ConsumerWidget {
                             children: [
                               Flexible(
                                 child: Text(
-                                  userEmail,
+                                  userEmail.isNotEmpty
+                                      ? userEmail
+                                      : (isKycVerified ? langNotifier.tr('Vérifié par PayPal', 'Verified by PayPal') : ''),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context)
@@ -278,7 +252,7 @@ class ProfileScreen extends ConsumerWidget {
                       context,
                       icon: Icons.person_outline,
                       title: langNotifier.tr(
-                          'Informations personnelles', 'Personal Information'),
+                          'Informations personnelles', 'Personal information'),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -291,8 +265,7 @@ class ProfileScreen extends ConsumerWidget {
                     _buildMenuItem(
                       context,
                       icon: Icons.verified_user_outlined,
-                      title: langNotifier.tr('Vérification d\'Identité (KYC)',
-                          'Identity Verification (KYC)'),
+                      title: langNotifier.tr('Identité', 'Identity'),
                       trailingText: isKycVerified
                           ? langNotifier.tr('Vérifié', 'Verified')
                           : langNotifier.tr('Non vérifié', 'Unverified'),
@@ -319,7 +292,7 @@ class ProfileScreen extends ConsumerWidget {
                     _buildMenuItem(
                       context,
                       icon: Icons.credit_card_outlined,
-                      title: langNotifier.tr('Méthodes de paiement', 'Payment Methods'),
+                      title: langNotifier.tr('Moyen de paiement', 'Payment method'),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -346,7 +319,7 @@ class ProfileScreen extends ConsumerWidget {
                     _buildMenuItem(
                       context,
                       icon: Icons.history,
-                      title: langNotifier.tr('Historique SIKA Pay', 'SIKA Pay history'),
+                      title: langNotifier.tr('Historique des paiements', 'Payment history'),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -368,7 +341,7 @@ class ProfileScreen extends ConsumerWidget {
                   onPressed: () => _showLogoutDialog(context, ref, langNotifier),
                   icon: const Icon(Icons.logout, color: AppColors.rose),
                   label: Text(
-                    langNotifier.tr('Déconnexion', 'Log Out'),
+                    langNotifier.tr('Se déconnecter', 'Log out'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppColors.rose,
                           fontWeight: FontWeight.bold,

@@ -150,8 +150,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> with Wi
         elevation: 0,
         centerTitle: true,
         title: Text(lang.tr('Abonnement', 'Subscription'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        actions: const [Padding(padding: EdgeInsets.only(right: 12), child: Center(child: SandboxBadge(compact: true)))],
-      ),
+              ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 32), children: [
@@ -177,7 +176,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> with Wi
               const Divider(height: 24),
               InfoRow(label: lang.tr('Prix', 'Price'), value: '${_sub['price']} ${_sub['currency']} / ${lang.tr('mois', 'month')}', strong: true),
               InfoRow(label: lang.tr('Statut', 'Status'), value: label),
-              InfoRow(label: lang.tr('Moyen de paiement', 'Payment method'), value: 'PayPal (Sandbox)'),
+              InfoRow(label: lang.tr('Moyen de paiement', 'Payment method'), value: 'PayPal'),
               if (next != null) InfoRow(label: lang.tr('Prochain prélèvement', 'Next payment'), value: DateFormat('d MMM yyyy').format(next)),
               if (paypal['subscription_id'] != null) InfoRow(label: lang.tr('ID PayPal', 'PayPal ID'), value: paypal['subscription_id'].toString()),
             ]),
@@ -263,8 +262,6 @@ class SubscriptionCard extends ConsumerWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             const PayPalWordmark(size: 14),
-            const SizedBox(width: 8),
-            const SandboxBadge(compact: true),
             const Spacer(),
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 4),

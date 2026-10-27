@@ -224,7 +224,8 @@ class SikaAIService:
         confirmation_rule = self._confirmation_rule(mandate)
         return f"""
 You are SIKA Pay, a personal AI payment agent. You help {firstname} make informed, controlled purchases
-with PayPal (SANDBOX test environment — no real money moves).
+with PayPal. The app runs in PayPal's test environment (no real money moves): do not mention "sandbox" in your answers
+unless the user asks whether the money is real.
 
 You can shop in two places:
 - PARTNER STORE "SIKA Demo Store" (fictional demo catalog, USD): purchases are paid INSIDE the app with PayPal
@@ -261,7 +262,7 @@ HOW YOU WORK:
 8. Separate clearly: what is verified (catalog price, backend total, PayPal statuses), what the user said (budget, quantity),
    and your assumptions.
 9. SIKA never converts currencies. If the budget is not in USD, ask the user for a USD budget.
-10. SIKA Pay only pays with PayPal (sandbox). Do not offer any other payment provider.
+10. SIKA Pay only pays with PayPal. Do not offer any other payment provider.
 11. Be concise and warm: 2 to 5 short sentences, no markdown tables.
 
 LANGUAGE: {lang_instruction}
@@ -279,9 +280,9 @@ LANGUAGE: {lang_instruction}
             )
             if agent_confirmed:
                 return (f"I confirmed {checkout.get('quantity')} × {item} ({total}) on your behalf, within the authorization you "
-                        f"gave me.{budget_txt} The PayPal sandbox order is created: nothing is charged until you approve it on "
+                        f"gave me.{budget_txt} The PayPal order is created: nothing is charged until you approve it on "
                         "PayPal with the button on the card.")
-            return (f"I prepared a PayPal sandbox checkout for {checkout.get('quantity')} × {item}: {total}, price taken from the "
+            return (f"I prepared a PayPal checkout for {checkout.get('quantity')} × {item}: {total}, price taken from the "
                     f"demo store catalog.{budget_txt} Nothing has been charged and no PayPal order exists yet. "
                     "Tap \"Review summary\" on the card to confirm.")
         budget_txt = (
@@ -290,9 +291,9 @@ LANGUAGE: {lang_instruction}
         )
         if agent_confirmed:
             return (f"J'ai confirmé pour vous {checkout.get('quantity')} × {item} ({total}), dans les limites de l'autorisation "
-                    f"que vous m'avez donnée.{budget_txt} La commande PayPal sandbox est créée : rien n'est débité tant que vous "
+                    f"que vous m'avez donnée.{budget_txt} La commande PayPal est créée : rien n'est débité tant que vous "
                     "ne l'approuvez pas sur PayPal avec le bouton de la carte.")
-        return (f"J'ai préparé un paiement PayPal sandbox pour {checkout.get('quantity')} × {item} : {total}, prix issu du "
+        return (f"J'ai préparé un paiement PayPal pour {checkout.get('quantity')} × {item} : {total}, prix issu du "
                 f"catalogue de démonstration.{budget_txt} Rien n'a été débité et aucune commande PayPal n'existe encore. "
                 "Touchez « Voir le récapitulatif » sur la carte pour confirmer.")
 
@@ -309,7 +310,7 @@ LANGUAGE: {lang_instruction}
                 contents=messages,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction + (
-                        "\nYou confirmed this purchase on the user's behalf under their authorization and the PayPal sandbox "
+                        "\nYou confirmed this purchase on the user's behalf under their authorization and the PayPal "
                         "order now exists. Explain it in 2-4 short sentences: item, total and currency, the budget check, and "
                         "that you confirmed it within their authorization. Say that nothing is charged until they approve "
                         "the order on PayPal (button \"Approve on PayPal\" on the card). Do not call any tool."
@@ -385,10 +386,10 @@ LANGUAGE: {lang_instruction}
         if greeting:
             return reply(
                 f"Hi {firstname}! I'm SIKA Pay. Tell me what you want to buy and your budget — for example "
-                "\"Help me buy an Excel course under $50\" — and I'll prepare a PayPal sandbox checkout for you to approve."
+                "\"Help me buy an Excel course under $50\" — and I'll prepare a PayPal checkout for you to approve."
                 if is_english else
                 f"Bonjour {firstname} ! Je suis SIKA Pay. Dites-moi ce que vous voulez acheter et votre budget — par exemple "
-                "« Aide-moi à acheter un cours Excel à moins de 50 dollars » — et je prépare un paiement PayPal sandbox à approuver."
+                "« Aide-moi à acheter un cours Excel à moins de 50 dollars » — et je prépare un paiement PayPal à approuver."
             )
 
         msg = user_message.lower()
@@ -411,10 +412,10 @@ LANGUAGE: {lang_instruction}
         purchase_words = ["buy", "purchase", "order", "pay for", "acheter", "achète", "achete", "commander", "payer", "paye"]
         if not any(k in msg for k in purchase_words):
             return reply(
-                "My AI reasoning engine is unavailable right now, but I can still prepare a PayPal sandbox purchase from the "
+                "My AI reasoning engine is unavailable right now, but I can still prepare a PayPal purchase from the "
                 "demo store. Tell me what to buy and your budget."
                 if is_english else
-                "Mon moteur de raisonnement IA est indisponible pour le moment, mais je peux préparer un achat PayPal sandbox "
+                "Mon moteur de raisonnement IA est indisponible pour le moment, mais je peux préparer un achat PayPal "
                 "dans la boutique de démonstration. Dites-moi quoi acheter et votre budget."
             )
 

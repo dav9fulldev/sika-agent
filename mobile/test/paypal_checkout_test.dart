@@ -61,13 +61,13 @@ void main() {
     expect(container.read(paypalCheckoutsProvider)['chk_0123456789abcdef01234567']!.status, 'COMPLETED');
   });
 
-  testWidgets('checkout card shows sandbox badge, verified total and budget', (tester) async {
+  testWidgets('checkout card shows verified total and budget', (tester) async {
     await tester.pumpWidget(ProviderScope(
       child: MaterialApp(home: Scaffold(body: PayPalCheckoutCard(initialCheckout: checkoutJson()))),
     ));
     await tester.pump();
 
-    expect(find.text('SANDBOX'), findsOneWidget);
+    expect(find.text('SANDBOX'), findsNothing);
     expect(find.text('49.00 USD'), findsOneWidget);
     expect(find.text('Online course: Excel for Small Business'), findsOneWidget);
     expect(find.textContaining('50.00 USD'), findsOneWidget);

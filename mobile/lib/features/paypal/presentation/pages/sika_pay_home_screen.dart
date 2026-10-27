@@ -58,8 +58,6 @@ class SikaPayHomeScreen extends ConsumerWidget {
                 const SikaPayLogo(size: 30),
                 const SizedBox(width: 8),
                 const SikaPayWordmark(fontSize: 21),
-                const SizedBox(width: 8),
-                const SandboxBadge(compact: true),
                 const Spacer(),
                 IconButton(
                   tooltip: lang.tr('Alertes de prix', 'Price alerts'),
@@ -91,7 +89,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
                 ),
               ]),
               const SizedBox(height: 22),
-              Text('${lang.tr('Bonjour', 'Hello')}${name.isNotEmpty ? ' $name' : ''} 👋',
+              Text('${lang.tr('Bonjour', 'Hello')}${name.isNotEmpty ? ' $name' : ''}',
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
               const SizedBox(height: 4),
               Text(lang.tr('Votre agent IA de paiement, toujours sous votre contrôle.', 'Your AI payment agent, always under your control.'),
@@ -133,10 +131,13 @@ class SikaPayHomeScreen extends ConsumerWidget {
 
               // Actions rapides
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                _quick(context, Icons.payments_rounded, lang.tr('Payer', 'Pay'), SikaPayColors.paypalBlue, onOpenChat),
-                _quick(context, Icons.shopping_bag_rounded, lang.tr('Achat assisté', 'Assisted buy'), AppColors.success,
+                _quick(context, Icons.shopping_bag_rounded, lang.tr('Acheter', 'Buy'), AppColors.success,
                     () => _ask(ref, assistedPrompt)),
-                _quick(context, Icons.receipt_long_rounded, lang.tr('Historique', 'History'), AppColors.brandPrimary, onOpenHistory),
+                _quick(context, Icons.compare_arrows_rounded, lang.tr('Comparer', 'Compare'), SikaPayColors.paypalBlue,
+                    () => _ask(ref, lang.tr('Compare les prix en ligne pour un casque sans fil sous 80 dollars.',
+                        'Compare prices online for wireless headphones under 80 dollars.'))),
+                _quick(context, Icons.autorenew_rounded, lang.tr('Abonnements', 'Subscriptions'), AppColors.brandPrimary,
+                    () => MySubscriptionsScreen.open(context)),
                 _quick(context, Icons.more_horiz_rounded, lang.tr('Plus', 'More'), AppColors.warning,
                     () => _showMore(context, ref, lang, kycStatus)),
               ]),
@@ -156,7 +157,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('PayPal (Sandbox)', style: TextStyle(fontWeight: FontWeight.w700)),
+                      const Text('PayPal', style: TextStyle(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 3),
                       status.when(
                         loading: () => Text(lang.tr('Vérification…', 'Checking…'), style: const TextStyle(fontSize: 12.5)),
@@ -164,8 +165,8 @@ class SikaPayHomeScreen extends ConsumerWidget {
                             style: const TextStyle(fontSize: 12.5, color: AppColors.error)),
                         data: (s) => Text(
                           s['configured'] == true
-                              ? lang.tr('Connecté au sandbox · compte de test', 'Connected to sandbox · test account')
-                              : lang.tr('Identifiants sandbox manquants sur le serveur', 'Sandbox credentials missing on the server'),
+                              ? lang.tr('Connecté', 'Connected')
+                              : lang.tr('Connexion PayPal indisponible', 'PayPal connection unavailable'),
                           style: TextStyle(fontSize: 12.5, color: s['configured'] == true ? AppColors.success : AppColors.warning),
                         ),
                       ),

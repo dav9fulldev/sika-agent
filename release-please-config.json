@@ -5,22 +5,59 @@
   "include-v-in-tag": true,
   "pull-request-title-pattern": "chore: release ${version}",
   "changelog-sections": [
-    {"type": "feat", "section": "Added"},
-    {"type": "fix", "section": "Fixed"},
-    {"type": "perf", "section": "Changed"},
-    {"type": "refactor", "section": "Changed"},
-    {"type": "security", "section": "Security"},
-    {"type": "docs", "section": "Documentation"},
-    {"type": "chore", "hidden": true},
-    {"type": "ci", "hidden": true},
-    {"type": "test", "hidden": true}
+    {
+      "type": "feat",
+      "section": "Added"
+    },
+    {
+      "type": "fix",
+      "section": "Fixed"
+    },
+    {
+      "type": "perf",
+      "section": "Changed"
+    },
+    {
+      "type": "refactor",
+      "section": "Changed"
+    },
+    {
+      "type": "security",
+      "section": "Security"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "chore",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "hidden": true
+    },
+    {
+      "type": "test",
+      "hidden": true
+    }
   ],
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        {"type": "generic", "path": "backend/app/config.py"},
-        {"type": "generic", "path": "mobile/pubspec.yaml"}
+        {
+          "type": "generic",
+          "path": "backend/app/config.py"
+        },
+        {
+          "type": "generic",
+          "path": "mobile/pubspec.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "mobile/lib/core/config/app_config.dart"
+        }
       ]
     }
   }

@@ -43,11 +43,11 @@ CENT = Decimal("0.01")
 
 STATUS_LABELS = {
     "AWAITING_USER_CONFIRMATION": "Prepared by SIKA — waiting for your confirmation",
-    "CREATING_ORDER": "Creating the PayPal sandbox order",
+    "CREATING_ORDER": "Creating the PayPal order",
     "AWAITING_PAYPAL_APPROVAL": "PayPal order created — waiting for your approval on PayPal",
     "APPROVED": "Approved on PayPal — ready to complete the payment",
     "CAPTURING": "Completing the payment with PayPal",
-    "COMPLETED": "Payment captured by PayPal (sandbox)",
+    "COMPLETED": "Payment captured by PayPal",
     "PENDING": "Capture pending at PayPal",
     "DECLINED": "Payment declined by PayPal",
     "CANCELLED": "Cancelled — no payment was made",
@@ -219,7 +219,7 @@ class PayPalCheckoutService:
             "unit_amount": row.unit_amount,
             "total_amount": row.total_amount,
             "currency": row.currency,
-            "fees": {"known_fees": "0.00", "note": "No SIKA fee. PayPal does not charge buyers for a standard sandbox checkout."},
+            "fees": {"known_fees": "0.00", "note": "No SIKA fee. PayPal does not charge buyers for a standard checkout."},
             "budget": {
                 "limit": row.budget_limit,
                 "currency": row.budget_currency,
@@ -243,7 +243,7 @@ class PayPalCheckoutService:
                 "user_provided": user_provided,
                 "assumptions": [
                     "Digital product, no shipping.",
-                    "Demo merchant and fictional catalog; PayPal operations are real sandbox API calls.",
+                    "Demo merchant and fictional catalog; PayPal operations are real calls to PayPal's test environment.",
                 ],
             },
             "last_error": {"code": row.last_error_code, "message": row.last_error_message} if row.last_error_code else None,
@@ -326,7 +326,7 @@ class PayPalCheckoutService:
         if total > max_amount:
             raise CheckoutError(
                 "AMOUNT_ABOVE_LIMIT",
-                f"Total {_fmt(total)} {currency} exceeds the SIKA Pay sandbox limit of {_fmt(max_amount)} {currency}.",
+                f"Total {_fmt(total)} {currency} exceeds the SIKA Pay limit of {_fmt(max_amount)} {currency}.",
             )
 
         budget_dec = None
