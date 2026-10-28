@@ -93,6 +93,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       case 'USE_GOOGLE_SIGN_IN':
         return lang.tr('Ce compte utilise la connexion Google : touchez Google ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
             'This account uses Google sign-in: tap Google below, or set a password with "Forgot password?".');
+      case 'GOOGLE_SIGN_IN_UNAVAILABLE':
+      case 'GOOGLE_TOKEN_REQUIRED':
+      case 'GOOGLE_TOKEN_INVALID':
+        return lang.tr('Connexion Google indisponible pour le moment. Utilisez PayPal ou votre e-mail.',
+            'Google sign-in is not available right now. Use PayPal or your email.');
       case 'INVALID_CREDENTIALS':
         return lang.tr('Adresse e-mail ou mot de passe incorrect.', 'Invalid email or password.');
       default:

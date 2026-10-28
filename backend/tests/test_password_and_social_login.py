@@ -56,3 +56,43 @@ def test_paypal_account_without_password_is_told_to_use_paypal():
     assert res.status_code == 401
     assert res.json()["detail"]["error_code"] == "USE_PAYPAL_SIGN_IN"
     assert "PayPal" in res.json()["detail"]["message"]
+
+
+# ---------------------------------------------------------------------------
+# Google : un email seul ne doit jamais ouvrir une session hors développement
+# ---------------------------------------------------------------------------
+
+def _register_victim():
+    email = f"victim-{uuid.uuid4().hex[:8]}@sika.test"
+    client.post("/api/v1/sika/auth/register", json={"email": email, "password": "Str0ng!Passw0rd", "name": "Victim"})
+    return email
+
+
+def test_google_email_without_token_is_refused_outside_development(monkeypatch):
+    from app.config import settings
+    email = _register_victim()
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
+    r = client.post("/api/v1/sika/auth/google", json={"email": email})
+    assert r.status_code == 401
+    assert r.json()["detail"]["error_code"] == "GOOGLE_TOKEN_REQUIRED"
+    assert "access_token" not in r.text
+
+
+def test_google_invalid_token_is_refused_outside_development(monkeypatch):
+    from app.config import settings
+    email = _register_victim()
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
+    r = client.post("/api/v1/sika/auth/google", json={"email": email, "id_token": "forged.token.value"})
+    assert r.status_code == 401
+    assert r.json()["detail"]["error_code"] == "GOOGLE_TOKEN_INVALID"
+
+
+def test_google_sign_in_unavailable_without_client_id(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", None)
+    r = client.post("/api/v1/sika/auth/google", json={"email": "anyone@sika.test", "id_token": "x"})
+    assert r.status_code == 503
+    assert r.json()["detail"]["error_code"] == "GOOGLE_SIGN_IN_UNAVAILABLE"

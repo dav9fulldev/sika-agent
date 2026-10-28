@@ -253,6 +253,17 @@ class OAuth2AuthService:
         verified_email = None
         verified_name = name
         google_sub_id = None
+        dev_mode = settings.ENV == "development"
+
+        # Hors développement, seul un jeton Google vérifié (signature, émetteur, audience) ouvre une session :
+        # un simple email ne prouve rien et permettrait de se connecter au compte de n'importe qui.
+        if not dev_mode:
+            if not settings.GOOGLE_CLIENT_ID:
+                raise HTTPException(status_code=503, detail={"error_code": "GOOGLE_SIGN_IN_UNAVAILABLE",
+                                                             "message": "Google sign-in is not available. Use PayPal or email."})
+            if not id_token:
+                raise HTTPException(status_code=401, detail={"error_code": "GOOGLE_TOKEN_REQUIRED",
+                                                             "message": "Google sign-in failed. Try again or use PayPal or email."})
 
         if id_token:
             try:
@@ -261,8 +272,9 @@ class OAuth2AuthService:
                 verified_name = id_info.get("name", name)
                 google_sub_id = id_info.get("sub")
             except ValueError as e:
-                if settings.ENV == "production":
-                    raise HTTPException(status_code=401, detail=f"Validation cryptographique du jeton Google échouée: {str(e)}")
+                if not dev_mode:
+                    raise HTTPException(status_code=401, detail={"error_code": "GOOGLE_TOKEN_INVALID",
+                                                                 "message": "Google sign-in failed. Try again or use PayPal or email."})
                 logger.warning(f"[AUTH GOOGLE DEV] Jeton Google invalide en DEV: {e}")
                 if email:
                     verified_email = email.strip().lower()

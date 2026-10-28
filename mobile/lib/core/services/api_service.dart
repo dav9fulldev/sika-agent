@@ -133,6 +133,12 @@ class ApiService {
         .timeout(AppConfig.defaultTimeout);
 
     if (response.statusCode == 200) return jsonDecode(response.body);
+    try {
+      final detail = jsonDecode(response.body)['detail'];
+      if (detail is Map && detail['error_code'] != null) {
+        throw AuthApiException(detail['error_code'].toString(), detail['message']?.toString() ?? '');
+      }
+    } on FormatException catch (_) {}
     throw Exception(_extractErrorMessage(response, 'Erreur Google Sign-In'));
   }
 

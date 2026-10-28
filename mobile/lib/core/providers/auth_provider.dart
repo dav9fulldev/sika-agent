@@ -590,6 +590,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _rememberSignInMethod('google');
 
       return true;
+    } on AuthApiException catch (e) {
+      // Refus explicite du serveur (connexion Google indisponible ou jeton refusé)
+      state = state.copyWith(isLoading: false, errorMessage: e.message, errorCode: e.code);
+      return false;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');
