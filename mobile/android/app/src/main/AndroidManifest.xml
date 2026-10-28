@@ -3,16 +3,12 @@
 
     <!-- SIKA Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Mode communication : annulation d'écho pendant la conversation vocale -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
@@ -29,7 +25,7 @@
     </queries>
 
     <application
-        android:label="Sika Financial Assistant"
+        android:label="SIKA Pay"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
@@ -59,36 +55,6 @@
                 <data android:scheme="sikapay" android:host="paypal"/>
             </intent-filter>
         </activity>
-
-        <!-- SIKA : Wake Word Detection Services -->
-        <service
-            android:name=".SikaWakeWordService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone">
-        </service>
-
-        <service
-            android:name=".SikaWakeWordServiceV2"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="microphone">
-        </service>
-
-        <!-- SIKA : Overlay Services -->
-        <service
-            android:name=".SikaOverlayService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-        </service>
-
-        <service
-            android:name=".SikaOverlayServiceV2"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-        </service>
 
         <meta-data
             android:name="flutterEmbedding"

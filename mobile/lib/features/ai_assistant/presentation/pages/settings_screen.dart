@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -9,7 +8,6 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/services/biometric_service.dart';
-import '../../../../core/services/sika_native_service.dart';
 import '../../../paypal/presentation/pages/agent_authorization_screen.dart';
 import '../../../paypal/presentation/pages/price_alerts_screen.dart';
 import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
@@ -18,7 +16,7 @@ import '../../../paypal/presentation/widgets/sika_pay_ui.dart';
 import '../../../paypal/providers/paypal_checkout_provider.dart';
 import '../../../profile/presentation/pages/kyc_verification_screen.dart';
 
-/// Réglages de SIKA Pay : contrôle de l'agent, sécurité, assistant vocal, affichage.
+/// Réglages de SIKA Pay : contrôle de l'agent, sécurité, affichage.
 /// Chaque ligne agit réellement : aucun interrupteur décoratif.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -28,24 +26,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const _wakeWordKey = 'wake_word_enabled';
-  bool _wakeWord = false;
-
-  @override
-  void initState() {
-    super.initState();
-    SharedPreferences.getInstance().then((prefs) {
-      if (mounted) setState(() => _wakeWord = prefs.getBool(_wakeWordKey) ?? false);
-    });
-  }
-
-  Future<void> _setWakeWord(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_wakeWordKey, value);
-    setState(() => _wakeWord = value);
-    value ? SikaNativeService.startSikaService() : SikaNativeService.stopSikaService();
-  }
-
   Future<void> _setBiometric(bool value, LanguageNotifier lang) async {
     if (value) {
       final bio = ref.read(biometricServiceProvider);
@@ -148,16 +128,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ? lang.tr('Vérification en attente', 'Verification pending')
                     : lang.tr('Non vérifiée', 'Not verified'),
             onTap: kyc == 'none' ? () => _push(const KycVerificationScreen()) : null,
-          ),
-        ]),
-        _Section(lang.tr('Assistant vocal', 'Voice assistant'), [
-          _Switch(
-            icon: Icons.mic_none_rounded,
-            title: lang.tr('Activation par la voix', 'Voice activation'),
-            subtitle: lang.tr('Dites « SIKA » pour parler à l\'assistant, même app fermée',
-                'Say "SIKA" to talk to the assistant, even when the app is closed'),
-            value: _wakeWord,
-            onChanged: _setWakeWord,
           ),
         ]),
         _Section(lang.tr('Affichage', 'Display'), [

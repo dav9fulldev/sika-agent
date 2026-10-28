@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'core/services/sika_native_service.dart';
 import 'core/constants/app_theme.dart';
 import 'core/providers/app_setup_provider.dart';
 import 'core/providers/auth_provider.dart';
@@ -34,28 +32,6 @@ class SikaApp extends ConsumerStatefulWidget {
 
 class _SikaAppState extends ConsumerState<SikaApp> {
   bool _splashFinished = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _demarrerServiceVocalSiAutorise();
-    });
-  }
-
-  /// Démarre le service vocal natif uniquement si les permissions ont déjà été accordées.
-  /// Les permissions sont demandées au moment où une fonction en a besoin, jamais au démarrage.
-  Future<void> _demarrerServiceVocalSiAutorise() async {
-    try {
-      if (await Permission.microphone.isGranted && await Permission.notification.isGranted) {
-        await SikaNativeService.startSikaService();
-        debugPrint('[SikaMain] ✅ Service Sika natif démarré au premier plan');
-      }
-    } catch (e) {
-      debugPrint('[SikaMain] ⚠️ Erreur lors du démarrage du service Sika: $e');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

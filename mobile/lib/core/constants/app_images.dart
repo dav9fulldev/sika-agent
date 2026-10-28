@@ -6,9 +6,4 @@ class AppImages {
   // Logo « S » détouré (fond transparent), utilisé sur les écrans clairs
   static const String sikaMark = 'assets/images/sika_logo_mark.png';
   static const String googleLogo = 'assets/images/google_logo.png';
-
-  // Mobile Money Provider Logos
-  static const String orange = 'assets/images/orange.png';
-  static const String mtn = 'assets/images/mtn.png';
-  static const String waveci = 'assets/images/waveci.png';
 }

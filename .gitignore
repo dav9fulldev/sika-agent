@@ -91,3 +91,8 @@ backend/app/data/
 # Outils d'agent locaux (skills)
 /.claude/
 /skills-lock.json
+
+# Clés de signature Android (jamais dans le dépôt)
+key.properties
+*.jks
+*.keystore

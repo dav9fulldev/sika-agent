@@ -1,0 +1,71 @@
+name: Android APK
+
+# Construit l'APK signé de SIKA Pay (relié au backend Cloud Run) et l'attache à la release GitHub.
+# Appelé automatiquement par release.yml après chaque release ; peut aussi être lancé à la main pour un tag.
+# Les releases créées par release-please ne déclenchent pas d'autres workflows : d'où l'appel explicite.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example v3.1.0)"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.6'
+          channel: stable
+          cache: true
+
+      - name: Release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          # Sans la clé de release, Google Sign-In refuserait l'APK : on s'arrête plutôt que de publier un build différent
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets are required to sign the APK."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sika-release.jks"
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=sika\nstoreFile=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" "$RUNNER_TEMP/sika-release.jks" > mobile/android/key.properties
+
+      - name: Build APK
+        working-directory: mobile
+        run: |
+          flutter pub get
+          # 64 bits uniquement (tous les téléphones Android récents) : APK trois fois plus léger que la version universelle
+          flutter build apk --release --target-platform android-arm64 --dart-define=SIKA_API_URL=https://sika-backend-1064195418653.europe-west9.run.app
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/sika-pay.apk"
+          (cd "$RUNNER_TEMP" && sha256sum sika-pay.apk > sika-pay.apk.sha256)
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "$RUNNER_TEMP/sika-pay.apk" "$RUNNER_TEMP/sika-pay.apk.sha256" --clobber --repo "${{ github.repository }}"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f mobile/android/key.properties "$RUNNER_TEMP/sika-release.jks"

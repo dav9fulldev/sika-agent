@@ -4,6 +4,14 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Clé de signature release (jamais dans le dépôt) : android/key.properties en local, secrets GitHub en CI.
+// Sans elle, l'APK release est signé avec la clé de debug (installable, mais Google Sign-In ne l'acceptera pas).
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader -> keystoreProperties.load(reader) }
+}
+
 android {
     namespace "com.sika.assistant"
     compileSdk 37
@@ -33,18 +41,38 @@ android {
         versionName flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // R8 : retire le code et les ressources inutilisés (règles des plugins + proguard-rules.pro)
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+// APK release 64 bits uniquement (tous les téléphones Android récents) : sans ce filtre, les bibliothèques
+// natives des plugins (ML Kit) restent embarquées pour 3 architectures. Les builds debug ne sont pas concernés.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll(["lib/armeabi-v7a/**", "lib/x86_64/**", "lib/x86/**"])
     }
 }
 
 dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
-    implementation "com.alphacephei:vosk-android:0.3.47@aar"
-    implementation "net.java.dev.jna:jna:5.13.0"
 }
 
 flutter {
