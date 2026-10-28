@@ -168,8 +168,12 @@ class PayPalAPIService:
     # ------------------------------------------------------------------
 
     def create_order(self, *, reference_id: str, currency: str, total: str, items: List[Dict[str, Any]],
-                     description: str, request_id: str, custom_id: str) -> Dict[str, Any]:
-        """Crée une commande intent=CAPTURE. Aucun débit n'a lieu à cette étape."""
+                     description: str, request_id: str, custom_id: str, vault_id: Optional[str] = None) -> Dict[str, Any]:
+        """Crée une commande intent=CAPTURE. Sans `vault_id`, aucun débit n'a lieu à cette étape (approbation PayPal requise).
+
+        Avec `vault_id` (compte PayPal enregistré par l'utilisateur), PayPal peut traiter le paiement dès la création :
+        un échec réseau à cette étape a donc un résultat inconnu, à vérifier avant toute conclusion.
+        """
         body = {
             "intent": "CAPTURE",
             "purchase_units": [
@@ -198,7 +202,45 @@ class PayPalAPIService:
                 }
             },
         }
+        if vault_id:
+            _validate_vault_id(vault_id)
+            body["payment_source"] = {"paypal": {"vault_id": vault_id}}
         return self._request("POST", "/v2/checkout/orders", json_body=body, request_id=request_id)
+
+    # ------------------------------------------------------------------
+    # Vault v3 : compte PayPal enregistré (approuvé une fois par l'utilisateur)
+    # ------------------------------------------------------------------
+
+    def create_vault_setup_token(self, request_id: str, return_url: str, cancel_url: str) -> Dict[str, Any]:
+        """Prépare l'enregistrement du compte PayPal du payeur ; rien n'est enregistré avant son approbation."""
+        body = {
+            "payment_source": {
+                "paypal": {
+                    "description": f"{settings.PAYPAL_BRAND_NAME[:60]} purchases you authorize SIKA to confirm",
+                    "usage_pattern": "IMMEDIATE",
+                    "usage_type": "MERCHANT",
+                    "customer_type": "CONSUMER",
+                    "permit_multiple_payment_tokens": False,
+                    "experience_context": {
+                        "brand_name": settings.PAYPAL_BRAND_NAME[:127],
+                        "shipping_preference": "NO_SHIPPING",
+                        "return_url": return_url,
+                        "cancel_url": cancel_url,
+                    },
+                }
+            }
+        }
+        return self._request("POST", "/v3/vault/setup-tokens", json_body=body, request_id=request_id)
+
+    def create_vault_payment_token(self, setup_token_id: str, request_id: str) -> Dict[str, Any]:
+        """Échange un setup token approuvé par le payeur contre un jeton de paiement réutilisable."""
+        _validate_vault_id(setup_token_id)
+        body = {"payment_source": {"token": {"id": setup_token_id, "type": "SETUP_TOKEN"}}}
+        return self._request("POST", "/v3/vault/payment-tokens", json_body=body, request_id=request_id)
+
+    def delete_vault_payment_token(self, payment_token_id: str) -> None:
+        _validate_vault_id(payment_token_id)
+        self._request("DELETE", f"/v3/vault/payment-tokens/{payment_token_id}")
 
     def get_order(self, order_id: str) -> Dict[str, Any]:
         _validate_order_id(order_id)
@@ -340,6 +382,12 @@ def _validate_order_id(order_id: str):
 
 
 BILLING_ID_PATTERN = re.compile(r"^[A-Z0-9-]{6,64}$")
+VAULT_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{6,64}$")
+
+
+def _validate_vault_id(value: str):
+    if not value or not VAULT_ID_PATTERN.match(str(value)):
+        raise ValueError("Identifiant de jeton PayPal Vault invalide.")
 
 
 def _validate_billing_id(value: str, prefix: str):

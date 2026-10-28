@@ -85,6 +85,9 @@ class _PayPalCheckoutCardState extends ConsumerState<PayPalCheckoutCard> {
               if (v.data['confirmed_by'] == 'AGENT')
                 _reason(Icons.auto_awesome_rounded, lang.tr('Confirmé par SIKA (votre autorisation)', 'Confirmed by SIKA (your authorization)'),
                     SikaPayColors.paypalBlue),
+              if (v.data['payment_method'] == 'SAVED_PAYPAL')
+                _reason(Icons.account_balance_wallet_outlined,
+                    lang.tr('Payé avec votre compte PayPal relié', 'Paid with your linked PayPal account'), SikaPayColors.paypalBlue),
             ]),
             if (v.status == 'CANCELLED' && v.lastError?['code'] == 'REPLACED_BY_NEW_REQUEST') ...[
               const SizedBox(height: 8),

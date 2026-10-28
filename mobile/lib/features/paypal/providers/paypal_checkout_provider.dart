@@ -182,6 +182,11 @@ final agentAuthorizationProvider = FutureProvider.autoDispose<Map<String, dynami
   return ref.watch(apiServiceProvider).getAgentAuthorization();
 });
 
+/// Compte PayPal enregistré : s'il est relié, SIKA paie avec lui les achats qu'il confirme sous autorisation.
+final savedPayPalProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(apiServiceProvider).getSavedPayPal();
+});
+
 /// Alertes de prix sur des produits du web (statuts du serveur, déclenchées par les webhooks Channel3).
 final priceWatchesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   return ref.watch(apiServiceProvider).listPriceWatches();

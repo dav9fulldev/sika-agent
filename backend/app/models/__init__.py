@@ -20,6 +20,7 @@ from .agent_mandate import AgentMandateModel
 from .paypal_webhook_event import PayPalWebhookEventModel
 from .price_watch import PriceWatchModel, ShoppingWebhookEventModel
 from .paypal_subscription import PayPalSubscriptionModel
+from .paypal_vault import PayPalVaultModel
 
 __all__ = [
     "PayPalCheckoutModel",

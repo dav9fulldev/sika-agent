@@ -218,8 +218,10 @@ class SikaAIService:
                 f"({mandate['remaining_today']} left today), until {mandate['expires_at']}. When the user clearly asks you to BUY "
                 "(not just to find, compare or check a price), call `confirm_checkout_with_authorization(checkout_id)` right after "
                 "a successful `prepare_paypal_checkout`. The backend enforces the limits: if it refuses, explain why and tell the "
-                "user to confirm in the app. The user still approves the order on PayPal; you never approve or capture yourself. "
-                "Say clearly when you confirmed on their behalf.")
+                "user to confirm in the app. If the user linked their PayPal account to SIKA, the backend pays with it right "
+                "away; otherwise the user approves the order on PayPal. Report only the status the tool returns (COMPLETED "
+                "means paid; AWAITING_PAYPAL_APPROVAL means they must approve on PayPal; UNKNOWN_RESULT means SIKA is still "
+                "verifying). You never approve or capture yourself. Say clearly when you confirmed on their behalf.")
 
     def _sika_pay_instruction(self, firstname: str, lang_instruction: str, mandate: Optional[Dict[str, Any]] = None) -> str:
         confirmation_rule = self._confirmation_rule(mandate)
@@ -277,6 +279,9 @@ LANGUAGE: {lang_instruction}
         total = f"{checkout.get('total_amount')} {checkout.get('currency')}"
         budget = checkout.get("budget") or {}
         agent_confirmed = checkout.get("status") == "AWAITING_PAYPAL_APPROVAL"
+        status = checkout.get("status")
+        if status in ("COMPLETED", "UNKNOWN_RESULT", "PENDING", "DECLINED", "FAILED"):
+            return self._saved_paypal_text(checkout, item, total, is_english)
         if is_english:
             budget_txt = (
                 f" It fits your budget of {budget.get('limit')} {budget.get('currency')} "
@@ -301,11 +306,31 @@ LANGUAGE: {lang_instruction}
                 f"catalogue de démonstration.{budget_txt} Rien n'a été débité et aucune commande PayPal n'existe encore. "
                 "Touchez « Voir le récapitulatif » sur la carte pour confirmer.")
 
+    @staticmethod
+    def _saved_paypal_text(checkout: Dict[str, Any], item: str, total: str, is_english: bool) -> str:
+        """Paiement fait avec le compte PayPal relié : uniquement le statut vérifié auprès de PayPal."""
+        status = checkout.get("status")
+        if status == "COMPLETED":
+            return (f"Done. I paid {total} for {item} with your saved PayPal account, within the authorization you gave me. "
+                    "PayPal confirmed the capture; your receipt is on the card." if is_english else
+                    f"C'est fait. J'ai payé {total} pour {item} avec votre compte PayPal enregistré, dans les limites de votre "
+                    "autorisation. PayPal a confirmé la capture ; le reçu est sur la carte.")
+        if status in ("UNKNOWN_RESULT", "PENDING"):
+            return (f"I confirmed {item} ({total}) with your saved PayPal account, but PayPal has not confirmed the result yet. "
+                    "I will only report it as paid once PayPal confirms it." if is_english else
+                    f"J'ai confirmé {item} ({total}) avec votre compte PayPal enregistré, mais PayPal n'a pas encore confirmé "
+                    "le résultat. Je ne l'annoncerai comme payé qu'une fois confirmé par PayPal.")
+        return (f"PayPal did not complete the payment for {item}. No funds were captured." if is_english else
+                f"PayPal n'a pas finalisé le paiement pour {item}. Aucun montant n'a été capturé.")
+
     async def _explain_prepared_checkout(self, messages: list, system_instruction: str, checkout: Dict[str, Any],
                                          is_english: bool) -> str:
         """Laisse Gemini expliquer le checkout préparé (sans aucun tool disponible), avec repli déterministe."""
         fallback = self._checkout_summary_text(checkout or {}, is_english)
         if not self.client or not checkout:
+            return fallback
+        if checkout.get("payment_method") == "SAVED_PAYPAL" and checkout.get("status") != "AWAITING_PAYPAL_APPROVAL":
+            # Résultat d'un paiement : texte factuel construit uniquement à partir du statut vérifié
             return fallback
         from google.genai import types
         try:

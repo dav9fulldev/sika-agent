@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/providers/api_service_provider.dart';
@@ -13,6 +14,8 @@ import '../widgets/sika_pay_ui.dart';
 
 /// Mode hybride : l'utilisateur choisit s'il confirme lui-même chaque achat (par défaut)
 /// ou s'il autorise SIKA à confirmer pour lui, dans des limites qu'il fixe et qu'il peut retirer à tout moment.
+/// S'il relie aussi son compte PayPal (approuvé une fois sur PayPal), SIKA paie ces achats sans redirection ;
+/// sinon, chaque paiement reste approuvé sur PayPal.
 class AgentAuthorizationScreen extends ConsumerStatefulWidget {
   const AgentAuthorizationScreen({super.key});
 
@@ -23,7 +26,25 @@ class AgentAuthorizationScreen extends ConsumerStatefulWidget {
   ConsumerState<AgentAuthorizationScreen> createState() => _AgentAuthorizationScreenState();
 }
 
-class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScreen> {
+class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Retour de PayPal après la liaison du compte : on relit l'état vérifié par le serveur
+    if (state == AppLifecycleState.resumed) ref.invalidate(savedPayPalProvider);
+  }
+
   static const _perPurchaseOptions = [10, 25, 50, 100];
   static const _dailyOptions = [25, 50, 100, 200];
   static const _durations = [24, 24 * 7, 24 * 30];
@@ -42,6 +63,7 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
     try {
       await call(ref.read(apiServiceProvider));
       ref.invalidate(agentAuthorizationProvider);
+      ref.invalidate(savedPayPalProvider);
     } on PayPalApiException catch (e) {
       _error = e.message;
     } catch (_) {
@@ -69,6 +91,18 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
         ));
   }
 
+  Future<void> _linkPayPal() async {
+    final lang = ref.read(languageProvider.notifier);
+    await _run((api) async {
+      final res = await api.startSavedPayPalLink();
+      final url = Uri.tryParse(res['approve_url']?.toString() ?? '');
+      if (url == null || !await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw PayPalApiException('OPEN_FAILED', lang.tr("Impossible d'ouvrir PayPal.", 'Could not open PayPal.'), 0);
+      }
+      return res;
+    });
+  }
+
   String _durationLabel(int hours, LanguageNotifier lang) {
     if (hours == 24) return lang.tr('24 heures', '24 hours');
     if (hours == 24 * 7) return lang.tr('7 jours', '7 days');
@@ -80,6 +114,8 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
     ref.watch(languageProvider);
     final lang = ref.read(languageProvider.notifier);
     final auth = ref.watch(agentAuthorizationProvider);
+    final saved = ref.watch(savedPayPalProvider).valueOrNull ?? const {};
+    final linked = saved['linked'] == true;
     final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
 
     return Scaffold(
@@ -104,7 +140,11 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
             const SizedBox(height: 16),
             SikaPayCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _bullet(Icons.lock_outline_rounded, lang.tr('Vous approuvez toujours le paiement sur PayPal.', 'You always approve the payment on PayPal.')),
+                linked
+                    ? _bullet(Icons.account_balance_wallet_outlined,
+                        lang.tr('SIKA paie avec votre compte PayPal relié, sans redirection.', 'SIKA pays with your linked PayPal account, without redirection.'))
+                    : _bullet(Icons.lock_outline_rounded,
+                        lang.tr('Vous approuvez chaque paiement sur PayPal.', 'You approve each payment on PayPal.')),
                 _bullet(Icons.shield_outlined,
                     lang.tr('Les limites sont vérifiées par le serveur, pas par l’IA.', 'Limits are enforced by the server, not by the AI.')),
                 _bullet(Icons.undo_rounded, lang.tr('Vous pouvez retirer l’autorisation à tout moment.', 'You can withdraw the authorization at any time.')),
@@ -112,6 +152,8 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
             ),
             const SizedBox(height: 20),
             if (a['active'] == true) ..._active(a, lang) else ..._form(lang),
+            const SizedBox(height: 28),
+            ..._savedPayPal(saved, lang, muted),
             if (_error != null) ...[
               const SizedBox(height: 14),
               Text(_error!, style: const TextStyle(color: SikaBrand.danger, fontSize: 13.5)),
@@ -164,6 +206,46 @@ class _AgentAuthorizationScreenState extends ConsumerState<AgentAuthorizationScr
       _chips<int>(_durations, _hours, (v) => _durationLabel(v, lang), (v) => _hours = v),
       const SizedBox(height: 24),
       SikaPrimaryButton(label: lang.tr('Autoriser SIKA', 'Authorize SIKA'), loading: _busy, onPressed: _grant),
+    ];
+  }
+
+  /// Libre choix : relier son compte PayPal pour que SIKA paie sans redirection, ou approuver chaque paiement sur PayPal.
+  List<Widget> _savedPayPal(Map<String, dynamic> saved, LanguageNotifier lang, Color muted) {
+    final linked = saved['linked'] == true;
+    return [
+      Text(lang.tr('Compte PayPal enregistré', 'Saved PayPal account'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+      const SizedBox(height: 6),
+      Text(
+        lang.tr(
+            'Facultatif. Reliez votre compte PayPal une fois : les achats que SIKA confirme pour vous sont alors payés sans passer par PayPal, toujours dans vos limites. Sans compte relié, vous approuvez chaque paiement sur PayPal.',
+            'Optional. Link your PayPal account once: purchases SIKA confirms for you are then paid without leaving SIKA, always within your limits. Without a linked account, you approve each payment on PayPal.'),
+        style: TextStyle(color: muted, fontSize: 13.5, height: 1.45),
+      ),
+      const SizedBox(height: 12),
+      if (linked) ...[
+        SikaPayCard(
+          child: Row(children: [
+            const Icon(Icons.verified_rounded, color: AppColors.success),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(lang.tr('Compte PayPal relié', 'PayPal account linked'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                if (saved['payer_email'] != null)
+                  Text(saved['payer_email'].toString(), style: TextStyle(color: muted, fontSize: 12.5)),
+              ]),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        SikaOutlineButton(
+          label: lang.tr('Délier le compte PayPal', 'Unlink PayPal account'),
+          onPressed: _busy ? null : () => _run((api) => api.unlinkSavedPayPal()),
+        ),
+      ] else
+        SikaOutlineButton(
+          label: lang.tr('Relier mon compte PayPal', 'Link my PayPal account'),
+          onPressed: _busy ? null : _linkPayPal,
+        ),
     ];
   }
 

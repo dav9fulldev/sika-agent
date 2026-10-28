@@ -26,6 +26,7 @@ from ..services.security_rate_limiter import security_rate_limiter
 from ..services.paypal_checkout_service import paypal_checkout_service, CheckoutError
 from ..services.agent_mandate_service import agent_mandate_service, MandateError
 from ..services.paypal_subscription_service import paypal_subscription_service, SubscriptionError
+from ..services.paypal_vault_service import paypal_vault_service, VaultError
 from ..services.wallet_integrations.paypal_api_service import paypal_api_service, PayPalAPIError, PayPalNetworkError
 from ..database import engine
 from ..models.paypal_webhook_event import PayPalWebhookEventModel
@@ -230,6 +231,54 @@ def subscription_return(subscription_id: str = Query("", max_length=64)):
 @router.get("/subscriptions-cancel", include_in_schema=False)
 def subscription_cancel_page():
     return _page("Subscription not started", "You left PayPal without approving. Nothing was charged.")
+
+
+# ----------------------------------------------------------------------
+# Compte PayPal enregistré (Vault) : choix de l'utilisateur, approuvé une fois sur PayPal
+# ----------------------------------------------------------------------
+
+def _vault_raise(err: VaultError):
+    raise HTTPException(status_code=err.http_status, detail=err.to_dict())
+
+
+@router.get("/vault", summary="Saved PayPal account status")
+def get_vault(authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return paypal_vault_service.status(user_id)
+
+
+@router.post("/vault", summary="Link a PayPal account (approval on PayPal)",
+             description="Returns a PayPal approval link. Nothing is saved before the user approves on PayPal.")
+def start_vault(authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    security_rate_limiter.check_ai_rate_limit(f"vault_{user_id}", max_requests=5)
+    try:
+        return paypal_vault_service.start_link(user_id)
+    except VaultError as e:
+        _vault_raise(e)
+
+
+@router.delete("/vault", summary="Unlink the saved PayPal account")
+def delete_vault(authorization: Optional[str] = Header(None)):
+    user_id = oauth2_auth_service.require_authenticated_user_id(authorization)
+    return paypal_vault_service.unlink(user_id)
+
+
+@router.get("/vault-return", include_in_schema=False)
+def vault_return(approval_token_id: str = Query("", max_length=64)):
+    if not re.match(r"^[A-Za-z0-9-]{6,64}$", approval_token_id or ""):
+        return _page("Unknown request", "This PayPal return link is not valid.")
+    status = paypal_vault_service.complete_link(approval_token_id)
+    if status == "ACTIVE":
+        return _page("PayPal account linked", "Your PayPal account is saved in SIKA Pay. Return to the app.")
+    if status == "PENDING_APPROVAL":
+        return _page("Almost done", "PayPal could not be reached to finish linking. Reload this page or try again in the app.")
+    return _page("Account not linked", "PayPal did not confirm the link. Nothing was saved.")
+
+
+@router.get("/vault-cancel", include_in_schema=False)
+def vault_cancel_page():
+    return _page("Account not linked", "You left PayPal without approving. Nothing was saved.")
 
 
 # ----------------------------------------------------------------------
