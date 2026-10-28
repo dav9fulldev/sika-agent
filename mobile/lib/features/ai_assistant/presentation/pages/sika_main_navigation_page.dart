@@ -33,6 +33,14 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
     final langNotifier = ref.read(languageProvider.notifier);
 
     ref.listen<SikaData>(sikaProvider, (previous, next) {
+      if (next.voiceLive) {
+        // Conversation vocale : on reste sur l'écran courant, sauf pour montrer une carte à confirmer
+        final newCard = next.messages.length != (previous?.messages.length ?? 0) &&
+            next.messages.isNotEmpty &&
+            next.messages.last.suggestedTransaction != null;
+        if (newCard && _currentIndex != 2) setState(() => _currentIndex = 2);
+        return;
+      }
       if ((next.state == SikaState.processing ||
               next.state == SikaState.speaking) &&
           _currentIndex != 2) {
@@ -139,13 +147,17 @@ class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
       button: true,
       label: isSpeaking
           ? langNotifier.tr('Arrêter SIKA', 'Stop SIKA')
-          : isListening
-              ? langNotifier.tr('Envoyer', 'Send')
-              : langNotifier.tr('Parler à SIKA', 'Talk to SIKA'),
+          : data.voiceLive
+              ? langNotifier.tr('Terminer la conversation', 'End conversation')
+              : isListening
+                  ? langNotifier.tr('Envoyer', 'Send')
+                  : langNotifier.tr('Parler à SIKA', 'Talk to SIKA'),
       child: GestureDetector(
         onTap: () async {
           if (isSpeaking) {
             await sikaNotifier.stopSpeaking(resetState: true);
+          } else if (data.voiceLive) {
+            await sikaNotifier.stopLiveVoice();
           } else if (!isProcessing) {
             await sikaNotifier.toggleListening(sttLocale: currentAppLang.sttLocale);
           }

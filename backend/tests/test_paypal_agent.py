@@ -158,8 +158,11 @@ def test_gemini_over_budget_is_explained_not_prepared(paypal_only):
 
 def test_react_loop_is_bounded(paypal_only):
     ai, models = _scripted_ai([([_call("search_demo_catalog", {"query": "x"})], None)] * 10)
-    asyncio.run(ai.chat("buy something", user_id="1"))
-    assert len(models.configs) == 5
+    res = asyncio.run(ai.chat("buy something", user_id="1"))
+    # 5 tours avec outils, puis une seule réponse finale sans aucun outil
+    assert len(models.configs) == 6
+    assert all(c.tools for c in models.configs[:5]) and not models.configs[5].tools
+    assert res["response"]
 
 
 # ---------------------------------------------------------------------------
@@ -234,3 +237,18 @@ def test_chat_endpoint_prepares_paypal_checkout(paypal_only, monkeypatch):
     assert body["intent"] == "prepare_paypal_checkout" and body["requires_confirmation"] is True
     assert body["action_data"]["checkout"]["provider"] == "PAYPAL"
     assert paypal_only.calls == []
+
+
+@pytest.mark.parametrize("query,lang", [
+    ("find me a good mechanical keyboard online", "en"),
+    ("Je cherche un clavier mécanique", "fr"),
+])
+def test_language_without_known_keywords(query, lang):
+    assert SikaAI.__new__(SikaAI).detect_language(query) == lang
+
+
+def test_generic_catalog_question_lists_whole_catalog():
+    from app.services import demo_catalog
+    products = demo_catalog.search_products("what's the cheapest thing in your store?")
+    assert len(products) >= 3
+    assert products == sorted(products, key=lambda p: float(p["unit_price"]))

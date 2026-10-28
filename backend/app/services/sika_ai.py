@@ -152,11 +152,12 @@ class SikaAIService:
         en_score += sum(1 for t in tokens if t in english_words)
         fr_score += sum(1 for t in tokens if t in french_words)
 
-        if fr_score >= en_score and fr_score > 0:
+        if fr_score > en_score:
             return "fr"
         if en_score > fr_score:
             return "en"
-        return "fr"
+        # Aucun indice net : les accents trahissent le français, sinon l'anglais (langue par défaut de l'app)
+        return "fr" if re.search(r"[àâäéèêëîïôöùûüç]", msg_lower) else "en"
 
     def _is_english(self, message: str) -> bool:
         """Vérifie si le message est en anglais."""
@@ -473,6 +474,74 @@ LANGUAGE: {lang_instruction}
             steps=steps,
         )
 
+    @staticmethod
+    def tool_label(name: str, is_english: bool) -> str:
+        """Libellé observable d'une étape (jamais le raisonnement interne du modèle)."""
+        labels = {
+            "search_demo_catalog": "Searching the demo store catalog" if is_english else "Recherche dans le catalogue",
+            "prepare_paypal_checkout": "Checking budget & preparing PayPal checkout" if is_english else "Vérification du budget et préparation PayPal",
+            "get_paypal_checkout_status": "Verifying the status with PayPal" if is_english else "Vérification du statut auprès de PayPal",
+            "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
+            "confirm_checkout_with_authorization": "Confirming with your authorization" if is_english else "Confirmation avec votre autorisation",
+            "search_web_products": "Comparing offers from online merchants" if is_english else "Comparaison des offres des marchands en ligne",
+            "watch_web_product_price": "Setting up your price alert" if is_english else "Création de votre alerte de prix",
+            "list_price_watches": "Reading your price alerts" if is_english else "Lecture de vos alertes de prix",
+            "search_subscription_plans": "Comparing subscription plans" if is_english else "Comparaison des abonnements",
+            "prepare_subscription": "Checking the plan with PayPal" if is_english else "Vérification du plan auprès de PayPal",
+            "list_my_subscriptions": "Checking your subscriptions with PayPal" if is_english else "Vérification de vos abonnements auprès de PayPal",
+            "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
+        }
+        return labels.get(name, "Analysing" if is_english else "Analyse en cours")
+
+    @staticmethod
+    def run_agent_tool(name: str, args: Optional[Dict[str, Any]], allowed_tool_names: set,
+                       user_id: Optional[str], user_message: str) -> Tuple[Dict[str, Any], str]:
+        """Exécute un tool demandé par le modèle via le ToolRegistry. Partagé par le chat et la voix.
+
+        L'identité (`user_id`) et la demande d'origine sont toujours injectées côté serveur.
+        """
+        import inspect
+        from ..agent.tool_registry import tool_registry
+        try:
+            if name not in allowed_tool_names:
+                raise PermissionError(f"Tool '{name}' is not available to the agent.")
+            call_args = dict(args) if args else {}
+            tool_func = tool_registry.get(name)
+            if tool_func:
+                sig = inspect.signature(tool_func)
+                if "user_id" in sig.parameters:
+                    # Toujours l'identité authentifiée côté serveur, jamais celle proposée par le modèle
+                    call_args["user_id"] = str(user_id) if user_id else None
+                if "user_request" in sig.parameters:
+                    call_args["user_request"] = user_message
+            tool_res = tool_registry.execute(name, call_args)
+            return tool_res.to_dict(), "completed" if tool_res.success else "failed"
+        except Exception as e:
+            logger.error(f"Tool execution failed: {e}")
+            return {"success": False, "error_message": str(e)}, "failed"
+
+    @staticmethod
+    def card_for_tool(name: str, res_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Carte à afficher dans l'app pour le résultat d'un tool (achat, abonnement, offres), sinon None."""
+        if not res_dict.get("success"):
+            return None
+        data = res_dict.get("data", {}) or {}
+        if name == "prepare_paypal_checkout":
+            return {"type": "paypal_checkout", "action_id": data.get("action_id"), "checkout": data.get("checkout")}
+        if name == "confirm_checkout_with_authorization":
+            return {"type": "paypal_checkout", "action_id": data.get("action_id"), "checkout": data.get("checkout"),
+                    "confirmed_by": "AGENT"}
+        if name == "prepare_subscription":
+            return {"type": "paypal_subscription", "action_id": data.get("action_id"), "subscription": data.get("subscription")}
+        if name == "list_my_subscriptions":
+            subs = data.get("subscriptions") or []
+            return {"type": "subscriptions_list", "subscriptions": subs[:5]} if subs else None
+        if name == "search_web_products":
+            products = data.get("products", [])[:3]
+            return {"type": "web_offers", "query": data.get("query"), "max_price": data.get("max_price"),
+                    "source": data.get("source"), "products": products} if products else None
+        return None
+
     async def chat(
         self,
         user_message: str,
@@ -512,7 +581,8 @@ LANGUAGE: {lang_instruction}
         excluded_tools = None if authorized else set(AUTHORIZATION_ONLY_TOOLS)
 
         safe_tools = tool_registry.get_gemini_tools(excluded_tools)
-        lang_instruction = "Answer ONLY in English." if is_english else "Réponds UNIQUEMENT en français."
+        lang_instruction = ("Reply in the language of the user's latest message (English or French only). "
+                            + ("It looks like English." if is_english else "Il semble être en français."))
         system_instruction = self._sika_pay_instruction(firstname, lang_instruction, mandate)
 
         messages = []
@@ -531,21 +601,6 @@ LANGUAGE: {lang_instruction}
         action_id = None
         agent_steps: list[dict] = []
 
-        # Libellés observables des étapes (jamais le raisonnement interne du modèle)
-        _TOOL_LABELS = {
-            "search_demo_catalog": "Searching the demo store catalog" if is_english else "Recherche dans le catalogue",
-            "prepare_paypal_checkout": "Checking budget & preparing PayPal checkout" if is_english else "Vérification du budget et préparation PayPal",
-            "get_paypal_checkout_status": "Verifying the status with PayPal" if is_english else "Vérification du statut auprès de PayPal",
-            "list_recent_paypal_checkouts": "Reading your SIKA Pay history" if is_english else "Lecture de l'historique SIKA Pay",
-            "confirm_checkout_with_authorization": "Confirming with your authorization" if is_english else "Confirmation avec votre autorisation",
-            "search_web_products": "Comparing offers from online merchants" if is_english else "Comparaison des offres des marchands en ligne",
-            "watch_web_product_price": "Setting up your price alert" if is_english else "Création de votre alerte de prix",
-            "list_price_watches": "Reading your price alerts" if is_english else "Lecture de vos alertes de prix",
-            "search_subscription_plans": "Comparing subscription plans" if is_english else "Comparaison des abonnements",
-            "prepare_subscription": "Checking the plan with PayPal" if is_english else "Vérification du plan auprès de PayPal",
-            "list_my_subscriptions": "Checking your subscriptions with PayPal" if is_english else "Vérification de vos abonnements auprès de PayPal",
-            "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
-        }
         allowed_tool_names = set(tool_registry.agent_tool_names(excluded_tools))
         agent_confirmed = False
         gen_config = types.GenerateContentConfig(
@@ -576,33 +631,12 @@ LANGUAGE: {lang_instruction}
                 break
 
             for call in response.function_calls:
-                logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name} with args: {call.args}")
-                try:
-                    if call.name not in allowed_tool_names:
-                        raise PermissionError(f"Tool '{call.name}' is not available to the agent.")
-                    call_args = dict(call.args) if call.args else {}
-                    tool_func = tool_registry.get(call.name)
-                    if tool_func:
-                        import inspect
-                        sig = inspect.signature(tool_func)
-                        if "user_id" in sig.parameters:
-                            # Toujours l'identité authentifiée côté serveur, jamais celle proposée par le modèle
-                            call_args["user_id"] = str(user_id) if user_id else None
-                        if "user_request" in sig.parameters:
-                            call_args["user_request"] = user_message
-
-                    tool_res = tool_registry.execute(call.name, call_args)
-                    res_dict = tool_res.to_dict()
-                    step_status = "completed" if tool_res.success else "failed"
-                except Exception as e:
-                    logger.error(f"Tool execution failed: {e}")
-                    res_dict = {"success": False, "error_message": str(e)}
-                    step_status = "failed"
-
+                logger.info(f"[SIKA AGENT] Gemini is calling tool: {call.name}")
+                res_dict, step_status = self.run_agent_tool(call.name, call.args, allowed_tool_names, user_id, user_message)
                 agent_steps.append({
                     "id": f"step_{len(agent_steps) + 1}",
                     "type": call.name,
-                    "label": _TOOL_LABELS.get(call.name, "Analysing" if is_english else "Analyse en cours"),
+                    "label": self.tool_label(call.name, is_english),
                     "status": step_status,
                 })
 
@@ -661,6 +695,21 @@ LANGUAGE: {lang_instruction}
                         messages, system_instruction, action_data_detected["checkout"], is_english
                     )
                 break
+
+        if not final_response_text and step >= max_steps:
+            # Boucle épuisée : le modèle conclut avec ce qu'il a trouvé, sans nouvel appel d'outil
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=messages,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction + "\nAnswer now with what you found. Do not call any tool.",
+                        temperature=0.2,
+                    ),
+                )
+                final_response_text = (response.text or "").strip()
+            except Exception as e:
+                logger.warning(f"[SIKA AGENT] Final answer after max steps failed: {type(e).__name__}")
 
         if not final_response_text:
             final_response_text = (
