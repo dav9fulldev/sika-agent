@@ -18,7 +18,7 @@ class AppConfig {
   AppConfig._(); // Singleton statique — pas d'instanciation.
 
   /// Version affichée dans les réglages (mise à jour par release-please avec pubspec.yaml).
-  static const String appVersion = '3.2.0'; // x-release-please-version
+  static const String appVersion = '3.3.0'; // x-release-please-version
 
   // ---------------------------------------------------------------------------
   // URL Cloud Run de production (à mettre à jour après chaque déploiement)
