@@ -171,11 +171,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       });
       final launched = await launchUrl(Uri.parse(start['authorize_url'].toString()), mode: LaunchMode.externalApplication);
-      if (!launched) throw Exception("Impossible d'ouvrir la page PayPal.");
+      if (!launched) {
+        state = state.copyWith(isLoading: false, clearError: true, errorCode: 'PAYPAL_OPEN_FAILED', errorMessage: '');
+        return false;
+      }
 
       final uri = await waiter.future.timeout(const Duration(minutes: 5));
       if (uri.queryParameters['error'] != null || uri.queryParameters['code'] == null) {
-        state = state.copyWith(isLoading: false, errorMessage: 'Connexion PayPal annulée.');
+        state = state.copyWith(isLoading: false, clearError: true, errorCode: 'PAYPAL_SIGN_IN_CANCELLED', errorMessage: '');
         return false;
       }
       final res = await _apiService.paypalLoginComplete(uri.queryParameters['code']!, uri.queryParameters['state'] ?? '');
@@ -198,11 +201,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _rememberSignInMethod('paypal');
       return true;
     } on TimeoutException {
-      state = state.copyWith(isLoading: false, errorMessage: "PayPal n'a pas renvoyé de réponse. Réessayez.");
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'PAYPAL_SIGN_IN_TIMEOUT', errorMessage: '');
       return false;
     } catch (e) {
       final msg = e.toString().replaceAll('Exception: ', '');
-      state = state.copyWith(isLoading: false, errorMessage: msg.isEmpty ? 'Connexion PayPal impossible.' : msg);
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: msg.isEmpty ? 'PAYPAL_SIGN_IN_FAILED' : null, errorMessage: msg);
       return false;
     } finally {
       _paypalRedirect = null;
