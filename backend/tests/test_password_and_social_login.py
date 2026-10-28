@@ -96,3 +96,20 @@ def test_google_sign_in_unavailable_without_client_id(monkeypatch):
     r = client.post("/api/v1/sika/auth/google", json={"email": "anyone@sika.test", "id_token": "x"})
     assert r.status_code == 503
     assert r.json()["detail"]["error_code"] == "GOOGLE_SIGN_IN_UNAVAILABLE"
+
+
+def test_reset_code_is_invalidated_after_five_wrong_attempts(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "development")  # expose le code (dev_otp) pour le test
+    email = _register_victim()
+    code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(5):
+        r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": wrong, "new_password": "N3w!Passw0rd"})
+        assert r.status_code == 400
+    # Même le bon code ne passe plus : il faut en demander un nouveau
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": code, "new_password": "N3w!Passw0rd"})
+    assert r.status_code == 429
+    new_code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": new_code, "new_password": "N3w!Passw0rd"})
+    assert r.status_code == 200
