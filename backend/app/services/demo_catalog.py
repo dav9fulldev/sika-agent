@@ -101,6 +101,10 @@ _STOPWORDS = {
     "budget", "dollars", "usd", "prepare", "payment", "paiement", "please", "stp", "than", "less", "max",
     "dollar", "without", "going", "over", "spend", "need", "some", "something", "get", "find", "cheap", "cheaper",
     "aide", "moi", "sans", "dépasser", "depasser", "trouve", "trouver", "besoin", "quelque", "chose", "voudrais",
+    # Questions sur le catalogue entier (« what's the cheapest thing in your store? »)
+    "what", "what's", "whats", "cheapest", "thing", "things", "anything", "everything", "store", "shop", "catalog",
+    "catalogue", "sell", "have", "you", "your", "do", "show", "list", "all", "items", "products", "available",
+    "moins", "cher", "boutique", "magasin", "vends", "vendez", "tout", "produits", "articles",
 }
 
 

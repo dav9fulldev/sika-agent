@@ -12,6 +12,7 @@ import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/api_service.dart';
 import '../../../../core/services/sika_native_service.dart';
 import '../../paypal/providers/paypal_checkout_provider.dart';
+import '../services/sika_live_voice.dart';
 
 enum SikaState {
   idle,
@@ -62,6 +63,12 @@ class SikaData {
   // NEW: Track the single active confirmable action and obsolete ones
   final String? activeActionId;
   final Set<String> obsoleteActionIds;
+  /// Conversation vocale en direct (Gemini Live) ouverte.
+  final bool voiceLive;
+  /// Micro en pause pendant une conversation vocale.
+  final bool micMuted;
+  /// Ce que SIKA est en train de dire (transcription en direct, avant l'ajout au fil).
+  final String? liveReply;
 
   SikaData({
     required this.state,
@@ -77,6 +84,9 @@ class SikaData {
     this.agentSteps = const [],
     this.activeActionId,
     this.obsoleteActionIds = const {},
+    this.voiceLive = false,
+    this.micMuted = false,
+    this.liveReply,
   });
 
   SikaData copyWith({
@@ -96,6 +106,10 @@ class SikaData {
     String? activeActionId,
     Set<String>? obsoleteActionIds,
     bool clearActiveAction = false,
+    bool? voiceLive,
+    bool? micMuted,
+    String? liveReply,
+    bool clearLiveReply = false,
   }) {
     return SikaData(
       state: state ?? this.state,
@@ -114,17 +128,36 @@ class SikaData {
       agentSteps: agentSteps ?? this.agentSteps,
       activeActionId: clearActiveAction ? null : (activeActionId ?? this.activeActionId),
       obsoleteActionIds: obsoleteActionIds ?? this.obsoleteActionIds,
+      voiceLive: voiceLive ?? this.voiceLive,
+      micMuted: micMuted ?? this.micMuted,
+      liveReply: clearLiveReply ? null : (liveReply ?? this.liveReply),
     );
   }
 }
 
 class SikaNotifier extends StateNotifier<SikaData> {
+  @override
+  void dispose() {
+    _live?.dispose();
+    super.dispose();
+  }
+
   final ApiService _apiService;
   final Ref _ref;
 
   final SpeechToText _speechToText = SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
   final AudioPlayer _audioPlayer = AudioPlayer();
+
+  SikaLiveVoice? _live;
+  final StringBuffer _liveHeard = StringBuffer();
+  final StringBuffer _liveSaid = StringBuffer();
+  final List<Map<String, dynamic>> _liveSteps = [];
+  Map<String, dynamic>? _liveCard;
+  /// Position dans le fil de la réponse en cours (déjà affichée avec sa carte), sinon null.
+  int? _liveReplyIndex;
+  bool _livePlaying = false;
+  bool _liveTurnDone = false;
 
   bool _speechEnabled = false;
   bool _sttRetried = false;
@@ -339,12 +372,233 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   Future<void> toggleListening({String? sttLocale}) async {
-    if (state.state == SikaState.listening) {
+    if (state.voiceLive) {
+      await stopLiveVoice();
+    } else if (state.state == SikaState.listening) {
       await stopListening();
     } else {
+      await startVoice(sttLocale: sttLocale);
+    }
+  }
+
+  // ==========================================================================
+  // CONVERSATION VOCALE EN LANGAGE NATUREL (Gemini Live via le backend)
+  // ==========================================================================
+
+  /// Ouvre la conversation vocale en direct ; repli sur la dictée du téléphone si elle est indisponible.
+  Future<void> startVoice({String? sttLocale}) async {
+    if (state.voiceLive) return;
+    final token = _apiService.token;
+    if (token == null) {
+      await startListening(sttLocale: sttLocale);
+      return;
+    }
+    if (state.state == SikaState.speaking) await stopSpeaking(resetState: false);
+    await SikaNativeService.pauseSikaService();
+    final isEn = _ref.read(languageProvider).code == 'en';
+    _resetLiveTurn();
+    state = state.copyWith(
+      state: SikaState.processing,
+      isVoiceMode: true,
+      voiceLive: true, // panneau vocal dès la connexion
+      clearText: true,
+      clearLiveReply: true,
+      micMuted: false,
+      soundLevel: 0,
+      agentSteps: const [],
+    );
+    final live = SikaLiveVoice(onEvent: _onLiveEvent, onMicLevel: _onLiveMicLevel, onPlayback: _onLivePlayback);
+    _live = live;
+    try {
+      final name = (_ref.read(authProvider).user?.name ?? '').trim().split(' ').first;
+      await live.start(token: token, lang: isEn ? 'en' : 'fr', firstname: name);
+      if (_live != live) return;
+      state = state.copyWith(state: SikaState.listening, voiceLive: true);
+    } on LiveVoiceException catch (e) {
+      debugPrint('[SIKA LIVE] Unavailable: ${e.code}');
+      await live.dispose();
+      _live = null;
+      state = state.copyWith(voiceLive: false);
+      if (e.code == 'MIC_PERMISSION') {
+        state = state.copyWith(
+          state: SikaState.error,
+          errorMessage: isEn
+              ? 'SIKA needs the microphone. Allow it in your phone settings.'
+              : 'SIKA a besoin du micro. Autorisez-le dans les réglages du téléphone.',
+        );
+        return;
+      }
+      await startListening(sttLocale: sttLocale);
+    } catch (e) {
+      debugPrint('[SIKA LIVE] Connection failed: $e');
+      await live.dispose();
+      _live = null;
+      state = state.copyWith(voiceLive: false);
       await startListening(sttLocale: sttLocale);
     }
   }
+
+  /// Termine la conversation vocale ; ce qui a été dit reste dans le fil du chat.
+  Future<void> stopLiveVoice() async {
+    final live = _live;
+    _live = null;
+    _commitLiveTurn();
+    state = state.copyWith(
+      state: SikaState.idle,
+      voiceLive: false,
+      micMuted: false,
+      isVoiceMode: false,
+      soundLevel: 0,
+      clearText: true,
+      clearLiveReply: true,
+    );
+    await live?.dispose();
+  }
+
+  void toggleMicMuted() {
+    final live = _live;
+    if (live == null) return;
+    live.setMuted(!live.muted);
+    state = state.copyWith(micMuted: live.muted, soundLevel: 0);
+  }
+
+  void _onLiveMicLevel(double level) {
+    if (!state.voiceLive || state.state != SikaState.listening) return;
+    state = state.copyWith(soundLevel: state.soundLevel * 0.5 + level * 0.5);
+  }
+
+  void _onLivePlayback(bool playing) {
+    _livePlaying = playing;
+    if (!state.voiceLive) return;
+    if (playing) {
+      state = state.copyWith(state: SikaState.speaking, soundLevel: 0);
+    } else if (_liveTurnDone) {
+      _commitLiveTurn();
+      state = state.copyWith(state: SikaState.listening, clearLiveReply: true);
+    }
+  }
+
+  void _onLiveEvent(Map<String, dynamic> event) {
+    if (_live == null) return;
+    switch (event['type']) {
+      case 'input_transcript':
+        if (_liveTurnDone) _commitLiveTurn();
+        _liveHeard.write(event['text'] ?? '');
+        state = state.copyWith(
+          currentText: _liveHeard.toString().trim(),
+          state: _livePlaying ? state.state : SikaState.listening,
+        );
+        break;
+      case 'step':
+        final step = {'id': event['id'], 'type': event['tool'], 'label': event['label'], 'status': event['status']};
+        final i = _liveSteps.indexWhere((s) => s['id'] == step['id']);
+        if (i >= 0) {
+          _liveSteps[i] = step;
+        } else {
+          _liveSteps.add(step);
+        }
+        state = state.copyWith(
+          state: _livePlaying ? state.state : SikaState.processing,
+          agentSteps: List<Map<String, dynamic>>.from(_liveSteps),
+        );
+        break;
+      case 'card':
+        // La carte s'affiche tout de suite, pendant que SIKA en parle
+        _liveCard = Map<String, dynamic>.from(event['card'] as Map);
+        _commitLiveTurn(partial: true);
+        break;
+      case 'output_transcript':
+        _liveSaid.write(event['text'] ?? '');
+        state = state.copyWith(liveReply: _liveSaid.toString().trim());
+        break;
+      case 'interrupted':
+        // L'utilisateur a repris la parole : SIKA s'est tue, on garde ce qu'elle a dit
+        _commitLiveTurn();
+        state = state.copyWith(state: SikaState.listening, clearLiveReply: true);
+        break;
+      case 'turn_complete':
+        _liveTurnDone = true;
+        if (!_livePlaying) {
+          _commitLiveTurn();
+          state = state.copyWith(state: SikaState.listening, clearLiveReply: true);
+        }
+        break;
+      case 'error':
+      case 'closed':
+        final isEn = _ref.read(languageProvider).code == 'en';
+        stopLiveVoice().then((_) {
+          if (event['type'] == 'error') {
+            state = state.copyWith(
+              state: SikaState.error,
+              isVoiceMode: true,
+              errorMessage: isEn
+                  ? 'The voice conversation stopped. Tap Talk to start again.'
+                  : 'La conversation vocale s\'est arrêtée. Touchez Parler pour recommencer.',
+            );
+          }
+        });
+        break;
+    }
+  }
+
+  void _resetLiveTurn() {
+    _liveHeard.clear();
+    _liveSaid.clear();
+    _liveSteps.clear();
+    _liveCard = null;
+    _liveTurnDone = false;
+    _liveReplyIndex = null;
+  }
+
+  /// Ajoute le tour vocal au fil du chat (avec sa carte et ses étapes), comme une réponse écrite.
+  /// `partial` : la carte vient d'arriver ; la réponse reste ouverte et son texte sera complété en fin de tour.
+  void _commitLiveTurn({bool partial = false}) {
+    final heard = _liveHeard.toString().trim();
+    final said = _liveSaid.toString().trim();
+    final card = _liveCard;
+    final steps = List<Map<String, dynamic>>.from(_liveSteps);
+    final replyIndex = _liveReplyIndex;
+    if (partial) {
+      _liveHeard.clear();
+    } else {
+      _resetLiveTurn();
+    }
+    if (heard.isEmpty && said.isEmpty && card == null) return;
+
+    final messages = List<SikaMessage>.from(state.messages);
+    if (heard.isNotEmpty) messages.add(SikaMessage(text: heard, isUser: true));
+    final reply = SikaMessage(
+      text: said,
+      isUser: false,
+      suggestedTransaction: card,
+      agentSteps: steps.isNotEmpty ? steps : null,
+    );
+    if (replyIndex != null && replyIndex < messages.length) {
+      messages[replyIndex] = reply;
+    } else if (said.isNotEmpty || card != null) {
+      messages.add(reply);
+      if (partial) _liveReplyIndex = messages.length - 1;
+    }
+
+    final actionId = card?['action_id']?.toString();
+    final previous = state.activeActionId;
+    final obsolete = Set<String>.from(state.obsoleteActionIds);
+    if (actionId != null && previous != null && previous != actionId) {
+      obsolete.add(previous);
+      if (previous.startsWith('chk_')) {
+        // Le backend a annulé l'ancienne préparation : on affiche son statut réel
+        _ref.read(paypalCheckoutsProvider.notifier).refresh(previous, sync: false);
+      }
+    }
+    state = state.copyWith(
+      messages: messages,
+      clearText: true,
+      agentSteps: steps,
+      activeActionId: actionId ?? state.activeActionId,
+      obsoleteActionIds: obsolete,
+    );
+  }
+
 
   void _onSpeechComplete() {
     if (state.state != SikaState.listening) return;
@@ -494,8 +748,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         actionData['action_id'] = actionId;
       }
 
-      final bool shouldSpeak =
-          (response['should_speak'] == true) || state.isVoiceMode;
+      // SIKA ne répond à voix haute que si l'utilisateur lui a parlé : au clavier, elle reste silencieuse
+      final bool shouldSpeak = state.isVoiceMode;
 
       final String backendLanguage = response['language'] as String? ?? (isEnglish ? 'en' : 'fr');
       final finalTtsLocale = backendLanguage == 'en' ? 'en-US' : 'fr-FR';
@@ -650,16 +904,23 @@ class SikaNotifier extends StateNotifier<SikaData> {
       messages: List<SikaMessage>.from(state.messages)..add(SikaMessage(text: text.trim(), isUser: false)),
       clearActiveAction: status != 'APPROVED' && state.activeActionId == id,
     );
+    if (_live != null) return;
     await _speak(text.trim(), ttsLocale: isEn ? 'en-US' : 'fr-FR');
   }
 
   Future<void> sendTextMessage(String text, {String? ttsLocale}) async {
+    if (_live != null) await stopLiveVoice();
     state = state.copyWith(isVoiceMode: false);
     await processUserQuery(text, ttsLocale: ttsLocale);
   }
 
   Future<void> _speak(String text, {required String ttsLocale}) async {
     final currentRequestId = ++_activeSpeechRequestId;
+    if (!state.isVoiceMode) {
+      // Conversation écrite : pas de synthèse vocale, on passe directement à l'état suivant
+      _onSpeechPlaybackFinished(currentRequestId);
+      return;
+    }
     final isEn = ttsLocale.toLowerCase().startsWith('en');
     final langCode = isEn ? 'en-US' : 'fr-FR'; // voix choisie par le serveur (Google Chirp 3 HD)
 
@@ -736,7 +997,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint(
           '[HANDS-FREE] Auto-resuming STT listening for user voice response (State: $nextState)');
       state = state.copyWith(state: nextState);
-      startListening();
+      // Le micro ne se rouvre seul que dans une conversation vocale
+      if (state.isVoiceMode) startListening();
     } else if (nextState == SikaState.securityValidation && actionId != null) {
       debugPrint(
           '[SECURITY] Awaiting user biometric or PIN confirmation on card for action_id: $actionId');
@@ -791,6 +1053,12 @@ class SikaNotifier extends StateNotifier<SikaData> {
   }
 
   Future<void> stopSpeaking({bool resetState = true}) async {
+    if (_live != null) {
+      await _live!.interrupt();
+      _commitLiveTurn();
+      state = state.copyWith(state: SikaState.listening, clearLiveReply: true);
+      return;
+    }
     try {
       await _audioPlayer.stop();
       await _flutterTts.stop();

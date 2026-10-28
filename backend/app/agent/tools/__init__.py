@@ -130,7 +130,9 @@ def register_all_sika_tools(registry):
         func=get_user_habits,
         name="get_user_habits",
         description="Récupérer les habitudes d'achat et le profil d'apprentissage du client.",
-        risk_level=RiskLevel.READ_ONLY
+        risk_level=RiskLevel.READ_ONLY,
+        # Schéma strict : le user_id est injecté par le serveur, le modèle ne le voit jamais
+        input_schema={"type": "object", "properties": {}},
     )
 
     register(

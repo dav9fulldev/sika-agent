@@ -26,7 +26,7 @@ from ...services.paypal_checkout_service import paypal_checkout_service, Checkou
 SEARCH_SCHEMA = {
     "type": "object",
     "properties": {
-        "query": {"type": "string", "description": "Keywords describing what the user wants to buy, e.g. 'excel course'."},
+        "query": {"type": "string", "description": "Keywords describing what the user wants to buy, e.g. 'excel course'. Use an empty string to list the whole catalog sorted by price (e.g. 'what do you sell?', 'cheapest item')."},
         "max_price": {"type": "number", "description": "Budget ceiling stated by the user, in the catalog currency (USD). Omit if the user gave none."},
     },
     "required": ["query"],

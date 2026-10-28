@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, HTTPException, Header, Depends, Request
+from fastapi import APIRouter, HTTPException, Header, Depends, Request, WebSocket
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import UserModel
@@ -265,6 +265,13 @@ def sika_text_to_speech(data: TTSRequest, authorization: Optional[str] = Header(
         raise HTTPException(status_code=500, detail=res.get("error", "Échec GCP TTS"))
 
     return res
+
+
+@router.websocket("/voice/live")
+async def sika_voice_live(websocket: WebSocket):
+    """Assistant vocal en langage naturel (Gemini Live). Authentifié par le premier message, jamais par l'URL."""
+    from ..services.sika_voice_live import handle_voice_socket
+    await handle_voice_socket(websocket)
 
 
 @router.get("/tts/voices", summary="List TTS Voices", description="Liste les voix françaises de haute qualité disponibles sur Google Cloud Text-to-Speech.")

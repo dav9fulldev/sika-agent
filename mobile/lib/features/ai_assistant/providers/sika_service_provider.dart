@@ -50,7 +50,7 @@ class SikaServiceNotifier extends StateNotifier<SikaServiceState> {
         // Ramener l'interface SIKA au premier plan
         final sikaNotifier = _ref.read(sikaProvider.notifier);
         // Force l'affichage de l'overlay et démarre l'écoute STT
-        sikaNotifier.startListening();
+        sikaNotifier.startVoice();
       }
     });
   }
