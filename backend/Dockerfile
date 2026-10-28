@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # 5. Installer les dépendances Python du projet
 RUN pip install --no-cache-dir -r requirements.txt
+# PayPal Agent Toolkit officiel (Apache-2.0) : seul son cœur REST est utilisé (pydantic, requests, httpx déjà installés),
+# sans ses intégrations CrewAI / LangChain / OpenAI
+RUN pip install --no-cache-dir --no-deps paypal-agent-toolkit==1.11.0
 # 5. Copier le reste du code source
 COPY --chown=appuser:appuser . .
 

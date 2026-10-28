@@ -8,6 +8,7 @@ from .commerce_tools import (
     search_demo_catalog, prepare_paypal_checkout, get_paypal_checkout_status, list_recent_paypal_checkouts,
     confirm_checkout_with_authorization, search_web_products, watch_web_product_price, list_price_watches,
     search_subscription_plans, prepare_subscription, list_my_subscriptions, SUB_SEARCH_SCHEMA, SUB_PREPARE_SCHEMA,
+    get_spending_summary, SPENDING_SCHEMA,
     SEARCH_SCHEMA, PREPARE_SCHEMA, STATUS_SCHEMA, LIST_SCHEMA, AGENT_CONFIRM_SCHEMA, WEB_SEARCH_SCHEMA, WATCH_SCHEMA,
 )
 
@@ -61,6 +62,15 @@ def register_all_sika_tools(registry):
         description="List the user's price alerts on web products and which ones were triggered.",
         risk_level=RiskLevel.READ_ONLY,
         input_schema={"type": "object", "properties": {}},
+    )
+
+    register(
+        func=get_spending_summary,
+        name="get_spending_summary",
+        description="Summarize what the user spent with SIKA Pay over a period (verified PayPal captures, by category, "
+                    "purchases SIKA confirmed, active subscriptions), cross-checked with PayPal's transaction reports.",
+        risk_level=RiskLevel.READ_ONLY,
+        input_schema=SPENDING_SCHEMA,
     )
 
     register(
@@ -166,6 +176,7 @@ __all__ = [
     "search_web_products",
     "watch_web_product_price",
     "list_price_watches",
+    "get_spending_summary",
     "search_subscription_plans",
     "prepare_subscription",
     "list_my_subscriptions",
