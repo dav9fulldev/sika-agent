@@ -49,6 +49,13 @@ class AppConfig {
   ///   3. `_emulatorUrl` en debug / profile
   static const String _dartDefineUrl = String.fromEnvironment('SIKA_API_URL');
 
+  /// ID client OAuth Google de type « Application Web » (public). Google l'utilise comme audience du jeton
+  /// d'identité que le backend vérifie : sans lui, Android ne renvoie pas de jeton et la connexion Google échoue.
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '1064195418653-coq6i7fnbgn5dvobbets8orh619s3d0s.apps.googleusercontent.com',
+  );
+
   static String get baseUrl {
     // Priorité 1 : override explicite fourni au build
     if (_dartDefineUrl.isNotEmpty) return _dartDefineUrl;

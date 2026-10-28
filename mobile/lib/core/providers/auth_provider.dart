@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -134,6 +135,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final SecureStorageService _secureStorage = SecureStorageService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId: AppConfig.googleServerClientId,
   );
 
   /// Applique l'état du profil renvoyé par le serveur (champs manquants, statut KYC).
