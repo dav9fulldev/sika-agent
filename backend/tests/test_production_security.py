@@ -247,13 +247,14 @@ def test_sql_errors_masked_in_api_response():
 def test_google_oauth_rejects_invalid_token_in_production(monkeypatch):
     """Vérifie qu'un faux token Google ID est immédiatement rejeté en production."""
     monkeypatch.setattr("app.config.settings.ENV", "production")
+    monkeypatch.setattr("app.config.settings.GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
 
     res = client.post(
         "/api/v1/sika/auth/google",
         json={"id_token": "fake_invalid_google_jwt_signature"}
     )
-    assert res.status_code in [400, 401]
-    assert "Échec" in res.text or "invalide" in res.text or "manquant" in res.text
+    assert res.status_code == 401
+    assert res.json()["detail"]["error_code"] == "GOOGLE_TOKEN_INVALID"
 
 
 # =============================================================================

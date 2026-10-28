@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -134,6 +135,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final SecureStorageService _secureStorage = SecureStorageService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId: AppConfig.googleServerClientId,
   );
 
   /// Applique l'état du profil renvoyé par le serveur (champs manquants, statut KYC).
@@ -590,6 +592,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _rememberSignInMethod('google');
 
       return true;
+    } on AuthApiException catch (e) {
+      // Refus explicite du serveur (connexion Google indisponible ou jeton refusé)
+      state = state.copyWith(isLoading: false, errorMessage: e.message, errorCode: e.code);
+      return false;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');

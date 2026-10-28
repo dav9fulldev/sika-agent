@@ -13,6 +13,11 @@ permissions:
   contents: read
   id-token: write
 
+# Un seul déploiement à la fois : deux pushes rapprochés (fusion puis release) se mettaient en conflit sur Cloud Run
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
 env:
   PROJECT_ID: sika-all-things-agentic
   REGION: europe-west9

@@ -78,6 +78,9 @@ def verify_google_id_token(token_str: str, client_id: Optional[str] = None) -> D
         raise ValueError(f"Jeton Google ID Token invalide ou signature expirée: {e}")
 
 
+OTP_MAX_ATTEMPTS = 5
+
+
 class OAuth2AuthService:
     """Gère l'authentification OAuth2 et la délivrance des jetons Bearer JWT sécurisés via PyJWT (HS256)."""
 
@@ -253,6 +256,17 @@ class OAuth2AuthService:
         verified_email = None
         verified_name = name
         google_sub_id = None
+        dev_mode = settings.ENV == "development"
+
+        # Hors développement, seul un jeton Google vérifié (signature, émetteur, audience) ouvre une session :
+        # un simple email ne prouve rien et permettrait de se connecter au compte de n'importe qui.
+        if not dev_mode:
+            if not settings.GOOGLE_CLIENT_ID:
+                raise HTTPException(status_code=503, detail={"error_code": "GOOGLE_SIGN_IN_UNAVAILABLE",
+                                                             "message": "Google sign-in is not available. Use PayPal or email."})
+            if not id_token:
+                raise HTTPException(status_code=401, detail={"error_code": "GOOGLE_TOKEN_REQUIRED",
+                                                             "message": "Google sign-in failed. Try again or use PayPal or email."})
 
         if id_token:
             try:
@@ -261,8 +275,9 @@ class OAuth2AuthService:
                 verified_name = id_info.get("name", name)
                 google_sub_id = id_info.get("sub")
             except ValueError as e:
-                if settings.ENV == "production":
-                    raise HTTPException(status_code=401, detail=f"Validation cryptographique du jeton Google échouée: {str(e)}")
+                if not dev_mode:
+                    raise HTTPException(status_code=401, detail={"error_code": "GOOGLE_TOKEN_INVALID",
+                                                                 "message": "Google sign-in failed. Try again or use PayPal or email."})
                 logger.warning(f"[AUTH GOOGLE DEV] Jeton Google invalide en DEV: {e}")
                 if email:
                     verified_email = email.strip().lower()
@@ -327,6 +342,8 @@ class OAuth2AuthService:
 
             otp = f"{secrets.randbelow(900000) + 100000}"
             security_rate_limiter.store_otp(clean_email, otp, expire_seconds=900)
+            # Nouveau code : le compteur d'essais repart de zéro
+            security_rate_limiter.store.reset_failures(f"otp_{clean_email}")
             logger.info("[AUTH FORGOT PASSWORD] OTP de réinitialisation généré.")
             if settings.ENV == "development":
                 response["dev_otp"] = otp
@@ -337,8 +354,15 @@ class OAuth2AuthService:
     def reset_password_with_otp(self, email: str, otp: str, new_password: str) -> Dict[str, Any]:
         """Réinitialise le mot de passe après vérification de l'OTP."""
         clean_email = email.strip().lower()
+        # Anti force brute : 5 codes faux invalident le code en cours (sinon 10^6 essais en 15 minutes suffisent)
+        failure_key = f"otp_{clean_email}"
+        if security_rate_limiter.store.get_failures(failure_key) >= OTP_MAX_ATTEMPTS:
+            security_rate_limiter.clear_otp(clean_email)
+            raise HTTPException(status_code=429, detail="Trop de codes incorrects. Demandez un nouveau code.")
         if not security_rate_limiter.verify_otp(clean_email, otp):
+            security_rate_limiter.store.record_failure(failure_key, window_seconds=900)
             raise HTTPException(status_code=400, detail="Code de vérification (OTP) invalide ou expiré.")
+        security_rate_limiter.store.reset_failures(failure_key)
 
         db = SessionLocal()
         try:

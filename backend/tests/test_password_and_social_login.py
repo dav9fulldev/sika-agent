@@ -56,3 +56,66 @@ def test_paypal_account_without_password_is_told_to_use_paypal():
     assert res.status_code == 401
     assert res.json()["detail"]["error_code"] == "USE_PAYPAL_SIGN_IN"
     assert "PayPal" in res.json()["detail"]["message"]
+
+
+# ---------------------------------------------------------------------------
+# Google : un email seul ne doit jamais ouvrir une session hors développement
+# ---------------------------------------------------------------------------
+
+def _test_password() -> str:
+    """Mot de passe jetable généré à l'exécution : aucun identifiant figé dans le dépôt."""
+    return f"T{uuid.uuid4().hex}!9"
+
+
+def _register_victim():
+    email = f"victim-{uuid.uuid4().hex[:8]}@sika.test"
+    client.post("/api/v1/sika/auth/register", json={"email": email, "password": _test_password(), "name": "Victim"})
+    return email
+
+
+def test_google_email_without_token_is_refused_outside_development(monkeypatch):
+    from app.config import settings
+    email = _register_victim()
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
+    r = client.post("/api/v1/sika/auth/google", json={"email": email})
+    assert r.status_code == 401
+    assert r.json()["detail"]["error_code"] == "GOOGLE_TOKEN_REQUIRED"
+    assert "access_token" not in r.text
+
+
+def test_google_invalid_token_is_refused_outside_development(monkeypatch):
+    from app.config import settings
+    email = _register_victim()
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
+    r = client.post("/api/v1/sika/auth/google", json={"email": email, "id_token": "forged.token.value"})
+    assert r.status_code == 401
+    assert r.json()["detail"]["error_code"] == "GOOGLE_TOKEN_INVALID"
+
+
+def test_google_sign_in_unavailable_without_client_id(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "staging")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", None)
+    r = client.post("/api/v1/sika/auth/google", json={"email": "anyone@sika.test", "id_token": "x"})
+    assert r.status_code == 503
+    assert r.json()["detail"]["error_code"] == "GOOGLE_SIGN_IN_UNAVAILABLE"
+
+
+def test_reset_code_is_invalidated_after_five_wrong_attempts(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "ENV", "development")  # expose le code (dev_otp) pour le test
+    email = _register_victim()
+    new_password = _test_password()
+    code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(5):
+        r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": wrong, "new_password": new_password})
+        assert r.status_code == 400
+    # Même le bon code ne passe plus : il faut en demander un nouveau
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": code, "new_password": new_password})
+    assert r.status_code == 429
+    new_code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": new_code, "new_password": new_password})
+    assert r.status_code == 200
