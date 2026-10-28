@@ -22,6 +22,8 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    # Un téléchargement bloqué (NDK, Gradle) ne doit pas occuper le runner pendant 6 heures
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
