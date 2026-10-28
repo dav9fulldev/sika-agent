@@ -263,6 +263,8 @@ String? eventLabel(Map<String, dynamic> e, LanguageNotifier lang) {
   if (type == 'USER_CONFIRMED') return lang.tr('Confirmé par vous', 'Confirmed by you');
   if (type == 'AGENT_CONFIRMED') return lang.tr('Confirmé par SIKA avec votre autorisation', 'Confirmed by SIKA with your authorization');
   if (type == 'PAYPAL_ORDER_CREATED') return lang.tr('Commande PayPal créée', 'PayPal order created');
+  if (type == 'PAID_WITH_SAVED_PAYPAL') return lang.tr('Payé avec votre compte PayPal relié', 'Paid with your linked PayPal account');
+  if (type == 'PAYPAL_APPROVED_SAVED_PAYPAL') return null;
   if (type.startsWith('PAYPAL_APPROVED')) return lang.tr('Approuvé par vous sur PayPal', 'Approved by you on PayPal');
   if (type.startsWith('PAYPAL_CAPTURE_COMPLETED')) return lang.tr('Paiement capturé par PayPal', 'Payment captured by PayPal');
   if (type.startsWith('PAYPAL_CAPTURE_PENDING')) return lang.tr('Capture en attente chez PayPal', 'Capture pending at PayPal');

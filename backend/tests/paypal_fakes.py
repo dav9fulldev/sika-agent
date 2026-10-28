@@ -30,6 +30,10 @@ class FakePayPalAPI:
         self.subscriptions = {}
         self.plan_overrides = {}
         self.webhooks = [{"id": "WH-TEST-0001", "url": "http://localhost:8001/api/v1/paypal/webhook"}]
+        self.setup_tokens: Dict[str, Dict[str, Any]] = {}
+        self.payment_tokens = set()
+        self.vault_order_status = "COMPLETED"
+        self.vault_failure_after_charge = False
 
     # API publique identique à PayPalAPIService
     def is_configured(self):
@@ -38,21 +42,62 @@ class FakePayPalAPI:
     extract_approve_url = staticmethod(PayPalAPIService.extract_approve_url)
     extract_capture = staticmethod(PayPalAPIService.extract_capture)
 
-    def create_order(self, *, reference_id, currency, total, items, description, request_id, custom_id):
-        self.calls.append(("create", request_id))
+    def create_order(self, *, reference_id, currency, total, items, description, request_id, custom_id, vault_id=None):
+        self.calls.append(("create_vault" if vault_id else "create", request_id))
         if self.create_failure:
             exc, self.create_failure = self.create_failure, None
+            if vault_id and self.vault_failure_after_charge:
+                # Le paiement a eu lieu chez PayPal mais la réponse s'est perdue
+                self.vault_failure_after_charge = False
+                self._create(reference_id, currency, total, items, request_id, vault_id)
             raise exc
         if request_id in self._by_request_id:  # idempotence PayPal-Request-Id
             return self._repr(self._by_request_id[request_id])
+        return self._repr(self._create(reference_id, currency, total, items, request_id, vault_id))
+
+    def _create(self, reference_id, currency, total, items, request_id, vault_id):
         order_id = f"5O190127TN{next(_ids):07d}"
+        amount = {"currency_code": currency, "value": self.order_amount_override or total}
         self.orders[order_id] = {
             "id": order_id, "status": self.create_status,
-            "amount": {"currency_code": currency, "value": self.order_amount_override or total},
-            "reference_id": reference_id, "items": items, "captures": [],
+            "amount": amount, "reference_id": reference_id, "items": items, "captures": [],
         }
+        if vault_id:
+            if vault_id not in self.payment_tokens:
+                raise PayPalAPIError(422, name="UNPROCESSABLE_ENTITY", issue="PAYMENT_SOURCE_INFO_CANNOT_BE_VERIFIED")
+            # Compte enregistré : PayPal traite le paiement dès la création de la commande
+            self.orders[order_id]["status"] = self.vault_order_status
+            if self.vault_order_status == "COMPLETED":
+                self.orders[order_id]["captures"].append({
+                    "id": f"3C679366HH{next(_ids):07d}", "status": self.capture_status,
+                    "amount": {"currency_code": currency, "value": self.captured_value_override or amount["value"]},
+                })
         self._by_request_id[request_id] = order_id
-        return self._repr(order_id)
+        return order_id
+
+    # Vault v3 : compte PayPal enregistré
+    def create_vault_setup_token(self, request_id, return_url, cancel_url):
+        self.calls.append(("vault_setup", request_id))
+        token_id = f"5C9{next(_ids):08d}"
+        self.setup_tokens[token_id] = {"approved": False}
+        return {"id": token_id, "status": "PAYER_ACTION_REQUIRED", "links": [
+            {"rel": "approve", "href": f"https://www.sandbox.paypal.com/agreements/approve?approval_session_id={token_id}"}]}
+
+    def approve_setup_token(self, token_id):
+        self.setup_tokens[token_id]["approved"] = True
+
+    def create_vault_payment_token(self, setup_token_id, request_id):
+        self.calls.append(("vault_payment_token", request_id))
+        if not self.setup_tokens.get(setup_token_id, {}).get("approved"):
+            raise PayPalAPIError(422, name="UNPROCESSABLE_ENTITY", issue="SETUP_TOKEN_NOT_APPROVED")
+        token_id = f"8kk{next(_ids):08d}"
+        self.payment_tokens.add(token_id)
+        return {"id": token_id, "customer": {"id": "CUST123"},
+                "payment_source": {"paypal": {"email_address": "buyer@example.com"}}}
+
+    def delete_vault_payment_token(self, payment_token_id):
+        self.calls.append(("vault_delete", payment_token_id))
+        self.payment_tokens.discard(payment_token_id)
 
     def get_order(self, order_id):
         self.calls.append(("get", order_id))

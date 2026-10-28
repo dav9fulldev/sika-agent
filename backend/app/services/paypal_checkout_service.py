@@ -228,6 +228,7 @@ class PayPalCheckoutService:
             },
             "details_hash": row.details_hash,
             "confirmed_by": row.confirmed_by,
+            "payment_method": row.payment_method,
             "paypal": {
                 "order_id": row.paypal_order_id,
                 "order_status": row.paypal_order_status,
@@ -451,10 +452,19 @@ class PayPalCheckoutService:
                 raise CheckoutError("PAYPAL_NOT_CONFIGURED",
                                     "PayPal sandbox credentials are not configured on the SIKA backend.", 503)
 
+            # Libre choix de l'utilisateur : son compte PayPal relié n'est utilisé que pour un achat confirmé par
+            # l'agent sous son autorisation. Sinon (ou sans compte relié), il approuve le paiement sur PayPal.
+            vault_id = None
+            if by == "AGENT":
+                from .paypal_vault_service import paypal_vault_service
+                vault_id = paypal_vault_service.active_payment_token(db, user_id)
+            payment_method = "SAVED_PAYPAL" if vault_id else "PAYPAL_APPROVAL"
+
             locked = db.query(PayPalCheckoutModel).filter(
                 PayPalCheckoutModel.checkout_id == row.checkout_id,
                 PayPalCheckoutModel.status == "AWAITING_USER_CONFIRMATION",
-            ).update({"status": "CREATING_ORDER", "confirmed_by": by, "updated_at": _now()}, synchronize_session=False)
+            ).update({"status": "CREATING_ORDER", "confirmed_by": by, "payment_method": payment_method,
+                      "updated_at": _now()}, synchronize_session=False)
             if locked != 1:
                 db.rollback()
                 raise CheckoutError("CONCURRENT_REQUEST", "This checkout is already being processed.", 409)
@@ -484,8 +494,16 @@ class PayPalCheckoutService:
                     items=items,
                     description=f"SIKA Pay sandbox — {row.item_name}",
                     request_id=row.create_request_id,
+                    vault_id=vault_id,
                 )
             except PayPalNetworkError:
+                if vault_id:
+                    # Avec le compte enregistré, PayPal a pu payer dès la création : résultat inconnu, jamais « rien payé »
+                    self._transition(db, row, "UNKNOWN_RESULT", "VAULT_ORDER_NETWORK_ERROR",
+                                     error=("NETWORK_ERROR", "PayPal could not be reached. SIKA is verifying whether the "
+                                                             "payment went through; a retry cannot charge twice."))
+                    return {**self.to_public_dict(row),
+                            "message": "The payment result is unknown. SIKA is verifying it with PayPal."}
                 # Création de commande : aucun argent ne bouge. Une nouvelle tentative réutilise le même
                 # PayPal-Request-Id, donc PayPal renverra la même commande au lieu d'en créer une seconde.
                 self._transition(db, row, "AWAITING_USER_CONFIRMATION", "ORDER_CREATE_NETWORK_ERROR",
@@ -499,6 +517,9 @@ class PayPalCheckoutService:
                 self._transition(db, row, "FAILED", "ORDER_CREATE_REJECTED", error=(e.issue or e.name, message), debug_id=e.debug_id)
                 raise CheckoutError(e.issue if e.issue in PAYMENT_REFUSED else "PAYPAL_REJECTED", message, 502,
                                     data={"checkout": self.to_public_dict(row)})
+
+            if vault_id:
+                return self._finish_saved_paypal_order(db, row, order)
 
             order_id = str(order.get("id") or "")
             order_status = str(order.get("status") or "")
@@ -524,6 +545,64 @@ class PayPalCheckoutService:
                              metadata={"paypal_order_id": order_id, "paypal_status": order_status})
             return {**self.to_public_dict(row), "message": "PayPal sandbox order created. Approve it on PayPal to continue."}
 
+    def _finish_saved_paypal_order(self, db: Session, row: PayPalCheckoutModel, order: Dict[str, Any]) -> Dict[str, Any]:
+        """Commande créée avec le compte PayPal relié : seule une capture COMPLETED au bon montant vaut paiement."""
+        order_id = str(order.get("id") or "")
+        order_status = str(order.get("status") or "")
+        row.paypal_order_id = order_id or None
+        row.paypal_order_status = order_status or None
+        _log_event(db, row, row.status, row.status, "PAID_WITH_SAVED_PAYPAL", None,
+                   {"paypal_order_id": order_id, "paypal_status": order_status})
+        db.commit()
+
+        if order_status == "COMPLETED":
+            capture = self.api.extract_capture(order)
+            if capture:
+                self._apply_capture(db, row, capture, "SAVED_PAYPAL")
+            else:
+                self._transition(db, row, "UNKNOWN_RESULT", "VAULT_ORDER_WITHOUT_CAPTURE",
+                                 error=("NO_CAPTURE", "PayPal completed the order without a capture. SIKA is verifying it."))
+        elif order_status == "APPROVED":
+            self._transition(db, row, "APPROVED", "PAYPAL_APPROVED_SAVED_PAYPAL")
+            self._auto_capture(db, row, source="SAVED_PAYPAL")
+        elif order_status in ("CREATED", "PAYER_ACTION_REQUIRED") and _is_paypal_url(self.api.extract_approve_url(order)):
+            # PayPal demande malgré tout une approbation : parcours standard
+            row.approve_url = self.api.extract_approve_url(order)
+            row.payment_method = "PAYPAL_APPROVAL"
+            self._transition(db, row, "AWAITING_PAYPAL_APPROVAL", "PAYPAL_ORDER_CREATED",
+                             metadata={"paypal_order_id": order_id, "paypal_status": order_status,
+                                       "reason": "SAVED_PAYPAL_NEEDS_APPROVAL"})
+            return {**self.to_public_dict(row), "message": "PayPal asks you to approve this payment."}
+        else:
+            self._transition(db, row, "UNKNOWN_RESULT", "VAULT_ORDER_UNEXPECTED_STATUS",
+                             error=("UNEXPECTED_ORDER_STATUS", f"PayPal returned order status '{order_status}'. SIKA is verifying it."))
+
+        messages = {
+            "COMPLETED": "Paid with your saved PayPal account. PayPal confirmed the capture.",
+            "PENDING": "PayPal is still processing this payment.",
+        }
+        return {**self.to_public_dict(row), "message": messages.get(row.status, "SIKA is verifying this payment with PayPal.")}
+
+    def _replay_saved_paypal_order(self, db: Session, row: PayPalCheckoutModel):
+        """Résultat inconnu après une erreur réseau : on rejoue la création avec le même PayPal-Request-Id.
+
+        PayPal renvoie alors la commande d'origine au lieu d'en créer une seconde : aucun double paiement possible.
+        """
+        from ..models.paypal_vault import PayPalVaultModel
+        token = (db.query(PayPalVaultModel).filter(PayPalVaultModel.user_id == row.user_id,
+                                                   PayPalVaultModel.payment_token_id.isnot(None))
+                 .order_by(PayPalVaultModel.updated_at.desc()).first())
+        if not token:
+            return
+        items = [{"name": row.item_name, "description": (row.item_description or "")[:127], "sku": row.sku,
+                  "quantity": str(row.quantity), "category": "DIGITAL_GOODS",
+                  "unit_amount": {"currency_code": row.currency, "value": row.unit_amount}}]
+        order = self.api.create_order(reference_id=row.checkout_id, custom_id=row.checkout_id, currency=row.currency,
+                                      total=row.total_amount, items=items,
+                                      description=f"SIKA Pay sandbox — {row.item_name}",
+                                      request_id=row.create_request_id, vault_id=token.payment_token_id)
+        self._finish_saved_paypal_order(db, row, order)
+
     # ==================================================================
     # Étape 3 — Synchronisation (lecture seule) avec PayPal
     # ==================================================================
@@ -534,7 +613,15 @@ class PayPalCheckoutService:
             if self._expire_if_needed(db, row):
                 db.commit()
             sync_error = None
-            if row.paypal_order_id and row.status in ("AWAITING_PAYPAL_APPROVAL", "APPROVED", "UNKNOWN_RESULT", "PENDING"):
+            if (row.status == "UNKNOWN_RESULT" and not row.paypal_order_id
+                    and row.payment_method == "SAVED_PAYPAL"):
+                try:
+                    self._replay_saved_paypal_order(db, row)
+                except PayPalNetworkError:
+                    sync_error = "PayPal could not be reached to verify the payment. The last verified status is shown."
+                except (PayPalAPIError, PayPalConfigurationError, ValueError) as e:
+                    sync_error = f"PayPal could not verify the payment ({getattr(e, 'issue', '') or type(e).__name__})."
+            elif row.paypal_order_id and row.status in ("AWAITING_PAYPAL_APPROVAL", "APPROVED", "UNKNOWN_RESULT", "PENDING"):
                 try:
                     order = self.api.get_order(row.paypal_order_id)
                     self._apply_order_state(db, row, order, source="SYNC")

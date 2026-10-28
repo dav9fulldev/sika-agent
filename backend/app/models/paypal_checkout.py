@@ -73,6 +73,9 @@ class PayPalCheckoutModel(Base):
     # Qui a confirmé l'achat : USER (dans l'app) ou AGENT (autorisation accordée par l'utilisateur)
     confirmed_by = Column(String(10), nullable=True)
 
+    # Moyen de paiement : PAYPAL_APPROVAL (approbation sur PayPal) ou SAVED_PAYPAL (compte relié, sans redirection)
+    payment_method = Column(String(20), nullable=True)
+
     # Données renvoyées par PayPal
     paypal_order_id = Column(String(64), nullable=True, unique=True, index=True)
     paypal_order_status = Column(String(40), nullable=True)

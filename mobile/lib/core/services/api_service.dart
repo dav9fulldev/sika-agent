@@ -494,6 +494,28 @@ class ApiService {
     return _decodePayPal(response);
   }
 
+  // Compte PayPal enregistré (Vault) : approuvé une fois sur PayPal, utilisé par SIKA sous autorisation
+  Future<Map<String, dynamic>> getSavedPayPal() async {
+    final response = await http
+        .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalVault}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> startSavedPayPalLink() async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.paypalVault}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> unlinkSavedPayPal() async {
+    final response = await http
+        .delete(Uri.parse('$safeBaseUrl${ApiConstants.paypalVault}'), headers: _headers)
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   Future<Map<String, dynamic>> getPayPalStatus() async {
     final response = await http
         .get(Uri.parse('$safeBaseUrl${ApiConstants.paypalStatus}'), headers: _headers)
