@@ -862,6 +862,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
     final id = checkout['checkout_id']?.toString() ?? '';
     final status = checkout['status']?.toString() ?? '';
     if (id.isEmpty || !_reportedPayPalOutcomes.add('$id:$status')) return;
+    // Paiement fait par SIKA avec le compte relié : SIKA vient déjà d'annoncer ce résultat vérifié
+    if (checkout['payment_method'] == 'SAVED_PAYPAL' && status == 'COMPLETED') return;
     if (!const ['APPROVED', 'COMPLETED', 'DECLINED', 'FAILED', 'CANCELLED', 'EXPIRED', 'UNKNOWN_RESULT', 'PENDING']
         .contains(status)) {
       return;
@@ -880,8 +882,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         break;
       case 'COMPLETED':
         text = isEn
-            ? 'Done. PayPal captured ${paypal['captured_amount']} ${paypal['captured_currency']} for $item. Order ${paypal['order_id']}, capture ${paypal['capture_id']}, status ${paypal['capture_status']}.'
-            : 'C\'est fait. PayPal a capturé ${paypal['captured_amount']} ${paypal['captured_currency']} pour $item. Commande ${paypal['order_id']}, capture ${paypal['capture_id']}, statut ${paypal['capture_status']}.';
+            ? 'Done. PayPal confirmed the payment of ${paypal['captured_amount']} ${paypal['captured_currency']} for $item. The order and capture references are on your receipt.'
+            : 'C\'est fait. PayPal a confirmé le paiement de ${paypal['captured_amount']} ${paypal['captured_currency']} pour $item. Les références de la commande et de la capture sont sur votre reçu.';
         break;
       case 'UNKNOWN_RESULT':
       case 'PENDING':
