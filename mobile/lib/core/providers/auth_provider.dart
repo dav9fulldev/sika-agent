@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
-import '../services/sika_native_service.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -196,7 +195,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         ),
       );
       _applyProfile(res);
-      _syncContextWithNative(token, state.user);
       await _rememberSignInMethod('paypal');
       return true;
     } on TimeoutException {
@@ -252,21 +250,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   @visibleForTesting
   AuthNotifier.withState(super.initial);
 
-  Future<void> _syncContextWithNative(String? token, UserProfileData? user) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lang = prefs.getString('sika_preferred_language') ?? 'en';
-      await SikaNativeService.setSessionContext(
-        token: token ?? "",
-        firstname: user?.name ?? "",
-        currency: "XOF",
-        language: lang,
-      );
-    } catch (e) {
-      debugPrint('[AUTH NATIVE SYNC] Error syncing context: $e');
-    }
-  }
-
   /// Charge les préférences et vérifie la session sécurisée
   Future<void> _loadInitialPreferences() async {
     try {
@@ -299,7 +282,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
               ),
             );
             _applyProfile(Map<String, dynamic>.from(res));
-            _syncContextWithNative(token, state.user!);
             return;
           }
         } catch (_) {
@@ -378,7 +360,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Sync context with native side
       _applyProfile(Map<String, dynamic>.from(res));
-      _syncContextWithNative(token, state.user);
       await _rememberSignInMethod('email');
 
       return true;
@@ -450,7 +431,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Sync context with native side
       _applyProfile(Map<String, dynamic>.from(res));
-      _syncContextWithNative(token, state.user);
 
       return true;
     } catch (e) {
@@ -588,7 +568,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Sync context with native side
       _applyProfile(Map<String, dynamic>.from(res));
-      _syncContextWithNative(token, state.user);
       await _rememberSignInMethod('google');
 
       return true;
@@ -666,7 +645,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
 
     // Clear context from native side
-    _syncContextWithNative(null, null);
   }
 }
 

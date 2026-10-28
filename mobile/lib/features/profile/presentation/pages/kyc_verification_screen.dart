@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:camera/camera.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -38,20 +37,11 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
   // ML Kit Variables
   bool _isDetecting = false;
-  late final FaceDetector _faceDetector;
   late final TextRecognizer _textRecognizer;
 
   @override
   void initState() {
     super.initState();
-    _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(
-        enableContours: false,
-        enableClassification: false,
-        enableLandmarks: false,
-        performanceMode: FaceDetectorMode.fast,
-      ),
-    );
     _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
     _initCamera();
@@ -156,22 +146,10 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
           feedback = 'Placez la carte dans le cadre.';
         }
       } else {
-        // Selfie Auto-Scan logic
-        final List<Face> faces = await _faceDetector.processImage(inputImage);
-        if (faces.length == 1) {
-          final face = faces.first;
-          if (face.headEulerAngleY != null &&
-              face.headEulerAngleY!.abs() > 15) {
-            feedback = 'Regardez droit devant vous.';
-          } else {
-            targetFound = true;
-            feedback = 'Visage détecté. Ne bougez pas...';
-          }
-        } else if (faces.isEmpty) {
-          feedback = 'Aucun visage détecté.';
-        } else {
-          feedback = 'Un seul visage autorisé.';
-        }
+        // Selfie : photo prise après 3 secondes face à la caméra avant (pas de détection de visage embarquée)
+        targetFound = true;
+        feedback = ref.read(languageProvider.notifier).tr(
+            "Regardez l'objectif : photo dans 3 secondes.", 'Look at the camera: photo in 3 seconds.');
       }
 
       if (targetFound) {
@@ -316,7 +294,6 @@ class _KycVerificationScreenState extends ConsumerState<KycVerificationScreen> {
 
   @override
   void dispose() {
-    _faceDetector.close();
     _textRecognizer.close();
     _cameraController?.dispose();
     super.dispose();

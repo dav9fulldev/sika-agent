@@ -4,13 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/services/api_service.dart';
-import '../../../../core/services/sika_native_service.dart';
 import '../../paypal/providers/paypal_checkout_provider.dart';
 import '../services/sika_live_voice.dart';
 
@@ -292,8 +290,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
       }
     }
 
-    // Mettre en pause le service Wake Word natif pour libérer le micro
-    await SikaNativeService.pauseSikaService();
 
     final activeSttLocale = sttLocale ?? _ref.read(languageProvider).sttLocale;
     debugPrint('[SIKA VOICE] Using locale: $activeSttLocale');
@@ -394,7 +390,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
       return;
     }
     if (state.state == SikaState.speaking) await stopSpeaking(resetState: false);
-    await SikaNativeService.pauseSikaService();
     final isEn = _ref.read(languageProvider).code == 'en';
     _resetLiveTurn();
     state = state.copyWith(
@@ -623,12 +618,6 @@ class SikaNotifier extends StateNotifier<SikaData> {
       isInitialized: state.isInitialized,
       isVoiceMode: false,
     );
-    // Relancer le service Wake Word natif en arrière-plan UNIQUEMENT s'il est activé
-    final prefs = await SharedPreferences.getInstance();
-    final isEnabled = prefs.getBool('wake_word_enabled') ?? false;
-    if (isEnabled) {
-      SikaNativeService.resumeSikaService();
-    }
   }
 
   /// Traitement d'une requête utilisateur (Vocale ou Textuelle) avec reconnaissance de l'utilisateur et de sa devise active

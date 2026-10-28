@@ -2,13 +2,6 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/sika_background" />
 
-    <!-- Bottom Wave Asset -->
-    <item android:gravity="bottom">
-        <bitmap
-            android:gravity="bottom|fill_horizontal"
-            android:src="@drawable/wave" />
-    </item>
-
     <!-- Center SIKA Logo -->
     <item android:gravity="center">
         <bitmap

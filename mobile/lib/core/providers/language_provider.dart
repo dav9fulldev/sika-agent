@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/sika_native_service.dart';
 
 enum AppLanguage { english, french }
 
@@ -31,7 +30,6 @@ class LanguageNotifier extends StateNotifier<AppLanguage> {
           state = AppLanguage.french;
         }
       }
-      _syncNativeLanguage();
     } catch (e) {
       debugPrint('[LANGUAGE PREFS] Error loading saved language: $e');
     }
@@ -46,23 +44,9 @@ class LanguageNotifier extends StateNotifier<AppLanguage> {
     }
   }
 
-  void _syncNativeLanguage() {
-    try {
-      SikaNativeService.setSessionContext(
-        token: '',
-        firstname: '',
-        currency: '',
-        language: state.code,
-      );
-    } catch (e) {
-      debugPrint('[LANGUAGE NATIVE] Error syncing language to native: $e');
-    }
-  }
-
   void setLanguage(AppLanguage lang) {
     state = lang;
     _saveLanguage(lang);
-    _syncNativeLanguage();
   }
 
   void setLanguageByString(String langStr) {
@@ -72,7 +56,6 @@ class LanguageNotifier extends StateNotifier<AppLanguage> {
       state = AppLanguage.french;
     }
     _saveLanguage(state);
-    _syncNativeLanguage();
   }
 
   bool get isEnglish => state == AppLanguage.english;

@@ -20,7 +20,6 @@ dependencies:
   url_launcher: ^6.3.1
 
   # Storage & Preferences
-  flutter_contacts: ^2.3.1
   shared_preferences: ^2.2.2
 
   # Google Authentication
@@ -36,16 +35,12 @@ dependencies:
   avatar_glow: ^3.0.1
 
   # Native & Hardware
-  permission_handler: ^11.2.0
   local_auth: ^2.3.0
 
   # Utilitaires
   intl: ^0.18.1
-  lottie: ^3.5.1
   flutter_secure_storage: ^11.0.0
-  image_picker: ^1.2.3
   camera: ^0.12.0+2
-  google_mlkit_face_detection: ^0.15.1
   google_mlkit_text_recognition: ^0.17.1
   google_fonts: ^8.2.1
   flutter_animate: ^4.5.2
