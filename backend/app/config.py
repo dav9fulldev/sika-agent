@@ -14,7 +14,7 @@ else:
 logger = logging.getLogger("AppConfig")
 
 # Version de l'API (SemVer) — voir CHANGELOG.md
-APP_VERSION = "3.3.1"  # x-release-please-version
+APP_VERSION = "3.3.2"  # x-release-please-version
 
 
 class Settings:
