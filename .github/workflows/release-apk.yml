@@ -38,6 +38,22 @@ jobs:
           channel: stable
           cache: true
 
+      # NDK installé d'avance, avec nouvelles tentatives : le téléchargement automatique pendant le build Gradle
+      # a déjà échoué sur une archive corrompue (« Archive is not a ZIP archive »)
+      - name: Android NDK
+        run: |
+          NDK=$(grep -oE 'ndkVersion "[^"]+"' mobile/android/app/build.gradle | cut -d'"' -f2)
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          for attempt in 1 2 3; do
+            if yes | "$SDKM" --install "ndk;$NDK" > /dev/null && [ -f "$ANDROID_HOME/ndk/$NDK/source.properties" ]; then
+              echo "NDK $NDK ready"; exit 0
+            fi
+            echo "NDK install attempt $attempt failed, retrying"
+            rm -rf "$ANDROID_HOME/ndk/$NDK"
+            sleep 10
+          done
+          exit 1
+
       - name: Release signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
