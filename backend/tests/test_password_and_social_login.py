@@ -62,9 +62,14 @@ def test_paypal_account_without_password_is_told_to_use_paypal():
 # Google : un email seul ne doit jamais ouvrir une session hors développement
 # ---------------------------------------------------------------------------
 
+def _test_password() -> str:
+    """Mot de passe jetable généré à l'exécution : aucun identifiant figé dans le dépôt."""
+    return f"T{uuid.uuid4().hex}!9"
+
+
 def _register_victim():
     email = f"victim-{uuid.uuid4().hex[:8]}@sika.test"
-    client.post("/api/v1/sika/auth/register", json={"email": email, "password": "Str0ng!Passw0rd", "name": "Victim"})
+    client.post("/api/v1/sika/auth/register", json={"email": email, "password": _test_password(), "name": "Victim"})
     return email
 
 
@@ -102,14 +107,15 @@ def test_reset_code_is_invalidated_after_five_wrong_attempts(monkeypatch):
     from app.config import settings
     monkeypatch.setattr(settings, "ENV", "development")  # expose le code (dev_otp) pour le test
     email = _register_victim()
+    new_password = _test_password()
     code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
     wrong = "000000" if code != "000000" else "111111"
     for _ in range(5):
-        r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": wrong, "new_password": "N3w!Passw0rd"})
+        r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": wrong, "new_password": new_password})
         assert r.status_code == 400
     # Même le bon code ne passe plus : il faut en demander un nouveau
-    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": code, "new_password": "N3w!Passw0rd"})
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": code, "new_password": new_password})
     assert r.status_code == 429
     new_code = client.post("/api/v1/sika/auth/forgot-password", json={"email": email}).json()["dev_otp"]
-    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": new_code, "new_password": "N3w!Passw0rd"})
+    r = client.post("/api/v1/sika/auth/reset-password", json={"email": email, "otp": new_code, "new_password": new_password})
     assert r.status_code == 200
