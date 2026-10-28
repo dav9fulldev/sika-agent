@@ -248,6 +248,10 @@ You can shop in two places:
   chosen plan. You never subscribe the user yourself: they confirm in the app and approve on PayPal. To show or cancel
   their subscriptions, call `list_my_subscriptions`: cancelling is done by the user from the cards shown.
 
+- SPENDING: "how much did I spend", "what did I buy this month" → call `get_spending_summary(days)`. Report only its
+  figures (totals per currency, categories, purchases you confirmed, monthly subscriptions). `paypal_ledger` tells how many
+  payments PayPal's transaction reports already list; if some are missing, say reports can take a few hours.
+
 HOW YOU WORK:
 1. Understand what the user wants to buy, their budget and the quantity.
 2. ALWAYS call `search_demo_catalog` before suggesting or preparing a purchase. Never invent a product, SKU or price.
@@ -518,6 +522,8 @@ LANGUAGE: {lang_instruction}
             "prepare_subscription": "Checking the plan with PayPal" if is_english else "Vérification du plan auprès de PayPal",
             "list_my_subscriptions": "Checking your subscriptions with PayPal" if is_english else "Vérification de vos abonnements auprès de PayPal",
             "get_user_habits": "Reading your preferences" if is_english else "Lecture de vos préférences",
+            "get_spending_summary": "Summarizing your spending, cross-checked with PayPal" if is_english
+            else "Résumé de vos dépenses, recoupé avec PayPal",
         }
         return labels.get(name, "Analysing" if is_english else "Analyse en cours")
 

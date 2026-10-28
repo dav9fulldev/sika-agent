@@ -210,6 +210,29 @@ def list_price_watches(user_id: Optional[str] = None) -> ToolResult:
                       data={"watches": price_watch_service.list(uid)})
 
 
+SPENDING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "days": {"type": "integer", "description": "Period to summarize, in days (e.g. 30 for the last month, 7 for a week). Default 30."},
+    },
+}
+
+
+def get_spending_summary(days: int = 30, user_id: Optional[str] = None) -> ToolResult:
+    """Résumé des dépenses de l'utilisateur (paiements capturés), recoupé avec PayPal via le PayPal Agent Toolkit."""
+    from ...services.spending_service import spending_service
+    uid = _uid(user_id)
+    if uid is None:
+        return ToolResult(success=False, tool_name="get_spending_summary", risk_level=RiskLevel.READ_ONLY,
+                          data={}, error_message="An authenticated user is required.")
+    try:
+        period = int(days or 30)
+    except (TypeError, ValueError):
+        period = 30
+    return ToolResult(success=True, tool_name="get_spending_summary", risk_level=RiskLevel.READ_ONLY,
+                      data=spending_service.summary(uid, period))
+
+
 def search_subscription_plans(query: str, max_monthly_price: Optional[float] = None) -> ToolResult:
     """Plans d'abonnement du SIKA Demo Store (prix mensuels du catalogue serveur, revérifiés avec PayPal à la préparation)."""
     from ...services import demo_subscriptions
