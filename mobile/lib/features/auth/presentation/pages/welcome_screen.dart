@@ -93,6 +93,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       case 'USE_GOOGLE_SIGN_IN':
         return lang.tr('Ce compte utilise la connexion Google : touchez Google ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
             'This account uses Google sign-in: tap Google below, or set a password with "Forgot password?".');
+      case 'PAYPAL_SIGN_IN_CANCELLED':
+        return lang.tr('Connexion PayPal annulée.', 'PayPal sign-in cancelled.');
+      case 'PAYPAL_SIGN_IN_TIMEOUT':
+        return lang.tr("PayPal n'a pas répondu à temps. Réessayez.", 'PayPal did not respond in time. Try again.');
+      case 'PAYPAL_OPEN_FAILED':
+        return lang.tr("Impossible d'ouvrir PayPal.", 'Could not open PayPal.');
+      case 'PAYPAL_SIGN_IN_FAILED':
+        return lang.tr('Connexion PayPal impossible. Réessayez.', 'PayPal sign-in failed. Try again.');
       case 'GOOGLE_SIGN_IN_UNAVAILABLE':
       case 'GOOGLE_TOKEN_REQUIRED':
       case 'GOOGLE_TOKEN_INVALID':
