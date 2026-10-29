@@ -7,6 +7,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../auth_error_text.dart';
 import '../../../../core/widgets/sika_surface.dart';
 import '../../../../core/widgets/sika_glass_text_field.dart';
 import '../../../../core/widgets/sika_premium_button.dart';
@@ -148,7 +149,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                               const SizedBox(width: AppSpacing.sm),
                               Expanded(
                                 child: Text(
-                                  authState.errorMessage!,
+                                  authErrorText(authState, langNotifier),
                                   style: AppTypography.caption.copyWith(color: AppColors.error),
                                 ),
                               ),

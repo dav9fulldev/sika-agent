@@ -7,6 +7,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/language_provider.dart';
 import '../../../../core/widgets/sika_pay_brand.dart';
 import '../../../paypal/presentation/widgets/sika_pay_ui.dart';
+import '../auth_error_text.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -82,35 +83,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         });
       }
     });
-  }
-
-  /// Message d'erreur dans la langue de l'app quand le serveur fournit un code.
-  String _errorText(AuthState auth, LanguageNotifier lang) {
-    switch (auth.errorCode) {
-      case 'USE_PAYPAL_SIGN_IN':
-        return lang.tr('Ce compte utilise la connexion PayPal : touchez PayPal ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
-            'This account uses PayPal sign-in: tap PayPal below, or set a password with "Forgot password?".');
-      case 'USE_GOOGLE_SIGN_IN':
-        return lang.tr('Ce compte utilise la connexion Google : touchez Google ci-dessous, ou créez un mot de passe avec « Mot de passe oublié ? ».',
-            'This account uses Google sign-in: tap Google below, or set a password with "Forgot password?".');
-      case 'PAYPAL_SIGN_IN_CANCELLED':
-        return lang.tr('Connexion PayPal annulée.', 'PayPal sign-in cancelled.');
-      case 'PAYPAL_SIGN_IN_TIMEOUT':
-        return lang.tr("PayPal n'a pas répondu à temps. Réessayez.", 'PayPal did not respond in time. Try again.');
-      case 'PAYPAL_OPEN_FAILED':
-        return lang.tr("Impossible d'ouvrir PayPal.", 'Could not open PayPal.');
-      case 'PAYPAL_SIGN_IN_FAILED':
-        return lang.tr('Connexion PayPal impossible. Réessayez.', 'PayPal sign-in failed. Try again.');
-      case 'GOOGLE_SIGN_IN_UNAVAILABLE':
-      case 'GOOGLE_TOKEN_REQUIRED':
-      case 'GOOGLE_TOKEN_INVALID':
-        return lang.tr('Connexion Google indisponible pour le moment. Utilisez PayPal ou votre e-mail.',
-            'Google sign-in is not available right now. Use PayPal or your email.');
-      case 'INVALID_CREDENTIALS':
-        return lang.tr('Adresse e-mail ou mot de passe incorrect.', 'Invalid email or password.');
-      default:
-        return auth.errorMessage ?? '';
-    }
   }
 
   @override
@@ -219,7 +191,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           ]),
           if (!auth.isLoading && auth.errorMessage != null) ...[
             const SizedBox(height: 4),
-            Text(_errorText(auth, lang), style: const TextStyle(color: SikaBrand.danger, fontSize: 13.5)),
+            Text(authErrorText(auth, lang), style: const TextStyle(color: SikaBrand.danger, fontSize: 13.5)),
           ],
           const SizedBox(height: 14),
           SikaPrimaryButton(label: lang.tr('Se connecter', 'Sign in'), loading: auth.isLoading && !_socialPending, onPressed: _onLogin),

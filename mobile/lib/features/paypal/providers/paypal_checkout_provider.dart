@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/api_service_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/utils/network_error.dart';
 import '../../ai_assistant/providers/sika_provider.dart';
 
 /// Vue locale d'un checkout SIKA Pay.
@@ -112,7 +113,15 @@ class PayPalCheckoutsNotifier extends StateNotifier<Map<String, PayPalCheckoutVi
       ));
     } catch (e) {
       debugPrint('[SIKA PAY] $op failed: $e');
-      _put(state[id]!.copyWith(clearBusy: true, errorCode: 'UNEXPECTED', errorMessage: e.toString()));
+      // Pas de connexion (DNS, ClientException…) : message réseau, jamais le texte technique
+      final network = isNetworkError(e);
+      _put(state[id]!.copyWith(
+        clearBusy: true,
+        errorCode: network ? 'NETWORK' : 'UNEXPECTED',
+        errorMessage: network
+            ? 'No connection to the SIKA server. Nothing new was sent to PayPal.'
+            : 'Something went wrong. The last verified status is shown — check again before retrying.',
+      ));
     }
   }
 

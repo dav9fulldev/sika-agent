@@ -311,6 +311,7 @@ String paypalErrorText(String? code, String? serverMessage, LanguageNotifier lan
     'DAILY_LIMIT_REACHED': 'Limite quotidienne de votre autorisation atteinte. Confirmez-le vous-même.',
     'TIMEOUT': 'Pas de réponse à temps. Le dernier statut vérifié est affiché : revérifiez avant de réessayer.',
     'NETWORK': "Pas de connexion au serveur SIKA. Rien de nouveau n'a été envoyé à PayPal.",
+    'UNEXPECTED': 'Une erreur est survenue. Le dernier statut vérifié est affiché : revérifiez avant de réessayer.',
   };
   if (!lang.isEnglish && code != null && fr.containsKey(code)) return fr[code]!;
   return serverMessage ?? lang.tr('Une erreur est survenue.', 'Something went wrong.');
