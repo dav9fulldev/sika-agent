@@ -252,3 +252,32 @@ def test_generic_catalog_question_lists_whole_catalog():
     products = demo_catalog.search_products("what's the cheapest thing in your store?")
     assert len(products) >= 3
     assert products == sorted(products, key=lambda p: float(p["unit_price"]))
+
+
+def test_gemini_quota_error_is_retried_before_fallback(paypal_only):
+    """Un 429 temporaire de Vertex AI ne doit pas faire basculer SIKA sur le mode de secours."""
+    ai, models = _scripted_ai([([], "Here is what I found.")])
+    calls = {"n": 0}
+    real = models.generate_content
+
+    async def flaky(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            err = RuntimeError("429 RESOURCE_EXHAUSTED. Resource exhausted.")
+            err.code = 429
+            raise err
+        return await real(**kwargs)
+
+    models.generate_content = flaky
+    import app.services.sika_ai as mod
+    import asyncio as _asyncio
+    async def no_sleep(_):
+        return None
+    orig = _asyncio.sleep
+    _asyncio.sleep = no_sleep
+    try:
+        res = asyncio.run(ai.chat("find me something to learn spreadsheets", user_id="1"))
+    finally:
+        _asyncio.sleep = orig
+    assert res["provider"] != "SIKA_LOCAL_FALLBACK" and res["response"] == "Here is what I found."
+    assert calls["n"] == 2

@@ -347,7 +347,7 @@ LANGUAGE: {lang_instruction}
             return fallback
         from google.genai import types
         try:
-            response = await self.client.aio.models.generate_content(
+            response = await self._generate(
                 model=self.model,
                 contents=messages,
                 config=types.GenerateContentConfig(
@@ -383,7 +383,7 @@ LANGUAGE: {lang_instruction}
             return fallback
         from google.genai import types
         try:
-            response = await self.client.aio.models.generate_content(
+            response = await self._generate(
                 model=self.model, contents=messages,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction + (
@@ -397,6 +397,23 @@ LANGUAGE: {lang_instruction}
         except Exception as e:
             logger.warning(f"[SIKA PAY] Subscription explanation failed, deterministic text used: {e}")
             return fallback
+
+    async def _generate(self, **kwargs):
+        """Appel Gemini avec une nouvelle tentative brève en cas de quota dépassé (429) ou d'indisponibilité (503).
+
+        Ces erreurs Vertex AI sont temporaires : sans nouvelle tentative, SIKA basculait sur le mode de secours.
+        """
+        import asyncio
+        for attempt in range(3):
+            try:
+                return await self.client.aio.models.generate_content(**kwargs)
+            except Exception as e:
+                code = getattr(e, "code", None) or getattr(e, "status_code", None)
+                temporary = code in (429, 503) or "RESOURCE_EXHAUSTED" in str(e) or "UNAVAILABLE" in str(e)
+                if not temporary or attempt == 2:
+                    raise
+                logger.warning(f"[SIKA AGENT] Gemini temporarily unavailable ({code}), retrying")
+                await asyncio.sleep(1.5 * (attempt + 1))
 
     def _chat_sika_pay_fallback(self, user_message: str, firstname: str, is_english: bool,
                                 user_id: Optional[str], greeting: bool = False) -> Dict[str, Any]:
@@ -657,7 +674,7 @@ LANGUAGE: {lang_instruction}
         while step < max_steps:
             step += 1
             try:
-                response = await self.client.aio.models.generate_content(
+                response = await self._generate(
                     model=self.model,
                     contents=messages,
                     config=gen_config,
@@ -742,7 +759,7 @@ LANGUAGE: {lang_instruction}
         if not final_response_text and step >= max_steps:
             # Boucle épuisée : le modèle conclut avec ce qu'il a trouvé, sans nouvel appel d'outil
             try:
-                response = await self.client.aio.models.generate_content(
+                response = await self._generate(
                     model=self.model,
                     contents=messages,
                     config=types.GenerateContentConfig(
