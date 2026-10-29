@@ -1119,5 +1119,8 @@ final sikaProvider = StateNotifierProvider<SikaNotifier, SikaData>((ref) {
   // POST /agent/confirm et POST /actions/{id}/reconcile reçoivent
   // l'Authorization: Bearer.
   final apiService = ref.watch(apiServiceProvider);
+  // Une conversation par session : à la déconnexion (ou au changement de compte), l'assistant est recréé,
+  // la conversation vocale fermée et l'historique affiché effacé
+  ref.watch(authProvider.select((a) => a.isAuthenticated ? a.user?.id : null));
   return SikaNotifier(apiService, ref);
 });
