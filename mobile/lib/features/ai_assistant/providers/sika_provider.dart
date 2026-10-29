@@ -180,7 +180,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA INIT] Error initializing SIKA services: $e');
       state = state.copyWith(
         state: SikaState.error,
-        errorMessage: 'Failed to initialize SIKA: $e',
+        errorMessage: _ref.read(languageProvider).code == 'en'
+            ? 'SIKA could not start its voice on this device. You can still type your request.'
+            : "SIKA n'a pas pu démarrer sa voix sur cet appareil. Vous pouvez toujours écrire votre demande.",
         isInitialized: false,
       );
     }
@@ -334,7 +336,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA VOICE EXCEPTION] Error starting STT: $e');
       state = state.copyWith(
         state: SikaState.error,
-        errorMessage: 'Error starting STT: $e',
+        errorMessage: _ref.read(languageProvider).code == 'en'
+            ? 'The microphone could not start. Try again, or type your request.'
+            : "Le micro n'a pas pu démarrer. Réessayez, ou écrivez votre demande.",
       );
     }
   }

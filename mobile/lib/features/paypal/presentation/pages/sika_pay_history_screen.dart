@@ -36,8 +36,9 @@ class SikaPayHistoryScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               history.when(
                 loading: () => const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator())),
-                error: (e, _) => SikaPayCard(
-                  child: Text(lang.tr('Historique indisponible : $e', 'History unavailable: $e')),
+                error: (_, __) => SikaPayCard(
+                  child: Text(lang.tr('Historique indisponible : serveur SIKA injoignable. Tirez pour réessayer.',
+                      'History unavailable: SIKA server unreachable. Pull to retry.')),
                 ),
                 data: (rows) => rows.isEmpty
                     ? SikaPayCard(

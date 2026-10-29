@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
+import '../utils/network_error.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -204,8 +205,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, clearError: true, errorCode: 'PAYPAL_SIGN_IN_TIMEOUT', errorMessage: '');
       return false;
     } catch (e) {
-      final msg = e.toString().replaceAll('Exception: ', '');
-      state = state.copyWith(isLoading: false, clearError: true, errorCode: msg.isEmpty ? 'PAYPAL_SIGN_IN_FAILED' : null, errorMessage: msg);
+      _fail(e, fallbackCode: 'PAYPAL_SIGN_IN_FAILED');
       return false;
     } finally {
       _paypalRedirect = null;
@@ -327,10 +327,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     if (email.trim().isEmpty || password.trim().isEmpty) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: "Veuillez remplir tous les champs.",
-      );
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'FIELDS_REQUIRED', errorMessage: '');
       return false;
     }
 
@@ -374,17 +371,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('[AUTH ERROR] Erreur login API: $e');
       }
 
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') ||
-          msg.contains('Failed host lookup') ||
-          msg.contains('Connection refused')) {
-        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
-      }
-
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: msg,
-      );
+      _fail(e);
       return false;
     }
   }
@@ -397,10 +384,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (name.trim().isEmpty ||
         email.trim().isEmpty ||
         password.trim().isEmpty) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: "Veuillez remplir tous les champs d'inscription.",
-      );
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'FIELDS_REQUIRED', errorMessage: '');
       return false;
     }
 
@@ -441,17 +425,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('[AUTH ERROR] Erreur register API: $e');
       }
 
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') ||
-          msg.contains('Failed host lookup') ||
-          msg.contains('Connection refused')) {
-        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
-      }
-
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: msg,
-      );
+      _fail(e);
       return false;
     }
   }
@@ -459,9 +433,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<String?> forgotPassword(String email) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     if (email.trim().isEmpty) {
-      state = state.copyWith(
-          isLoading: false,
-          errorMessage: "Veuillez entrer votre adresse email.");
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'EMAIL_REQUIRED', errorMessage: '');
       return null;
     }
     try {
@@ -470,13 +442,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Le serveur ne renvoie un code qu'en développement (`dev_otp`) ; sinon il est envoyé hors application.
       return res['dev_otp']?.toString() ?? '';
     } catch (e) {
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') ||
-          msg.contains('Failed host lookup') ||
-          msg.contains('Connection refused')) {
-        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
-      }
-      state = state.copyWith(isLoading: false, errorMessage: msg);
+      _fail(e);
       return null;
     }
   }
@@ -485,8 +451,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String email, String otp, String newPassword) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     if (otp.trim().isEmpty || newPassword.trim().isEmpty) {
-      state = state.copyWith(
-          isLoading: false, errorMessage: "Veuillez remplir tous les champs.");
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'FIELDS_REQUIRED', errorMessage: '');
       return false;
     }
     try {
@@ -495,15 +460,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') ||
-          msg.contains('Failed host lookup') ||
-          msg.contains('Connection refused')) {
-        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
-      }
-      state = state.copyWith(isLoading: false, errorMessage: msg);
+      _fail(e);
       return false;
     }
+  }
+
+  /// Échec d'un appel d'authentification : erreur réseau traduite par l'écran (code), sinon message du serveur.
+  void _fail(Object e, {String? fallbackCode}) {
+    if (isNetworkError(e)) {
+      state = state.copyWith(isLoading: false, clearError: true, errorCode: 'NETWORK_UNAVAILABLE', errorMessage: '');
+      return;
+    }
+    final msg = e.toString().replaceAll('Exception: ', '');
+    state = state.copyWith(isLoading: false, clearError: true, errorCode: msg.isEmpty ? fallbackCode : null, errorMessage: msg);
   }
 
   /// Connexion et inscription via Google Sign-In (OAuth2 / OIDC)
@@ -582,19 +551,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) {
         debugPrint('[AUTH ERROR] Erreur Google Sign-In: $e');
       }
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
-        msg =
-            "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.";
-      } else if (msg.contains('SocketException') ||
-          msg.contains('Failed host lookup') ||
-          msg.contains('Connection refused')) {
-        msg = "Vérifiez votre connexion internet ou réessayez plus tard.";
+      final msg = e.toString();
+      if (!isNetworkError(e) && (msg.contains('ApiException: 10') || msg.contains('sign_in_failed'))) {
+        state = state.copyWith(
+          isLoading: false,
+          clearError: true,
+          errorMessage:
+              "Émulateur Android : Clé SHA-1 non configurée sur Google Cloud. Utilisez l'inscription classique par email.",
+        );
+        return false;
       }
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: msg,
-      );
+      _fail(e);
       return false;
     }
   }
