@@ -12,7 +12,7 @@ import '../../../paypal/presentation/pages/agent_authorization_screen.dart';
 import '../../../paypal/presentation/pages/price_alerts_screen.dart';
 import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
 import '../../../paypal/presentation/pages/subscription_screen.dart';
-import '../../../paypal/presentation/widgets/sika_pay_ui.dart';
+import '../../../paypal/presentation/widgets/sika_list.dart';
 import '../../../paypal/providers/paypal_checkout_provider.dart';
 import '../../../profile/presentation/pages/kyc_verification_screen.dart';
 
@@ -102,9 +102,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(lang.tr('Réglages', 'Settings'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
       ),
       body: ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.of(context).padding.bottom), children: [
-        _Section(lang.tr("Paiements et agent", 'Payments and agent'), [
-          _Row(
-            icon: Icons.auto_awesome_outlined,
+        SikaListSection(lang.tr("Paiements et agent", 'Payments and agent'), [
+          SikaListRow(
+            icon: Icons.tune_rounded,
             title: lang.tr('Autorisation de SIKA', 'SIKA authorization'),
             subtitle: authorized
                 ? lang.tr('SIKA peut confirmer jusqu\'à ${authorization!['max_per_purchase']} USD par achat',
@@ -112,24 +112,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : lang.tr('Vous confirmez chaque achat', 'You confirm every purchase'),
             onTap: () => AgentAuthorizationScreen.open(context),
           ),
-          _Row(
+          SikaListRow(
             icon: Icons.autorenew_rounded,
             title: lang.tr('Mes abonnements', 'My subscriptions'),
             onTap: () => MySubscriptionsScreen.open(context),
           ),
-          _Row(
+          SikaListRow(
             icon: Icons.notifications_active_outlined,
             title: lang.tr('Alertes de prix', 'Price alerts'),
             onTap: () => PriceAlertsScreen.open(context),
           ),
-          _Row(
+          SikaListRow(
             icon: Icons.receipt_long_outlined,
             title: lang.tr('Historique des paiements', 'Payment history'),
             onTap: () => _push(const SikaPayHistoryScreen()),
           ),
         ]),
-        _Section(lang.tr('Sécurité', 'Security'), [
-          _Switch(
+        SikaListSection(lang.tr('Sécurité', 'Security'), [
+          SikaListSwitch(
             icon: Icons.fingerprint_rounded,
             title: lang.tr('Déverrouillage biométrique', 'Biometric unlock'),
             subtitle: lang.tr("Demandé à l'ouverture de l'app et avant chaque paiement",
@@ -137,7 +137,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             value: setup.biometricEnabled,
             onChanged: (v) => _setBiometric(v, lang),
           ),
-          _Row(
+          SikaListRow(
             icon: kyc == 'paypal' ? Icons.verified_rounded : Icons.badge_outlined,
             title: lang.tr('Identité', 'Identity'),
             subtitle: kyc == 'paypal'
@@ -148,111 +148,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: kyc == 'none' ? () => _push(const KycVerificationScreen()) : null,
           ),
         ]),
-        _Section(lang.tr('Affichage', 'Display'), [
-          _Row(
+        SikaListSection(lang.tr('Affichage', 'Display'), [
+          SikaListRow(
             icon: Icons.language_rounded,
             title: lang.tr('Langue', 'Language'),
             trailing: currentLang.displayName,
             onTap: () => _chooseLanguage(lang, currentLang),
           ),
-          _Switch(
+          SikaListSwitch(
             icon: Icons.dark_mode_outlined,
             title: lang.tr('Thème sombre', 'Dark theme'),
             value: isDark,
             onChanged: (_) => ref.read(themeProvider.notifier).toggleTheme(),
           ),
         ]),
-        _Section(lang.tr('À propos', 'About'), const [
-          _Row(icon: Icons.info_outline_rounded, title: 'SIKA Pay', trailing: 'v${AppConfig.appVersion}'),
+        SikaListSection(lang.tr('À propos', 'About'), const [
+          SikaListRow(icon: Icons.info_outline_rounded, title: 'SIKA Pay', trailing: 'v${AppConfig.appVersion}'),
         ]),
-        _Section(lang.tr('Compte', 'Account'), [
-          _Row(
+        SikaListSection(lang.tr('Compte', 'Account'), [
+          SikaListRow(
             icon: Icons.logout_rounded,
             title: lang.tr('Se déconnecter', 'Log out'),
             onTap: () => _logout(lang),
           ),
         ]),
       ]),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-  final List<Widget> rows;
-  const _Section(this.title, this.rows);
-
-  @override
-  Widget build(BuildContext context) {
-    final divider = Divider(height: 1, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06));
-    return Padding(
-      padding: const EdgeInsets.only(top: 18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(title,
-              style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
-        ),
-        SikaPayCard(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (var i = 0; i < rows.length; i++) ...[if (i > 0) divider, rows[i]],
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final String? trailing;
-  final VoidCallback? onTap;
-  const _Row({required this.icon, required this.title, this.subtitle, this.trailing, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55);
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Icon(icon, color: AppColors.brandPrimary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-      subtitle: subtitle == null ? null : Text(subtitle!, style: TextStyle(fontSize: 12.5, color: muted)),
-      trailing: trailing != null
-          ? Text(trailing!, style: TextStyle(color: muted, fontWeight: FontWeight.w600))
-          : (onTap != null ? Icon(Icons.chevron_right_rounded, color: muted) : null),
-      onTap: onTap,
-    );
-  }
-}
-
-class _Switch extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  const _Switch({required this.icon, required this.title, this.subtitle, required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      secondary: Icon(icon, color: AppColors.brandPrimary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle!,
-              style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55))),
-      value: value,
-      activeThumbColor: AppColors.brandPrimary,
-      activeTrackColor: AppColors.brandPrimary.withValues(alpha: 0.3),
-      onChanged: onChanged,
     );
   }
 }
