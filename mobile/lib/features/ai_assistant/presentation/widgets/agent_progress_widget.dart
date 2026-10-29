@@ -80,10 +80,17 @@ class _AgentProgressWidgetState extends State<AgentProgressWidget>
 
   /// In-flight mode: generic honest observable activity
   Widget _buildInFlightWorkingIndicator(BuildContext context, bool isDark) {
-    final String currentText = widget.initialWorkingText ??
-        (_workingPhase == 0
-            ? 'SIKA analyse votre demande...'
-            : 'SIKA prépare votre réponse...');
+    return Consumer(builder: (context, ref, _) {
+      final isFr = ref.watch(languageProvider) == AppLanguage.french;
+      final String currentText = widget.initialWorkingText ??
+          (_workingPhase == 0
+              ? (isFr ? 'SIKA analyse votre demande…' : 'SIKA is looking into your request…')
+              : (isFr ? 'SIKA prépare sa réponse…' : 'SIKA is preparing an answer…'));
+      return _workingBubble(context, isDark, currentText);
+    });
+  }
+
+  Widget _workingBubble(BuildContext context, bool isDark, String currentText) {
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -205,7 +212,7 @@ class _AgentProgressWidgetState extends State<AgentProgressWidget>
   Widget _buildStepRow(
       BuildContext context, bool isDark, Map<String, dynamic> step) {
     final String status = step['status']?.toString().toLowerCase() ?? 'completed';
-    final String label = step['label']?.toString() ?? 'Opération';
+    final String label = step['label']?.toString() ?? '';
 
     IconData iconData;
     Color iconColor;

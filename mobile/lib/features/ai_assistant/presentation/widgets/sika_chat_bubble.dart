@@ -3,6 +3,7 @@ import '../../../paypal/presentation/widgets/web_offers_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/language_provider.dart';
 import '../../providers/sika_provider.dart';
 import 'agent_progress_widget.dart';
 import '../../../paypal/presentation/widgets/paypal_checkout_card.dart';
@@ -150,13 +151,13 @@ class SikaChatBubble extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05)),
       ),
-      child: Text(
-        'Opération structurée disponible',
+      child: Consumer(builder: (context, ref, _) => Text(
+        ref.watch(languageProvider) == AppLanguage.french ? 'Opération disponible' : 'Action available',
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               fontStyle: FontStyle.italic,
             ),
-      ),
+      )),
     );
   }
 }

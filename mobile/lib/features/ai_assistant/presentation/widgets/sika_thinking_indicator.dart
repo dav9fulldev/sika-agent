@@ -3,12 +3,10 @@ import 'agent_progress_widget.dart';
 
 /// SikaThinkingIndicator — Backward-compatible wrapper delegating to AgentProgressWidget
 class SikaThinkingIndicator extends StatelessWidget {
-  final String text;
+  /// Texte imposé ; sinon le texte suit la langue de l'app (voir AgentProgressWidget)
+  final String? text;
 
-  const SikaThinkingIndicator({
-    super.key,
-    this.text = 'SIKA analyse votre demande...',
-  });
+  const SikaThinkingIndicator({super.key, this.text});
 
   @override
   Widget build(BuildContext context) {
