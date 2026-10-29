@@ -187,7 +187,9 @@ async def sika_chat(data: SikaQueryDTO, request: Request, authorization: Optiona
     security_rate_limiter.check_ai_rate_limit(str(user_id))
         
     ctx_dict = data.context if isinstance(data.context, dict) else (data.context.dict() if data.context else {})
-    firstname = ctx_dict.get("user_firstname", "David")
+    # Le prénom vient du compte authentifié ; celui envoyé par l'app ne sert que s'il n'y en a pas
+    from ..services.user_profile import account_first_name
+    firstname = account_first_name(user_id) or str(ctx_dict.get("user_firstname") or "").strip()[:40]
 
 
     from ..agent.session_manager import sika_session_manager

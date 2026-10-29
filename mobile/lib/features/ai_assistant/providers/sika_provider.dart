@@ -649,9 +649,9 @@ class SikaNotifier extends StateNotifier<SikaData> {
 
     // Récupération dynamique du prénom de l'utilisateur connecté
     final authState = _ref.read(authProvider);
-    final rawName = authState.user?.name ?? 'David';
-    final userFirstName =
-        rawName.trim().isNotEmpty ? rawName.trim().split(' ').first : 'David';
+    // Prénom du compte connecté (le serveur le relit de toute façon depuis le compte)
+    final rawName = (authState.user?.name ?? '').trim();
+    final userFirstName = rawName.isNotEmpty ? rawName.split(' ').first : '';
 
     // Récupération dynamique de la devise active de l'utilisateur
     final activeCurrency = _ref.read(currencyProvider);
@@ -667,8 +667,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
         lower == 'hey sika' ||
         lower == 'hello sika') {
       final greetingText = isEnglish
-          ? 'Yes $userFirstName, I am listening! How can I assist with your finances today?'
-          : 'Oui $userFirstName, je vous écoute ! Que puis-je faire pour vos finances aujourd\'hui ?';
+          ? 'Yes${userFirstName.isEmpty ? '' : ' $userFirstName'}, I am listening! What would you like to buy?'
+          : 'Oui${userFirstName.isEmpty ? '' : ' $userFirstName'}, je vous écoute ! Que voulez-vous acheter ?';
 
       final sikaMsg = SikaMessage(text: greetingText, isUser: false);
       final updatedMsgs = List<SikaMessage>.from(state.messages)
@@ -719,8 +719,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
           (response['message'] as String?) ??
           (response['response'] as String?) ??
           (isEnglish
-              ? 'Sorry $userFirstName, I didn\'t quite catch that. Could you please repeat?'
-              : 'Pardon $userFirstName, je n\'ai pas bien compris. Peux-tu répéter ?');
+              ? 'Sorry, I didn\'t quite catch that. Could you please repeat?'
+              : 'Pardon, je n\'ai pas bien compris. Pouvez-vous répéter ?');
 
       final action = response['intent'] ?? response['action'];
       final status = response['status'] as String? ?? 'PROCESSED';
@@ -819,8 +819,8 @@ class SikaNotifier extends StateNotifier<SikaData> {
       debugPrint('[SIKA API] Error chatting with SIKA: $e');
 
       final fallbackText = isEnglish
-          ? 'Sorry $userFirstName, I am experiencing a connection issue with my server. Could you please try again?'
-          : 'Désolé $userFirstName, je rencontre une difficulté de connexion avec mon serveur. Peux-tu réessayer ?';
+          ? 'Sorry, I am having trouble reaching my server. Please try again.'
+          : 'Désolé, je n\'arrive pas à joindre mon serveur. Réessayez dans un instant.';
 
       final sikaMessage = SikaMessage(text: fallbackText, isUser: false);
       final finalMessages = List<SikaMessage>.from(state.messages)
