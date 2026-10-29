@@ -68,7 +68,7 @@ class VoiceLiveBridge:
     def __init__(self, user_id: str, firstname: str, lang: str,
                  live_connect: Optional[Callable[[Any], Any]] = None):
         self.user_id = str(user_id)
-        self.firstname = firstname or "there"
+        self.firstname = (firstname or "").strip()
         self.is_english = lang != "fr"
         self.live_connect = live_connect or default_live_connect
         self.user_utterance = ""
@@ -265,7 +265,8 @@ async def handle_voice_socket(ws, live_connect: Optional[Callable[[Any], Any]] =
         return
 
     started = time.time()
-    firstname = str(start.get("firstname") or "")[:40]
+    from .user_profile import account_first_name
+    firstname = account_first_name(user_id) or str(start.get("firstname") or "").strip()[:40]
     lang = "fr" if start.get("lang") == "fr" else "en"
     await VoiceLiveBridge(user_id, firstname, lang, live_connect).run(ws)
     logger.info(f"[SIKA VOICE] Session ended after {round(time.time() - started)} s")
