@@ -133,7 +133,8 @@ class ProfileScreen extends ConsumerWidget {
           ),
           
           ListView(
-            padding: const EdgeInsets.all(20),
+            // Marge basse : la barre de navigation flottante recouvrait le bouton « Log out »
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 140 + MediaQuery.of(context).padding.bottom),
             children: [
               // USER PROFILE HEADER CARD
               Container(

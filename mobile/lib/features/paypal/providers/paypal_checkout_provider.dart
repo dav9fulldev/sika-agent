@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/providers/api_service_provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/services/api_service.dart';
 import '../../ai_assistant/providers/sika_provider.dart';
 
@@ -162,6 +163,8 @@ class PayPalCheckoutsNotifier extends StateNotifier<Map<String, PayPalCheckoutVi
 
 final paypalCheckoutsProvider =
     StateNotifierProvider<PayPalCheckoutsNotifier, Map<String, PayPalCheckoutView>>((ref) {
+  // Les cartes de paiement appartiennent au compte connecté : effacées à la déconnexion
+  ref.watch(authProvider.select((a) => a.isAuthenticated ? a.user?.id : null));
   return PayPalCheckoutsNotifier(ref.watch(apiServiceProvider), ref);
 });
 

@@ -26,6 +26,24 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  Future<void> _logout(LanguageNotifier lang) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(lang.tr('Se déconnecter ?', 'Log out?')),
+        content: Text(lang.tr('Vous devrez vous reconnecter pour utiliser SIKA Pay.', 'You will need to sign in again to use SIKA Pay.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(lang.tr('Annuler', 'Cancel'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(lang.tr('Se déconnecter', 'Log out'))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(authProvider.notifier).logout();
+    // Le routeur de main.dart affiche l'écran de connexion selon l'état d'authentification
+    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   Future<void> _setBiometric(bool value, LanguageNotifier lang) async {
     if (value) {
       final bio = ref.read(biometricServiceProvider);
@@ -83,7 +101,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         centerTitle: true,
         title: Text(lang.tr('Réglages', 'Settings'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
       ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
+      body: ListView(padding: EdgeInsets.fromLTRB(16, 4, 16, 32 + MediaQuery.of(context).padding.bottom), children: [
         _Section(lang.tr("Paiements et agent", 'Payments and agent'), [
           _Row(
             icon: Icons.auto_awesome_outlined,
@@ -146,6 +164,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ]),
         _Section(lang.tr('À propos', 'About'), const [
           _Row(icon: Icons.info_outline_rounded, title: 'SIKA Pay', trailing: 'v${AppConfig.appVersion}'),
+        ]),
+        _Section(lang.tr('Compte', 'Account'), [
+          _Row(
+            icon: Icons.logout_rounded,
+            title: lang.tr('Se déconnecter', 'Log out'),
+            onTap: () => _logout(lang),
+          ),
         ]),
       ]),
     );
