@@ -1,0 +1,73 @@
+:root {
+  --royal: #0a3bb5;
+  --cyan: #06c1e0;
+  --action: #1463ff;
+  --ink: #0d1b3e;
+  --muted: #5b6886;
+  --mist: #f4f7fd;
+  --line: #e2e8f4;
+  --ok: #0e9f6e;
+  --warn: #c27c0e;
+  --danger: #d92d45;
+  font-family: 'Outfit Variable', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--mist);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+button { font: inherit; }
+
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand-name { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: var(--ink); }
+.brand-name span { color: var(--action); font-weight: 700; }
+
+/* Connexion par code */
+.signin { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+.signin-card { width: 100%; max-width: 420px; background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+.signin-card h1 { margin: 8px 0 0; font-size: 24px; letter-spacing: -0.3px; }
+.signin-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.signin-card label { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.signin-card input { font: inherit; font-size: 22px; letter-spacing: 3px; text-align: center; padding: 12px; border: 1.5px solid var(--line); border-radius: 12px; color: var(--ink); }
+.signin-card input:focus { outline: 2px solid var(--action); outline-offset: 1px; border-color: transparent; }
+.signin-card button { background: var(--action); color: #fff; border: 0; border-radius: 12px; padding: 13px; font-weight: 700; cursor: pointer; }
+.signin-card button:disabled { opacity: 0.45; cursor: default; }
+.signin-card button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.signin-error { color: var(--danger); font-size: 14px; }
+.signin-note { font-size: 12.5px; }
+
+/* Tableau de bord */
+.shell { height: 100%; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+.topbar-note { color: var(--muted); font-size: 13px; margin-right: auto; }
+.link { background: none; border: 0; color: var(--action); font-weight: 600; cursor: pointer; padding: 6px; }
+.studio { flex: 1; min-height: 0; }
+
+/* Widget : autorisation de SIKA */
+.sika-meter { height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 4px 8px; }
+.sika-meter-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.sika-meter-figures { display: flex; align-items: baseline; gap: 8px; }
+.sika-meter-spent { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.sika-meter-limit { color: var(--muted); }
+.sika-meter-track { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.sika-meter-fill { height: 100%; border-radius: 999px; background: var(--ok); transition: width 0.4s ease; }
+.sika-meter-mid .sika-meter-fill { background: var(--warn); }
+.sika-meter-high .sika-meter-fill { background: var(--danger); }
+.sika-meter-note { font-size: 12.5px; color: var(--muted); }
+.sika-meter-off { font-size: 16px; font-weight: 600; }
+
+/* Widget : parcours d'un paiement */
+.sika-journey { height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 4px 8px; }
+.sika-journey-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sika-journey-step { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: #fff; }
+.sika-journey-step:not(:last-child)::after { content: ''; position: absolute; right: -8px; top: 50%; width: 6px; height: 2px; background: var(--line); }
+.sika-journey-step.is-final { border-color: var(--ok); }
+.sika-journey-step.is-final .sika-journey-count { color: var(--ok); }
+.sika-journey-count { font-size: 26px; font-weight: 800; }
+.sika-journey-label { font-size: 13px; color: var(--muted); }
+.sika-journey-stopped { display: flex; flex-wrap: wrap; gap: 6px; }
+.sika-journey-chip { font-size: 12.5px; border-radius: 999px; padding: 3px 10px; background: #fdecee; color: var(--danger); }
+.sika-journey-note { font-size: 12px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { .sika-meter-fill { transition: none; } }
+@media (max-width: 640px) { .topbar-note { display: none; } }

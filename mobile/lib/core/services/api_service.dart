@@ -457,6 +457,13 @@ class ApiService {
     return _decodePayPal(response);
   }
 
+  /// Code à usage unique pour ouvrir le tableau de bord web (lecture seule).
+  Future<Map<String, dynamic>> createDashboardCode() async {
+    final response =
+        await http.post(Uri.parse('$safeBaseUrl${ApiConstants.dashboardCode}'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   /// Changements signalés sur les produits suivis (baisse de prix, retour en stock…).
   Future<Map<String, dynamic>> listNotifications() async {
     final response = await http.get(Uri.parse('$safeBaseUrl${ApiConstants.notifications}'), headers: _headers).timeout(AppConfig.agentTimeout);

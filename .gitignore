@@ -98,3 +98,6 @@ key.properties
 google-services.json
 *.jks
 *.keystore
+
+# Tableau de bord web construit (copié dans l image Docker au déploiement)
+backend/static/dashboard/

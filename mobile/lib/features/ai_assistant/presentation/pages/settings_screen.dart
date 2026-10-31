@@ -14,6 +14,7 @@ import '../../../paypal/presentation/pages/price_alerts_screen.dart';
 import '../../../paypal/presentation/pages/sika_pay_history_screen.dart';
 import '../../../paypal/presentation/pages/subscription_screen.dart';
 import '../../../paypal/presentation/widgets/sika_list.dart';
+import '../../../paypal/presentation/widgets/web_dashboard_sheet.dart';
 import '../../../paypal/providers/paypal_checkout_provider.dart';
 import '../../../profile/presentation/pages/kyc_verification_screen.dart';
 
@@ -143,6 +144,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.receipt_long_outlined,
             title: lang.tr('Historique des paiements', 'Payment history'),
             onTap: () => _push(const SikaPayHistoryScreen()),
+          ),
+          SikaListRow(
+            icon: Icons.desktop_windows_outlined,
+            title: lang.tr('Tableau de bord web', 'Web dashboard'),
+            subtitle: lang.tr('Vos paiements et les prix suivis, sur un ordinateur', 'Your payments and followed prices, on a computer'),
+            onTap: () => WebDashboardSheet.open(context),
           ),
         ]),
         SikaListSection(lang.tr('Sécurité', 'Security'), [
