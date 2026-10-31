@@ -102,7 +102,7 @@ class _WebDashboardSheetState extends ConsumerState<WebDashboardSheet> {
               child: SelectableText(
                 code,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: 4, color: SikaBrand.ink),
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: 4, color: Theme.of(context).colorScheme.onSurface),
               ),
             ),
             const SizedBox(height: 8),
