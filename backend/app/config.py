@@ -117,6 +117,10 @@ class Settings:
         self.CHANNEL3_API_BASE: str = overrides.get(
             "CHANNEL3_API_BASE", os.getenv("CHANNEL3_API_BASE", "https://api.trychannel3.com")
         ).rstrip("/")
+        # Licence AG Studio du tableau de bord web (clé côté navigateur, publique par nature ; hors du dépôt)
+        self.AG_STUDIO_LICENSE: Optional[str] = resolved_secrets.get(
+            "AG_STUDIO_LICENSE", overrides.get("AG_STUDIO_LICENSE", os.getenv("AG_STUDIO_LICENSE") or None)
+        )
         # Notifications push (Firebase Cloud Messaging HTTP v1, compte de service de Cloud Run). Vide = push désactivé,
         # les notifications restent visibles dans l'app.
         self.FCM_PROJECT_ID: Optional[str] = overrides.get("FCM_PROJECT_ID", os.getenv("FCM_PROJECT_ID") or None)
@@ -186,7 +190,7 @@ class Settings:
 
         target_secrets = ["JWT_SECRET_KEY", "DATABASE_URL", "REDIS_URL", "GOOGLE_CLIENT_ID",
                           "PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET", "CHANNEL3_API_KEY",
-                          "CHANNEL3_WEBHOOK_SECRET"]
+                          "CHANNEL3_WEBHOOK_SECRET", "AG_STUDIO_LICENSE"]
         try:
             # pyrefly: ignore [missing-import]
             from google.cloud import secretmanager

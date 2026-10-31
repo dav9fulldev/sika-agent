@@ -4,6 +4,8 @@ import logging
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings, APP_VERSION
@@ -14,6 +16,7 @@ from app.routes.user_router import router as user_router
 from app.routes.paypal_router import router as paypal_router
 from app.routes.shopping_router import router as shopping_router
 from app.routes.notifications_router import router as notifications_router
+from app.routes.dashboard_router import router as dashboard_router
 from app.database import Base, engine
 from app import models as _all_models  # noqa: F401  (enregistre toutes les tables avant create_all)
 
@@ -60,6 +63,9 @@ app = FastAPI(
 cors_origins = settings.ALLOWED_ORIGINS
 is_wildcard = "*" in cors_origins
 
+# Compression : le tableau de bord web (AG Studio) pèse environ 6 Mo, 1,7 Mo une fois compressé
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -81,7 +87,9 @@ async def security_and_tracing_middleware(request: Request, call_next):
 
     # 2. Protection DoS : Limitation stricte de la taille du payload (1 Mo max)
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > settings.MAX_REQUEST_BODY_SIZE:
+    # Les tours d'agent du tableau de bord transportent l'historique et les schémas d'outils d'AG Studio
+    max_body = 2_000_000 if request.url.path == "/api/v1/dashboard/llm" else settings.MAX_REQUEST_BODY_SIZE
+    if content_length and int(content_length) > max_body:
         logger.warning(f"[DOS ALERT] Rejet de requête volumineuse ({content_length} octets) - RequestID: {request_id}")
         return JSONResponse(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -157,6 +165,12 @@ app.include_router(shopping_router)
 app.include_router(notifications_router)
 app.include_router(perception_router)
 app.include_router(user_router)
+app.include_router(dashboard_router)
+
+# Tableau de bord web (AG Studio), construit depuis dashboard/ dans l'image Docker
+_DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "static", "dashboard")
+if os.path.isdir(_DASHBOARD_DIR):
+    app.mount("/dashboard", StaticFiles(directory=_DASHBOARD_DIR, html=True), name="dashboard")
 
 
 @app.get("/")

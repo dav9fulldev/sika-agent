@@ -120,13 +120,20 @@ class OAuth2AuthService:
             "exp": exp_time,
             "iss": "SIKA_AUTH_SERVER"
         }
+        if user_data.get("scope"):
+            # Jeton restreint (ex. « dashboard » : tableau de bord web en lecture seule)
+            payload["scope"] = user_data["scope"]
 
         jwt_token = jwt.encode(payload, self.SECRET_KEY, algorithm=self.ALGORITHM)
         logger.info(f"[AUTH OAUTH2] Jeton JWT (PyJWT HS256) généré avec succès pour {user_data.get('email')}")
         return jwt_token
 
-    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Vérifie la validité cryptographique d'un jeton Bearer JWT avec PyJWT et extrait le payload."""
+    def verify_token(self, token: str, allow_dashboard: bool = False) -> Optional[Dict[str, Any]]:
+        """Vérifie la validité cryptographique d'un jeton Bearer JWT avec PyJWT et extrait le payload.
+
+        Un jeton limité au tableau de bord web (scope « dashboard ») n'est accepté que par les routes
+        du tableau de bord : il ne peut ni payer, ni modifier le compte.
+        """
         try:
             if not token:
                 return None
@@ -144,6 +151,9 @@ class OAuth2AuthService:
             if jti and security_rate_limiter.is_token_revoked(token, jti=jti):
                 logger.warning("[AUTH OAUTH2] Tentative d'accès avec un JTI révoqué.")
                 return None
+            if payload.get("scope") and not (allow_dashboard and payload.get("scope") == "dashboard"):
+                logger.warning("[AUTH OAUTH2] Jeton restreint refusé hors de son périmètre.")
+                return None
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("[AUTH OAUTH2] Jeton JWT expiré")
@@ -155,13 +165,14 @@ class OAuth2AuthService:
             logger.error(f"[AUTH OAUTH2] Erreur inattendue de validation du jeton: {e}")
             return None
 
-    def require_authenticated_user_id(self, authorization: Optional[str] = None, authorization_header: Optional[str] = None) -> Any:
+    def require_authenticated_user_id(self, authorization: Optional[str] = None, authorization_header: Optional[str] = None,
+                                      allow_dashboard: bool = False) -> Any:
         """Extrait et valide le user_id à partir de l'en-tête Authorization Bearer ou lève une HTTPException 401."""
         auth_val = authorization or authorization_header
         if not auth_val or not auth_val.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Authentication required: En-tête Authorization Bearer manquant ou invalide.")
         token = auth_val.split("Bearer ")[1].strip()
-        payload = self.verify_token(token)
+        payload = self.verify_token(token, allow_dashboard=allow_dashboard)
         if not payload or "user_id" not in payload:
             raise HTTPException(status_code=401, detail="Authentication required: Jeton d'authentification invalide ou expiré.")
         u_id = payload["user_id"]

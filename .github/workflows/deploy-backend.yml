@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'dashboard/**'
       - '.github/workflows/**'
 
 # Permet l'utilisation de l'OIDC pour Workload Identity Federation
@@ -71,6 +72,23 @@ jobs:
       - name: Configuration de Docker pour Artifact Registry
         run: |
           gcloud auth configure-docker europe-west9-docker.pkg.dev --quiet
+
+      # Tableau de bord web (AG Studio) : construit puis servi par le backend sous /dashboard/
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Build du tableau de bord web
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+          rm -rf ../backend/static/dashboard
+          mkdir -p ../backend/static
+          cp -r dist ../backend/static/dashboard
 
       - name: Build et Push de l'image Docker
         run: |

@@ -65,6 +65,16 @@ SIKA stores only PayPal's token ID and a masked e-mail. Unlinking deletes the to
 
 *"How much did I spend this month, and on what?"* SIKA answers from your own payments whose capture was verified with PayPal (totals, categories, purchases it confirmed for you, active subscriptions), cross-checked with PayPal's transaction reports through the official **[PayPal Agent Toolkit](https://github.com/paypal/agent-toolkit)** (`list_transactions`). PayPal's reports contain every customer of the merchant, so the server keeps only your own payments before anything reaches the AI.
 
+### Price and stock alerts that come to you
+
+Every web product SIKA shows you is followed for 30 days through **Channel3 product subscriptions** (`offer.price.changed`, `offer.availability.changed`, `offer.created`, `offer.deleted`). When the best offer changes (price drop or increase, back in stock, out of stock, a cheaper merchant, an offer removed), SIKA tells you in the app and with a push notification (Firebase Cloud Messaging). Changes under 2% or $1 are ignored, at most one alert per product per day, nothing at night. Alerts never buy anything, and automatic following can be turned off in Settings.
+
+### Web dashboard (AG Studio)
+
+**Settings → Web dashboard** shows a single-use code; enter it at `/dashboard/` on a computer. The dashboard is built with **[AG Studio](https://www.ag-grid.com/studio/)**: your payments, the payment journey (prepared → waiting for PayPal → paid), your spending authorization, followed products and the changes SIKA noticed, in the SIKA Pay theme with two SIKA widgets of its own.
+
+Its assistant uses the **Studio Agent Framework** with Gemini as the model: a SIKA agent leads the conversation and hands page work to Studio's built-in agents (planning, data, page, widget). *"What did SIKA pay for me?"* queries the data, filters the payments table and answers with the total. The browser never holds a model key (each turn goes through `/api/v1/dashboard/llm`, answered by Gemini on Vertex AI), and the dashboard session is read-only: its token is refused by every other API route, so nothing can be paid from the web.
+
 ### Voice (experimental)
 
 Tap the microphone and talk naturally: SIKA answers out loud through **Gemini Live** (speech-to-speech), with the same tools and the same safety rules as the chat. It is still being tuned; the chat is the reference experience.
@@ -201,11 +211,12 @@ The script creates a real sandbox order and prints the approval link. Approve it
 ## Tests
 
 ```bash
-cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q   # 219 tests, no network
-cd mobile && flutter analyze && flutter test                                     # 0 issues, 27 tests
+cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q   # 242 tests, no network
+cd mobile && flutter analyze && flutter test                                     # 0 issues, 31 tests
+cd dashboard && npm ci && npm run lint && npm run build                          # web dashboard
 ```
 
-CI (GitHub Actions) runs both suites on every pull request, and a failing backend test blocks the Cloud Run deployment. Each release also builds and attaches the signed Android APK.
+CI (GitHub Actions) runs the backend, mobile and dashboard checks on every pull request, and a failing backend test blocks the Cloud Run deployment. Each release also builds and attaches the signed Android APK.
 
 The suites cover server-side pricing, budget refusal, confirmation binding and tampering, cross-user isolation, idempotent creation and capture, no capture before approval, network failures → `UNKNOWN_RESULT`, declines, pending captures, amount mismatches, the sandbox-only configuration, the tool allow-list, rejection of model-supplied amounts and `user_id` spoofing, the bounded agent loop, authorization limits, the saved PayPal account (never used without authorization or above the limits, reconciliation without double charge), webhook signatures and deduplication, the spending summary (only the user's own payments), the voice bridge, and the sign-in protections. Unit tests use test doubles of PayPal, Gemini and Channel3 and never call the network.
 
@@ -231,6 +242,10 @@ Verified against the real PayPal sandbox:
 | POST | `/api/v1/paypal/webhook` | PayPal signature |
 | GET / POST / DELETE | `/api/v1/shopping/price-watches` | JWT |
 | POST | `/api/v1/shopping/channel3/webhook` | Svix signature |
+| GET / POST | `/api/v1/notifications` · `/read` · `/devices` · `/devices/remove` · `/preferences` | JWT |
+| POST | `/api/v1/dashboard/code` (single-use code for the web dashboard) | JWT |
+| POST | `/api/v1/dashboard/session` (code → read-only dashboard token) | code |
+| GET / POST | `/api/v1/dashboard/config` · `/data` · `/llm` | dashboard token |
 | GET | `/api/v1/paypal/return` · `/cancel` · `/vault-return` · `/vault-cancel` (PayPal redirects, server-verified) | – |
 
 ## Known limitations
