@@ -187,3 +187,25 @@ def test_llm_route_needs_a_session_and_reports_failures(monkeypatch):
     monkeypatch.setattr(sika_ai.sika_ai_service, "_generate", answer)
     r = client.post("/api/v1/dashboard/llm", json=body, headers=headers)
     assert r.json()["status"] == "completed" and r.json()["output"][0]["content"][0]["text"] == "Hello"
+
+
+def test_payments_show_who_confirmed_and_how_it_was_paid():
+    import uuid
+    from app.models.paypal_checkout import PayPalCheckoutModel
+
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        db.query(PayPalCheckoutModel).filter(PayPalCheckoutModel.user_id == 1).delete()
+        for by, method in (("AGENT", "SAVED_PAYPAL"), ("USER", "PAYPAL_APPROVAL")):
+            db.add(PayPalCheckoutModel(
+                checkout_id=f"chk_{uuid.uuid4().hex[:12]}", user_id=1, status="COMPLETED", sku="x", item_name="Course",
+                quantity=1, unit_amount="29.00", total_amount="29.00", currency="USD", merchant_name="SIKA Demo Store",
+                details_hash="h" * 64, create_request_id=uuid.uuid4().hex, capture_request_id=uuid.uuid4().hex,
+                confirmed_by=by, payment_method=method, capture_status="COMPLETED", captured_amount="29.00",
+                captured_currency="USD", expires_at=now, created_at=now, updated_at=now))
+        db.commit()
+    headers, _ = _session(1)
+    payments = client.get("/api/v1/dashboard/data", headers=headers).json()["tables"]["payments"]
+    pairs = {(p["confirmedBy"], p["paymentMethod"]) for p in payments}
+    assert pairs == {("SIKA, within your authorization", "Saved PayPal account"), ("You", "PayPal approval")}
+    assert all(p["status"] == "Paid" and p["paidAmount"] == 29.0 for p in payments)

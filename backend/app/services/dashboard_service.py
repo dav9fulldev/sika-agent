@@ -190,8 +190,9 @@ class DashboardService:
                     "paidAmount": _num(c.captured_amount) if paid else 0.0,
                     "currency": c.captured_currency or c.currency,
                     "status": "Paid" if paid else STATUS_LABELS.get(c.status, c.status.replace("_", " ").capitalize()),
-                    "confirmedBy": "SIKA, within your authorization" if c.confirmed_by == "agent" else "You",
-                    "paymentMethod": "Saved PayPal account" if c.payment_method == "vault" else "PayPal approval",
+                    # Valeurs stockées : USER / AGENT et PAYPAL_APPROVAL / SAVED_PAYPAL
+                    "confirmedBy": "SIKA, within your authorization" if (c.confirmed_by or "").upper() == "AGENT" else "You",
+                    "paymentMethod": "Saved PayPal account" if (c.payment_method or "").upper() == "SAVED_PAYPAL" else "PayPal approval",
                     "budget": _num(c.budget_limit),
                     "isPaid": paid,
                 })
