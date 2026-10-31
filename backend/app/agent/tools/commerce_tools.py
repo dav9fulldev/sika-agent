@@ -16,12 +16,16 @@ Le modèle ne fournit jamais de montant : uniquement un SKU, une quantité et le
 par l'utilisateur. `user_id` est toujours injecté par le serveur.
 """
 
+import logging
+import threading
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from .tool_models import RiskLevel, ToolResult
 from ...services import demo_catalog
 from ...services.paypal_checkout_service import paypal_checkout_service, CheckoutError
+
+logger = logging.getLogger("SikaCommerceTools")
 
 SEARCH_SCHEMA = {
     "type": "object",
@@ -181,7 +185,23 @@ def search_web_products(query: str, max_price: Optional[float] = None, user_id: 
     except WebShoppingError as e:
         return ToolResult(success=False, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY,
                           data={"error_code": e.code}, error_message=e.message)
+    uid = _uid(user_id)
+    if uid is not None and data.get("products"):
+        _follow_in_background(uid, data["products"])
     return ToolResult(success=True, tool_name="search_web_products", risk_level=RiskLevel.READ_ONLY, data=data)
+
+
+def _follow_in_background(user_id: int, products: list) -> None:
+    """Suivi automatique des produits montrés : en arrière-plan pour ne pas ralentir la réponse de SIKA."""
+    from ...services.price_watch_service import price_watch_service
+
+    def run():
+        try:
+            price_watch_service.auto_follow(user_id, products)
+        except Exception as e:  # le suivi ne doit jamais casser la conversation
+            logger.warning(f"[AUTO FOLLOW] Failed: {type(e).__name__}")
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def watch_web_product_price(product_id: str, target_price: Optional[float] = None, user_id: Optional[str] = None) -> ToolResult:
@@ -206,8 +226,10 @@ def list_price_watches(user_id: Optional[str] = None) -> ToolResult:
     if uid is None:
         return ToolResult(success=False, tool_name="list_price_watches", risk_level=RiskLevel.READ_ONLY,
                           data={}, error_message="An authenticated user is required.")
+    from ...services.notification_service import notification_service
     return ToolResult(success=True, tool_name="list_price_watches", risk_level=RiskLevel.READ_ONLY,
-                      data={"watches": price_watch_service.list(uid)})
+                      data={"watches": price_watch_service.list(uid),
+                            "recent_changes": notification_service.list(uid, limit=10)["notifications"]})
 
 
 SPENDING_SCHEMA = {

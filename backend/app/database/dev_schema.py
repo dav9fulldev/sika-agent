@@ -17,6 +17,12 @@ _DEV_COLUMNS = {
         "paypal_payer_id": "VARCHAR(64)",
         "country": "VARCHAR(64)",
         "kyc_status": "VARCHAR(20) NOT NULL DEFAULT 'none'",
+        "auto_follow_products": "BOOLEAN NOT NULL DEFAULT 1",
+    },
+    "price_watches": {
+        "source": "VARCHAR(8) NOT NULL DEFAULT 'user'",
+        "expires_at": "DATETIME",
+        "last_notified_at": "DATETIME",
     },
     "paypal_checkouts": {
         "confirmed_by": "VARCHAR(10)",

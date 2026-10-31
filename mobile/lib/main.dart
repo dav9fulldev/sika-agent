@@ -4,6 +4,7 @@ import 'core/constants/app_theme.dart';
 import 'core/providers/app_setup_provider.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/services/push_notifications.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/splash/loading_screen.dart';
 import 'features/auth/presentation/pages/welcome_screen.dart';
@@ -77,6 +78,8 @@ class _SikaAppState extends ConsumerState<SikaApp> {
 
     return MaterialApp(
       title: 'SIKA Pay',
+      navigatorKey: rootNavigatorKey,
+      scaffoldMessengerKey: rootMessengerKey,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,

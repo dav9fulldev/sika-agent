@@ -59,7 +59,7 @@ def register_all_sika_tools(registry):
     register(
         func=list_price_watches,
         name="list_price_watches",
-        description="List the user's price alerts on web products and which ones were triggered.",
+        description="List the products the user follows (price alerts they asked for, and products SIKA follows automatically for 30 days after showing them) and the recent changes SIKA noticed: price drops or increases, back in stock, out of stock, cheaper merchants, removed offers. Use it when the user asks what changed or about their alerts.",
         risk_level=RiskLevel.READ_ONLY,
         input_schema={"type": "object", "properties": {}},
     )

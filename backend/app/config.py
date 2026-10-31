@@ -117,6 +117,9 @@ class Settings:
         self.CHANNEL3_API_BASE: str = overrides.get(
             "CHANNEL3_API_BASE", os.getenv("CHANNEL3_API_BASE", "https://api.trychannel3.com")
         ).rstrip("/")
+        # Notifications push (Firebase Cloud Messaging HTTP v1, compte de service de Cloud Run). Vide = push désactivé,
+        # les notifications restent visibles dans l'app.
+        self.FCM_PROJECT_ID: Optional[str] = overrides.get("FCM_PROJECT_ID", os.getenv("FCM_PROJECT_ID") or None)
         # URL publique du backend, utilisée pour les redirections return/cancel de PayPal
         self.PUBLIC_BASE_URL: str = overrides.get("PUBLIC_BASE_URL", os.getenv("PUBLIC_BASE_URL", "http://localhost:8001")).rstrip("/")
         self.PAYPAL_RETURN_URL: str = overrides.get(

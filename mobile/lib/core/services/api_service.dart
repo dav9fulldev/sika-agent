@@ -457,6 +457,49 @@ class ApiService {
     return _decodePayPal(response);
   }
 
+  /// Changements signalés sur les produits suivis (baisse de prix, retour en stock…).
+  Future<Map<String, dynamic>> listNotifications() async {
+    final response = await http.get(Uri.parse('$safeBaseUrl${ApiConstants.notifications}'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> markNotificationsRead() async {
+    final response =
+        await http.post(Uri.parse('$safeBaseUrl${ApiConstants.notifications}/read'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> registerPushDevice(String token, {required String language, required int tzOffsetMinutes}) async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.notifications}/devices'),
+            headers: _headers,
+            body: jsonEncode({'token': token, 'platform': 'android', 'language': language, 'tz_offset_minutes': tzOffsetMinutes}))
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> removePushDevice(String token) async {
+    final response = await http
+        .post(Uri.parse('$safeBaseUrl${ApiConstants.notifications}/devices/remove'),
+            headers: _headers, body: jsonEncode({'token': token}))
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> getNotificationPreferences() async {
+    final response =
+        await http.get(Uri.parse('$safeBaseUrl${ApiConstants.notifications}/preferences'), headers: _headers).timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
+  Future<Map<String, dynamic>> setAutoFollowProducts(bool enabled) async {
+    final response = await http
+        .put(Uri.parse('$safeBaseUrl${ApiConstants.notifications}/preferences'),
+            headers: _headers, body: jsonEncode({'auto_follow_products': enabled}))
+        .timeout(AppConfig.agentTimeout);
+    return _decodePayPal(response);
+  }
+
   Future<Map<String, dynamic>> deletePriceWatch(int watchId) async {
     final response = await http
         .delete(Uri.parse('$safeBaseUrl${ApiConstants.priceWatches}/$watchId'), headers: _headers)
