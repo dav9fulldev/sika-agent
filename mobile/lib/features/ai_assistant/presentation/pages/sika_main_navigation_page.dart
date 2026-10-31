@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/providers/language_provider.dart';
+import '../../../../core/services/push_notifications.dart';
+import '../../../paypal/presentation/pages/notifications_screen.dart';
+import '../../../paypal/providers/paypal_checkout_provider.dart';
 import '../../../../core/widgets/sika_pay_brand.dart';
 import '../../providers/sika_provider.dart';
 import '../widgets/sika_voice_overlay_widget.dart';
@@ -21,6 +25,33 @@ class SikaMainNavigationPage extends ConsumerStatefulWidget {
 class _SikaMainNavigationPageState extends ConsumerState<SikaMainNavigationPage>
 {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Notifications push des changements de prix et de stock (sans effet si Firebase n'est pas configuré)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final push = PushNotifications.instance;
+      final lang = ref.read(languageProvider.notifier);
+      push.onForeground = (title, body) {
+        ref.invalidate(notificationsProvider);
+        rootMessengerKey.currentState?.showSnackBar(SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(body.isNotEmpty ? body : title),
+          action: SnackBarAction(label: lang.tr('Voir', 'View'), onPressed: _openNotifications),
+        ));
+      };
+      push.onOpened = _openNotifications;
+      push.register(ref.read(apiServiceProvider), language: ref.read(languageProvider).code);
+    });
+  }
+
+  void _openNotifications() {
+    final navigator = rootNavigatorKey.currentState;
+    if (navigator == null) return;
+    navigator.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    ref.invalidate(notificationsProvider);
+  }
 
   @override
   Widget build(BuildContext context) {

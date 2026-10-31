@@ -7,7 +7,7 @@ import '../../../../core/providers/language_provider.dart';
 import '../../providers/paypal_checkout_provider.dart';
 import '../widgets/sika_pay_ui.dart';
 
-/// Alertes de prix sur des produits du web : déclenchées par les notifications Channel3, jamais d'achat automatique.
+/// Produits suivis : alertes demandées et produits suivis automatiquement (Channel3). Jamais d'achat automatique.
 class PriceAlertsScreen extends ConsumerStatefulWidget {
   const PriceAlertsScreen({super.key});
 
@@ -42,7 +42,7 @@ class _PriceAlertsScreenState extends ConsumerState<PriceAlertsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: Text(lang.tr('Alertes de prix', 'Price alerts'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        title: Text(lang.tr('Produits suivis', 'Followed products'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
       ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(priceWatchesProvider),
@@ -58,8 +58,9 @@ class _PriceAlertsScreenState extends ConsumerState<PriceAlertsScreen> {
                 Icon(Icons.notifications_none_rounded, size: 48, color: muted),
                 const SizedBox(height: 12),
                 Text(
-                  lang.tr("Aucune alerte. Demandez à SIKA : « Préviens-moi quand ce casque passe sous 50 dollars ».",
-                      'No alerts yet. Ask SIKA: "Tell me when these headphones drop below 50 dollars."'),
+                  lang.tr(
+                      "Aucun produit suivi. SIKA suit automatiquement les produits qu'il vous montre, ou demandez-lui : « Préviens-moi quand ce casque passe sous 50 dollars ».",
+                      'No followed products. SIKA follows the products it shows you, or ask it: "Tell me when these headphones drop below 50 dollars."'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: muted, height: 1.4),
                 ),
@@ -94,6 +95,9 @@ class _AlertTile extends ConsumerWidget {
             ? lang.tr('Prix atteint : ${watch['last_price']} $cur chez ${watch['last_merchant']}',
                 'Target reached: ${watch['last_price']} $cur at ${watch['last_merchant']}')
             : lang.tr('De retour en stock chez ${watch['last_merchant']}', 'Back in stock at ${watch['last_merchant']}'))
+        : watch['source'] == 'auto'
+            ? lang.tr('Suivi automatique · ${watch['last_price'] ?? '—'} $cur chez ${watch['last_merchant'] ?? '—'}',
+                'Followed automatically · ${watch['last_price'] ?? '—'} $cur at ${watch['last_merchant'] ?? '—'}')
         : (target != null
             ? lang.tr('Alerte sous $target $cur · actuellement ${watch['last_price'] ?? '—'} $cur',
                 'Alert below $target $cur · now ${watch['last_price'] ?? '—'} $cur')
@@ -112,7 +116,7 @@ class _AlertTile extends ConsumerWidget {
           ]),
         ),
         IconButton(
-          tooltip: lang.tr("Arrêter l'alerte", 'Stop alert'),
+          tooltip: lang.tr('Ne plus suivre', 'Stop following'),
           icon: const Icon(Icons.close_rounded),
           onPressed: () async {
             try {

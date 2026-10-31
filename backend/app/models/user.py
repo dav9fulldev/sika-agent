@@ -6,7 +6,7 @@ avec les données propres à chaque utilisateur.
 
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, true
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -81,6 +81,14 @@ class UserModel(Base):
         String(20),
         nullable=False,
         default="none"
+    )
+
+    # Suivi automatique des produits que SIKA montre (désactivable dans les réglages)
+    auto_follow_products = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true()
     )
 
     created_at = Column(

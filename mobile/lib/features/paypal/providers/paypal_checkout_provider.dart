@@ -204,6 +204,16 @@ final priceWatchesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((r
   return ref.watch(apiServiceProvider).listPriceWatches();
 });
 
+/// Changements signalés sur les produits suivis (le badge de la cloche compte les non lus).
+final notificationsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(apiServiceProvider).listNotifications();
+});
+
+/// Préférences : suivi automatique des produits que SIKA montre.
+final notificationPreferencesProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ref.watch(apiServiceProvider).getNotificationPreferences();
+});
+
 /// Abonnements PayPal de l'utilisateur (statuts revérifiés auprès de PayPal).
 final subscriptionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final res = await ref.watch(apiServiceProvider).listSubscriptions(sync: true);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/providers/api_service_provider.dart';
 import '../../../../core/providers/app_setup_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/providers/language_provider.dart';
@@ -93,6 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final kyc = ref.watch(authProvider).user?.kycStatus ?? 'none';
     final authorization = ref.watch(agentAuthorizationProvider).valueOrNull;
     final authorized = authorization?['active'] == true;
+    final autoFollow = ref.watch(notificationPreferencesProvider).valueOrNull?['auto_follow_products'] != false;
 
     return Scaffold(
       appBar: AppBar(
@@ -119,8 +121,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           SikaListRow(
             icon: Icons.notifications_active_outlined,
-            title: lang.tr('Alertes de prix', 'Price alerts'),
+            title: lang.tr('Produits suivis', 'Followed products'),
             onTap: () => PriceAlertsScreen.open(context),
+          ),
+          SikaListSwitch(
+            icon: Icons.track_changes_rounded,
+            title: lang.tr('Suivre les produits montrés', 'Follow products SIKA shows'),
+            subtitle: lang.tr('Pendant 30 jours, SIKA vous prévient si leur prix ou leur stock change',
+                'For 30 days, SIKA tells you when their price or stock changes'),
+            value: autoFollow,
+            onChanged: (v) async {
+              try {
+                await ref.read(apiServiceProvider).setAutoFollowProducts(v);
+              } catch (_) {
+                _snack(lang.tr("Le réglage n'a pas pu être enregistré.", 'The setting could not be saved.'));
+              }
+              ref.invalidate(notificationPreferencesProvider);
+            },
           ),
           SikaListRow(
             icon: Icons.receipt_long_outlined,

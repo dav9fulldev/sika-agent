@@ -4,6 +4,12 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Notifications push (Firebase Cloud Messaging) : google-services.json n'est pas dans le dépôt
+// (téléchargé depuis la console Firebase en local, secret GitHub en CI). Sans lui, l'app fonctionne sans push.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
+
 // Clé de signature release (jamais dans le dépôt) : android/key.properties en local, secrets GitHub en CI.
 // Sans elle, l'APK release est signé avec la clé de debug (installable, mais Google Sign-In ne l'acceptera pas).
 def keystoreProperties = new Properties()

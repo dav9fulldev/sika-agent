@@ -37,6 +37,7 @@ class ApiConstants {
   static const String paypalVault = '/api/v1/paypal/vault';
   static const String paypalWebProducts = '/api/v1/paypal/web-products';
   static const String priceWatches = '/api/v1/shopping/price-watches';
+  static const String notifications = '/api/v1/notifications';
   static const String paypalSubscriptions = '/api/v1/paypal/subscriptions';
 
   // Perception SMS

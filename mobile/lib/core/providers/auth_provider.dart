@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/push_notifications.dart';
 import '../services/secure_storage_service.dart';
 import '../utils/network_error.dart';
 
@@ -600,6 +601,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Déconnexion sécurisée (Log Out)
   Future<void> logout() async {
+    // Ce téléphone ne doit plus recevoir les notifications de ce compte
+    await PushNotifications.instance.unregister(_authedApi);
     try {
       await _authedApi.logout();
     } catch (_) {}

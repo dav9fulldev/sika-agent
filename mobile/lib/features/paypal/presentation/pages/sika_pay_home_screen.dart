@@ -11,7 +11,7 @@ import '../../providers/paypal_checkout_provider.dart';
 import '../../../../core/widgets/sika_pay_brand.dart';
 import '../widgets/sika_pay_ui.dart';
 import 'agent_authorization_screen.dart';
-import 'price_alerts_screen.dart';
+import 'notifications_screen.dart';
 import 'subscription_screen.dart';
 import 'paypal_checkout_screen.dart';
 
@@ -41,7 +41,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
     final name = (user?.name ?? '').trim().split(' ').first;
     final kycStatus = user?.kycStatus ?? 'none';
-    final unseenAlerts = (ref.watch(priceWatchesProvider).valueOrNull?['unseen'] as num?)?.toInt() ?? 0;
+    final unseenAlerts = (ref.watch(notificationsProvider).valueOrNull?['unread'] as num?)?.toInt() ?? 0;
     final status = ref.watch(paypalStatusProvider);
     final history = ref.watch(paypalHistoryProvider);
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -54,6 +54,7 @@ class SikaPayHomeScreen extends ConsumerWidget {
             ref.invalidate(paypalStatusProvider);
             ref.invalidate(paypalHistoryProvider);
             ref.invalidate(priceWatchesProvider);
+            ref.invalidate(notificationsProvider);
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -64,15 +65,15 @@ class SikaPayHomeScreen extends ConsumerWidget {
                 const SikaPayWordmark(fontSize: 21),
                 const Spacer(),
                 IconButton(
-                  tooltip: lang.tr('Alertes de prix', 'Price alerts'),
+                  tooltip: lang.tr('Notifications', 'Notifications'),
                   icon: Badge(
                     isLabelVisible: unseenAlerts > 0,
                     label: Text('$unseenAlerts'),
                     child: const Icon(Icons.notifications_none_rounded),
                   ),
                   onPressed: () async {
-                    await PriceAlertsScreen.open(context);
-                    ref.invalidate(priceWatchesProvider);
+                    await NotificationsScreen.open(context);
+                    ref.invalidate(notificationsProvider);
                   },
                 ),
                 InkWell(

@@ -13,6 +13,7 @@ from app.routes.perception_router import router as perception_router
 from app.routes.user_router import router as user_router
 from app.routes.paypal_router import router as paypal_router
 from app.routes.shopping_router import router as shopping_router
+from app.routes.notifications_router import router as notifications_router
 from app.database import Base, engine
 from app import models as _all_models  # noqa: F401  (enregistre toutes les tables avant create_all)
 
@@ -153,6 +154,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 app.include_router(sika_router)
 app.include_router(paypal_router)
 app.include_router(shopping_router)
+app.include_router(notifications_router)
 app.include_router(perception_router)
 app.include_router(user_router)
 

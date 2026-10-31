@@ -94,5 +94,7 @@ backend/app/data/
 
 # Clés de signature Android (jamais dans le dépôt)
 key.properties
+# Configuration Firebase de l'app Android (téléchargée depuis la console, secret GitHub en CI)
+google-services.json
 *.jks
 *.keystore

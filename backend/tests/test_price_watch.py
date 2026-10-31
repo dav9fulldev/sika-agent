@@ -109,10 +109,10 @@ def test_webhook_rejects_unsigned_and_triggers_once(setup):
     assert client.post("/api/v1/shopping/channel3/webhook", content=body,
                        headers={**headers, "svix-signature": "v1,AAAA"}).status_code == 401
     r = client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers)
-    assert r.status_code == 200 and r.json()["outcome"] == "MATCHED_1_TRIGGERED_0"   # 55 > 50 : pas encore
+    assert r.status_code == 200 and r.json()["outcome"] == "MATCHED_1_TRIGGERED_0_NOTIFIED_1"   # 55 > 50 : pas encore, mais baisse signalée
 
     body, headers = _signed(_price_event("evt_2", 47.99), msg_id="msg_2")
-    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1"
+    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1_NOTIFIED_1"
     again = client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers)
     assert again.json()["outcome"] == "DUPLICATE"
 
@@ -129,7 +129,7 @@ def test_back_in_stock_alert_and_unconfigured_secret(setup, monkeypatch):
     event = {"id": "evt_3", "type": "offer.availability.changed",
              "data": {"subject": {"product_id": "p1", "domain": "store-b.com"}, "previous": "OutOfStock", "current": "InStock"}}
     body, headers = _signed(event, msg_id="msg_3")
-    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1"
+    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1_NOTIFIED_1"
     monkeypatch.setattr(pws.settings, "CHANNEL3_WEBHOOK_SECRET", None)
     assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).status_code == 503
 
@@ -147,7 +147,7 @@ def test_legacy_price_changed_event_is_handled_and_deduplicated_on_svix_id(setup
     legacy = {"type": "price.changed", "canonical_product_id": "p1", "domain": "store-d.com", "old_price": 59.0,
               "new_price": 49.5, "currency": "USD", "buy_url": "https://buy.example/d", "timestamp": "2026-10-27T15:49:00Z"}
     body, headers = _signed(legacy, msg_id="msg_legacy_1")
-    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1"
+    assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "MATCHED_1_TRIGGERED_1_NOTIFIED_1"
     assert client.post("/api/v1/shopping/channel3/webhook", content=body, headers=headers).json()["outcome"] == "DUPLICATE"
     w = client.get("/api/v1/shopping/price-watches", headers=_auth(1)).json()["watches"][0]
     assert w["status"] == "triggered" and w["last_price"] == "49.50" and w["last_merchant"] == "store-d.com"
