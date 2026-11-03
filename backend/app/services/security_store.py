@@ -235,10 +235,144 @@ class RedisSecurityStore(BaseSecurityStore):
             logger.warning(f"[REDIS WARN] Erreur lors de la suppression de l'OTP: {e}")
 
 
-def create_security_store(env: Optional[str] = None, redis_url: Optional[str] = None) -> BaseSecurityStore:
+class DatabaseSecurityStore(BaseSecurityStore):
+    """Implémentation partagée adossée à PostgreSQL (table security_entries), sans serveur Redis.
+
+    Les instances Cloud Run partagent la même base : révocations, échecs et limites restent cohérents
+    entre instances et survivent aux redémarrages. Chaque mise à jour verrouille sa ligne (SELECT … FOR UPDATE).
+    """
+
+    def __init__(self, engine=None):
+        from ..database import engine as default_engine
+        from ..models.security_entry import SecurityEntryModel
+        self._engine = engine or default_engine
+        self._model = SecurityEntryModel
+
+    @staticmethod
+    def _key(kind: str, raw: str) -> str:
+        import hashlib
+        return f"{kind}:{hashlib.sha256(raw.encode()).hexdigest()}"
+
+    @staticmethod
+    def _now():
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).replace(tzinfo=None)  # colonnes DateTime sans fuseau (UTC)
+
+    def _live(self, db, key: str, lock: bool = False):
+        query = db.query(self._model).filter(self._model.key == key)
+        if lock:
+            query = query.with_for_update()
+        row = query.first()
+        if row and row.expires_at <= self._now():
+            db.delete(row)
+            db.flush()
+            return None
+        return row
+
+    def _increment(self, key: str, window_seconds: int, refresh_expiry: bool) -> int:
+        from datetime import timedelta
+        from sqlalchemy.exc import IntegrityError
+        from sqlalchemy.orm import Session
+        for _ in range(2):  # une seconde tentative si deux instances créent la même ligne en même temps
+            with Session(self._engine) as db:
+                row = self._live(db, key, lock=True)
+                expiry = self._now() + timedelta(seconds=window_seconds)
+                if row is None:
+                    row = self._model(key=key, count=1, expires_at=expiry)
+                    db.add(row)
+                else:
+                    row.count += 1
+                    if refresh_expiry:
+                        row.expires_at = expiry
+                try:
+                    db.commit()
+                    return row.count
+                except IntegrityError:
+                    db.rollback()
+        return 1
+
+    def add_revoked_token(self, token_identifier: str, expire_seconds: int = 259200) -> None:
+        from datetime import timedelta
+        from sqlalchemy.orm import Session
+        key = self._key("revoked", token_identifier)
+        with Session(self._engine) as db:
+            row = db.get(self._model, key)
+            expiry = self._now() + timedelta(seconds=expire_seconds)
+            if row:
+                row.expires_at = max(row.expires_at, expiry)
+            else:
+                db.add(self._model(key=key, count=1, expires_at=expiry))
+            db.commit()
+
+    def is_token_revoked(self, token_identifier: str) -> bool:
+        from sqlalchemy.orm import Session
+        with Session(self._engine) as db:
+            row = db.get(self._model, self._key("revoked", token_identifier))
+            return bool(row and row.expires_at > self._now())
+
+    def record_failure(self, key: str, window_seconds: int = 900) -> int:
+        return self._increment(self._key("failures", key), window_seconds, refresh_expiry=True)
+
+    def get_failures(self, key: str) -> int:
+        from sqlalchemy.orm import Session
+        with Session(self._engine) as db:
+            row = db.get(self._model, self._key("failures", key))
+            return row.count if row and row.expires_at > self._now() else 0
+
+    def reset_failures(self, key: str) -> None:
+        self._delete(self._key("failures", key))
+
+    def check_rate_limit(self, key: str, max_requests: int, window_seconds: int) -> bool:
+        # Fenêtre fixe, comme l'implémentation Redis (INCR + EXPIRE)
+        return self._increment(self._key("rate", key), window_seconds, refresh_expiry=False) <= max_requests
+
+    def clear(self) -> None:
+        from sqlalchemy.orm import Session
+        with Session(self._engine) as db:
+            db.query(self._model).delete()
+            db.commit()
+
+    def store_otp(self, email: str, otp: str, expire_seconds: int = 900) -> None:
+        import hashlib
+        from datetime import timedelta
+        from sqlalchemy.orm import Session
+        key = self._key("otp", email)
+        with Session(self._engine) as db:
+            row = db.get(self._model, key) or self._model(key=key, count=0)
+            row.value = hashlib.sha256(otp.encode()).hexdigest()
+            row.expires_at = self._now() + timedelta(seconds=expire_seconds)
+            db.merge(row)
+            db.commit()
+
+    def verify_otp(self, email: str, otp: str) -> bool:
+        import hashlib
+        import hmac
+        from sqlalchemy.orm import Session
+        with Session(self._engine) as db:
+            row = db.get(self._model, self._key("otp", email))
+            if not row or row.expires_at <= self._now() or not row.value:
+                return False
+            return hmac.compare_digest(row.value, hashlib.sha256(otp.encode()).hexdigest())
+
+    def clear_otp(self, email: str) -> None:
+        self._delete(self._key("otp", email))
+
+    def _delete(self, key: str) -> None:
+        from sqlalchemy.orm import Session
+        with Session(self._engine) as db:
+            db.query(self._model).filter(self._model.key == key).delete()
+            db.commit()
+
+
+def create_security_store(env: Optional[str] = None, redis_url: Optional[str] = None,
+                          store_kind: Optional[str] = None) -> BaseSecurityStore:
     """Factory instanciant le store approprié selon la configuration de l'environnement."""
     current_env = (env or settings.ENV).lower().strip()
     target_redis_url = redis_url or settings.REDIS_URL
+
+    if (store_kind or settings.SECURITY_STORE) == "database":
+        # Table PostgreSQL partagée par toutes les instances : pas de serveur Redis à faire tourner
+        return DatabaseSecurityStore()
 
     if current_env == "production":
         if not target_redis_url:

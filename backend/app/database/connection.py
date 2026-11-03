@@ -1,3 +1,4 @@
+import os
 """
 Database Connection & Engine Management for SIKA AI Backend.
 Supports PostgreSQL (Cloud SQL) and SQLite (Development Fallback).
@@ -28,8 +29,9 @@ else:
             echo=False,
             pool_pre_ping=True,
             pool_recycle=1800,
-            pool_size=10,
-            max_overflow=20
+            # Taille réglable : la plus petite instance Cloud SQL (db-f1-micro) n'accepte que 25 connexions
+            pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+            max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20"))
         )
         with engine.connect() as conn:
             target_info = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL
