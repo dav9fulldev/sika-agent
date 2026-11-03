@@ -29,7 +29,7 @@ class Settings:
     3. Validation stricte :
        - JWT_SECRET_KEY obligatoire (>= 32 caractères, non-par défaut).
        - DATABASE_URL obligatoire (PostgreSQL/MySQL, rejet absolu de SQLite).
-       - REDIS_URL obligatoire (store distribué anti-bruteforce multi-instance).
+       - Store de sécurité distribué obligatoire : REDIS_URL, ou SECURITY_STORE=database (table PostgreSQL).
     """
 
     def __init__(self, **overrides):
@@ -58,6 +58,9 @@ class Settings:
         )
 
         # Redis (Multi-Instance Distributed Store)
+        # Store de sécurité partagé entre instances (révocations, échecs de connexion, rate limits, OTP) :
+        # « redis » (Memorystore) ou « database » (table PostgreSQL, sans serveur Redis à payer)
+        self.SECURITY_STORE: str = overrides.get("SECURITY_STORE", os.getenv("SECURITY_STORE", "redis")).lower().strip()
         self.REDIS_URL: Optional[str] = resolved_secrets.get(
             "REDIS_URL",
             overrides.get("REDIS_URL", os.getenv("REDIS_URL", None))
@@ -237,10 +240,11 @@ class Settings:
                 raise ValueError("[SECURITY FATAL] SQLite est interdit en production. DATABASE_URL doit pointer vers PostgreSQL.")
 
             # 3. Exigence stricte de Redis en production
-            if not self.REDIS_URL or not self.REDIS_URL.strip():
+            if self.SECURITY_STORE != "database" and (not self.REDIS_URL or not self.REDIS_URL.strip()):
                 raise ValueError(
                     "[SECURITY FATAL] En production (ENV=production), REDIS_URL est obligatoire "
-                    "pour garantir le stockage distribué multi-instances des révocations et rate limits."
+                    "(ou SECURITY_STORE=database) pour garantir le stockage distribué multi-instances "
+                    "des révocations et rate limits."
                 )
 
 

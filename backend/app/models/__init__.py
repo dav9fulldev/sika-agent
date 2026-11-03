@@ -22,6 +22,7 @@ from .price_watch import PriceWatchModel, ShoppingWebhookEventModel, UserNotific
 from .paypal_subscription import PayPalSubscriptionModel
 from .paypal_vault import PayPalVaultModel
 from .dashboard_login_code import DashboardLoginCodeModel
+from .security_entry import SecurityEntryModel
 
 __all__ = [
     "PayPalCheckoutModel",
